@@ -1,0 +1,113 @@
+---
+sidebar_position: 6
+sidebar_label: ER 节点骨架（实时）
+---
+
+import ERNodePlayground from '@site/src/components/ERNodePlayground';
+
+# Entity 领域图元 · 可复制 ER 节点骨架（实时）
+
+`ice-entity-designer` 的 ER 图里，每个实体就是 ice-render 内核上的一个**自定义图元**：表头 + 字段列表，
+自带字段约束标记（PK / FK / UQ / AI / NN）与 `toEntityObject()`，并能一键 `clone()` 出副本骨架。
+落到序列化时，整张图会被归一化成符合 TypeORM `EntitySchema` 规范的普通对象。
+
+下面这个 playground 是 `ice-entity-designer/src/er-component/Entity.ts` 与
+`src/utils/serialization_util.ts` 的**忠实复刻**，跑在同一个 UMD 内核上：
+
+<ERNodePlayground />
+
+- **复制节点**：把选中实体的 `entityName` + `fields` 深拷贝，生成一个 `<name>_copy` 骨架，偏移摆放。
+- **＋ / － 字段**：对选中实体命令式追加 / 删除字段，画布与右侧 TypeORM Schema 同步刷新。
+- 右侧面板即 `toSchemaObject([...nodes])` 的实时输出，可直接 `new EntitySchema(obj)`。
+
+## 节点骨架：一个继承 ICEGroup 的领域图元
+
+ER 节点本质是一个 `extends ICE.ICEGroup` 的组件，构造时用 `merge` 把默认样式与传入 props 合并，
+再 `syncEntityNameAndFields()` 把「表头文本 + 表头背景 + 分隔线 + 每个字段一行文本」拼成子节点：
+
+```jsx title="EREntityNode（节选自 ERNodePlayground）" {1,3,14,22}
+class EREntityNode extends ICE.ICEGroup {
+  constructor(props) {
+    const param = mergeDeep(
+      { entityName: 'Entity Name', fields: [], width: 250,
+        style: { strokeStyle: '#334155', fillStyle: '#ffffff', radius: 8, lineWidth: 1.5 },
+        headerStyle: { textColor: '#0f172a', backgroundColor: '#f1f5f9', fontSize: 18, fontWeight: 'bold', paddingTop: 12, paddingLeft: 14, paddingRight: 14, paddingBottom: 12 },
+        fieldStyle: { textColor: '#334155', fontSize: 16, paddingTop: 9, paddingLeft: 14, paddingRight: 14 },
+        dividerStyle: { strokeStyle: '#cbd5e1', fillStyle: '#cbd5e1', lineWidth: 1 } },
+      props, { transformable: false });
+    super(param);
+    this.syncEntityNameAndFields();
+  }
+
+  fieldDisplay(field) {
+    const tags = [];
+    if (field.primary) tags.push('PK');
+    if (field.foreignKey) tags.push('FK');
+    if (field.unique) tags.push('UQ');
+    if (field.autoIncrement) tags.push('AI');
+    if (field.nullable === false) tags.push('NN');
+    const keyText = tags.length ? `${tags.join(' ')} ` : '';
+    const typeText = field.type ? `${field.type}${field.length ? `(${field.length})` : ''}` : '';
+    return { text: `${keyText}${field.name}${typeText ? `  ${typeText}` : ''}` };
+  }
+
+  toEntityObject() {
+    const result = { name: this.state.entityName, columns: {} };
+    (this.state.fields || []).forEach((f) => {
+      const col = {};
+      if (f.type !== undefined) col.type = f.type;
+      if (f.primary) col.primary = true;
+      if (f.autoIncrement) { col.generated = true; col.strategy = 'increment'; }
+      if (f.nullable === false) col.nullable = false;
+      if (f.unique) col.unique = true;
+      result.columns[f.name] = col;
+    });
+    return result;
+  }
+
+  // 深拷贝出一个副本骨架
+  clone(opts) {
+    const fields = (this.state.fields || []).map((f) => ({ ...f }));
+    return new EREntityNode({
+      left: (this.state.left || 0) + (opts?.dx || 0),
+      top: (this.state.top || 0) + (opts?.dy || 0),
+      entityName: (this.state.entityName || 'Entity') + '_copy',
+      fields,
+    });
+  }
+}
+```
+
+## TypeORM 序列化：画布约定 → EntitySchema
+
+字段类型按 `TYPE_MAP` 归一化（`number → int`、`string → varchar`、`decimal(12,2) → precision+scale` 等），
+约束直接落到列上；关系（one-to-many / many-to-one …）按「外键归属」规则补 `joinColumn`——
+这些都在 `serialization_util.toSchemaObject()` 里完成。单实体维度等价于：
+
+```jsx title="toSchemaObject（单实体维度）"
+function normalizeColumn(field) {
+  const column = {};
+  const type = TYPE_MAP[String(field.type).toLowerCase()] || field.type;
+  if (type !== undefined) column.type = type;
+  if (field.primary) column.primary = true;
+  if (field.autoIncrement) { column.generated = true; column.strategy = 'increment'; }
+  if (field.nullable === false) column.nullable = false;
+  if (field.unique) column.unique = true;
+  return column;
+}
+
+function toSchemaObject(nodes) {
+  return nodes.map((n) => {
+    const obj = n.toEntityObject();
+    const columns = {};
+    Object.keys(obj.columns).forEach((k) => { columns[k] = normalizeColumn(obj.columns[k]); });
+    return { name: obj.name, columns };
+  });
+}
+// 用法：new EntitySchema(toSchemaObject([userNode, userNode_copy])[0])
+```
+
+## 延伸
+
+- 这条「基于内核二次开发」的路线，完整说明见 [基于内核二次开发](/docs/advanced/secondary-development)。
+- 真实实现：`ice-entity-designer` 仓库 `src/er-component/Entity.ts`（节点图元）与 `src/utils/serialization_util.ts`（TypeORM 序列化）。
