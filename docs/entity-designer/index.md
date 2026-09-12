@@ -8,9 +8,9 @@ sidebar_position: 1
 
 MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
-## 一个完整的实时例子（就是仓库里的 `tests/entity-editor.html`）
+## 一个完整的实时例子（就是仓库里的 `examples/entity-editor.html`）
 
-下面这个 iframe 直接嵌入了 `ice-entity-designer` 仓库 `tests/entity-editor.html` 的**完整代码**：工具栏（新增 / 删除 / 撤销 / 重做 / 校验 / 保存 / 加载 / 输出 Schema / 重置视图）、四种自动布局（水平 / 垂直 / 径向 / 力导向）、连接关系、滚轮缩放 + 拖拽平移，右侧 antd 面板可编辑实体字段与关系属性，并实时切换到「序列化 JSON / TypeORM Schema」标签页。初始已加载一套 30 张表的电商域模型，你可以直接改、直接连、直接看 Schema 落地：
+下面这个 iframe 直接嵌入了 `ice-entity-designer` 仓库 `examples/entity-editor.html` 的**完整代码**：工具栏（新增 / 删除 / 撤销 / 重做 / 校验 / 保存 / 加载 / 输出 Schema / 重置视图）、四种自动布局（水平 / 垂直 / 径向 / 力导向）、连接关系、滚轮缩放 + 拖拽平移，右侧 antd 面板可编辑实体字段与关系属性，并实时切换到「序列化 JSON / TypeORM Schema」标签页。初始已加载一套 30 张表的电商域模型，你可以直接改、直接连、直接看 Schema 落地：
 
 <iframe
   src="/ied/entity-editor.html"
