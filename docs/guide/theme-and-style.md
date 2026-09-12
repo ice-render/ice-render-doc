@@ -2,6 +2,8 @@
 sidebar_position: 8
 ---
 
+import IceCanvas from '@site/src/components/IceCanvas';
+
 # 主题与样式机制
 
 ice-render 的样式机制是「**透传 + 增强**」，主题机制是「**三层 design token + 命名主题**」。本文说明两者的设计、用法与优先级链。
@@ -58,6 +60,8 @@ new ICERect({ style: { fillStyle: '#fff', shadow: 'md' } });
 
 ### 虚线 / 蚂蚁线 / 水管壁
 
+`ICEPolyLine` 等路径组件支持静态虚线、流动蚂蚁线（marching ants）与水管壁三种模式：
+
 ```js
 // 静态虚线
 new ICEPolyLine({ lineDash: [10, 6], style: { strokeStyle: '#888', lineWidth: 2 } });
@@ -80,7 +84,61 @@ new ICEPolyLine({
 });
 ```
 
+流动蚂蚁线只需 `lineDash` + `lineDashFlow: true`，引擎内部的动画管理器会自动每帧重绘——**无需手写 `setInterval` + `lineDashOffset`**。下面这条线段是真实流动效果（不是截图）：
+
+<IceCanvas
+  height={200}
+  setup={(ICE, ice) => {
+    const { ICEPolyLine } = ICE;
+    ice.addChild(new ICEPolyLine({
+      points: [[20, 100], [700, 100]],
+      lineWidth: 5, stroke: true,
+      lineDash: [15, 5], lineDashFlow: true, lineDashFlowSpeed: 60,
+      style: { strokeStyle: '#2563eb', lineWidth: 5 },
+    }));
+  }}
+/>
+
+```jsx title="流动蚂蚁线" {3-5}
+// lineDash 定义虚线段，lineDashFlow 开启自动流动
+lineDash: [15, 5],
+lineDashFlow: true,
+lineDashFlowSpeed: 60, // 像素/秒
+```
+
 ### 渐变
+
+ice-render 把渐变做成**可序列化**的声明式对象 `fillGradient`，坐标是**组件本地坐标**（左上角为 `(0,0)`）。下面这条矩形是真实渲染的线性渐变：
+
+<IceCanvas
+  height={160}
+  setup={(ICE, ice) => {
+    const { ICERect } = ICE;
+    ice.addChild(new ICERect({
+      left: 60, top: 40, width: 320, height: 60, fill: true,
+      style: {
+        fillGradient: {
+          type: 'linear', from: [0, 0], to: [320, 0],
+          stops: [[0, 'red'], [0.5, 'yellow'], [1, 'green']],
+        },
+      },
+    }));
+  }}
+/>
+
+```jsx title="声明式线性渐变" {3-9}
+// type: 'linear' | 'radial' | 'conic'；from/to 为组件本地坐标
+style: {
+  fillGradient: {
+    type: 'linear', from: [0, 0], to: [320, 0],
+    stops: [[0, 'red'], [0.5, 'yellow'], [1, 'green']],
+  },
+}
+```
+
+也支持 `radial`（含 `center` / `radius`）与 `conic`（含 `startAngle`）——`strokeGradient` 同样适用，用于描边渐变。
+
+复杂场景也可用命令式 `createLinearGradient` 拿到原生渐变对象再塞进 `style.fillStyle`：
 
 ```js
 const g = ice.createLinearGradient(0, 0, 100, 0);
@@ -88,6 +146,35 @@ g.addColorStop(0, '#e24b4a');
 g.addColorStop(1, '#7f77dd');
 new ICERect({ style: { fillStyle: g } });
 ```
+
+### 图片
+
+ice-render 用 `ICEImage` 组件直接承载位图，`src` 接受普通 URL 或 data URL（下面用内联 SVG 作 demo）：
+
+<IceCanvas
+  height={220}
+  setup={(ICE, ice) => {
+    const { ICEImage } = ICE;
+    const svg =
+      'data:image/svg+xml;utf8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">' +
+        '<rect width="64" height="64" fill="#4f8cff"/>' +
+        '<circle cx="32" cy="32" r="20" fill="#ffffff"/></svg>'
+      );
+    ice.addChild(new ICEImage({ left: 300, top: 30, width: 160, height: 160, src: svg }));
+  }}
+/>
+
+```jsx title="图片组件" {1-7}
+const { ICEImage } = ICE;
+ice.addChild(new ICEImage({
+  left: 300, top: 30, width: 160, height: 160,
+  src: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg ...>...</svg>'),
+}));
+```
+
+图案平铺可在业务层用多个 `ICEImage` 平铺实现；`ICEImage` 还支持 `clipType:'circle'` 圆形裁剪与雪碧图裁剪（`sx/sy/sw/sh`）。
 
 ### 圆角
 

@@ -104,7 +104,7 @@ import TabItem from '@theme/TabItem';
 
 ### 5. 实时渲染（本仓库特色）
 
-普通代码块只展示文本；要“既看代码又看效果”，用本仓库封装的 `<IceCanvas>`（见[形状·实时示例](/docs/examples/shapes-live)）。它本质是一个 `BrowserOnly` 包裹的客户端组件，加载 `static/ice-render.js` 后即可在浏览器里跑真实 ICE 代码。
+普通代码块只展示文本；要“既看代码又看效果”，用本仓库封装的 `<IceCanvas>`（见[核心概念 · 第一个实时示例](/docs/guide/core-concepts) 与[图元](/docs/guide/shapes)）。它本质是一个 `BrowserOnly` 包裹的客户端组件，加载 `static/ice-render.js` 后即可在浏览器里跑真实 ICE 代码。
 
 ---
 
@@ -118,17 +118,74 @@ import TabItem from '@theme/TabItem';
 
 **3. 作用域注入 `ICE`** —— swizzle 了 `@theme/ReactLiveScope`，用 getter 延迟暴露 `window.ICE`，因此 `jsx live` 块里能直接写 `ICE.ICERect` / `new ICE.ICE()`（首屏前 `window.ICE` 可能未就绪，块内有 `if (!window.ICE) return` 兜底）。
 
-**4. 用法** —— 语言写 `jsx live`，`title` 可选；完整可运行示例见 [可编辑运行](/docs/examples/live-playground)：
+**4. 用法** —— 语言写 `jsx live`，`title` 可选。下面两个块就是真实可编辑示例，改一改右侧立刻重渲染：
+
+### React 片段
+
+```jsx live
+function Counter() {
+  const [n, setN] = React.useState(0);
+  return (
+    <button onClick={() => setN(n + 1)} style={{ padding: 8, fontSize: 16 }}>
+      点击了 {n} 次
+    </button>
+  );
+}
+```
+
+### ICE 片段（直接操作内核）
+
+下面这段在 live 块里创建了一个 `ICE` 实例并画了一个矩形——改 `fillStyle` 或尺寸，画布立刻重绘：
+
+```jsx live
+function IceDemo() {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!window.ICE) return;
+    const ice = new window.ICE.ICE();
+    ice.init(ref.current);
+    ice.addChild(
+      new window.ICE.ICERect({
+        left: 20,
+        top: 20,
+        width: 160,
+        height: 100,
+        radius: 12,
+        fill: true,
+        stroke: true,
+        style: { fillStyle: '#4f8cff', strokeStyle: '#1f4fb0', lineWidth: 2 },
+      })
+    );
+    return () => ice.destroy();
+  }, []);
+  return (
+    <canvas
+      ref={ref}
+      width={200}
+      height={140}
+      style={{ border: '1px solid #ccc', borderRadius: 8 }}
+    />
+  );
+}
+```
+
+### 用法细节
+
+围栏语言写 `jsx live` 即可（可加 `title`）：
 
 ````mdx
-```jsx live
+```jsx live title="可编辑示例"
 function Demo() {
-  return <button style={{ padding: 8 }}>点我</button>;
+  return <button>点我</button>;
 }
 ```
 ````
 
-> 已通过 swizzle `@theme/ReactLiveScope` 把 `ICE` 注入 live 块作用域，可直接编辑 ICE 代码；不想引入可编辑能力时，仍可用 `<IceCanvas>` 展示固定示例（见[形状 · 实时示例](/docs/examples/shapes-live)）。
+- 默认「内联模式」：代码块**最后一行表达式**被渲染（如上例的 `<Counter />`）。
+- 需要多条语句 / 自己 `render` 时，加 `noInline`：` ```jsx live noInline `，然后在代码里调用 `render(<Demo />)`。
+- 想让更多标识符进作用域（如某个自定义组件），swizzle `@theme/ReactLiveScope` 即可（本仓库已注入 `ICE`）。
+
+> 和 `<IceCanvas>`（见[核心概念 · 第一个实时示例](/docs/guide/core-concepts)）的区别：那里用 `<IceCanvas>` 组件封装了加载 / 生命周期 / `destroy`，适合「展示一个固定示例」；这里的 `jsx live` 适合「让读者自己改代码看效果」。两者底层都是同一个 ICE 内核。
 
 ---
 

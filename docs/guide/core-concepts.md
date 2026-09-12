@@ -2,9 +2,53 @@
 sidebar_position: 1
 ---
 
+import IceCanvas from '@site/src/components/IceCanvas';
+
 # 核心概念
 
 ICERender 的编程模型可以概括为：**React 式的组件/props/state + W3C 式的事件模型 + 场景树**。
+
+## 第一个实时示例
+
+下面这个画布由 **ice-render 内核在你的浏览器里实时渲染**（纯前端、不发请求）。它演示了三个最核心的图元：`ICERect`（矩形）、`ICECircle`（正圆）、`ICEText`（文本）——**试着拖动它们，天生可交互**：
+
+<IceCanvas
+  height={300}
+  setup={(ICE, ice) => {
+    const { ICERect, ICECircle, ICEText } = ICE;
+    ice.addChild(new ICERect({
+      left: 40, top: 40, width: 160, height: 110, fill: true, stroke: true,
+      style: { fillStyle: '#4f8cff', strokeStyle: '#1f4fb0', lineWidth: 2 },
+    }));
+    ice.addChild(new ICECircle({
+      left: 270, top: 40, radius: 55, fill: true, stroke: true,
+      style: { fillStyle: '#ff7a59', strokeStyle: '#c2410c', lineWidth: 2 },
+    }));
+    ice.addChild(new ICEText({
+      text: 'ICE Render', left: 40, top: 200,
+      style: { fontSize: 40, fillStyle: '#1f2937', fontFamily: 'Arial' },
+    }));
+  }}
+/>
+
+驱动它的就是一段普通的 ICE API 调用，没有任何特殊封装：
+
+```jsx title="第一个实时示例" {1,5-13}
+import IceCanvas from '@site/src/components/IceCanvas';
+
+<IceCanvas
+  height={300}
+  setup={(ICE, ice) => {
+    const { ICERect, ICECircle, ICEText } = ICE;
+    ice.addChild(new ICERect({ left: 40, top: 40, width: 160, height: 110, fill: true, stroke: true,
+      style: { fillStyle: '#4f8cff', strokeStyle: '#1f4fb0', lineWidth: 2 } }));
+    ice.addChild(new ICECircle({ left: 270, top: 40, radius: 55, fill: true, stroke: true,
+      style: { fillStyle: '#ff7a59', strokeStyle: '#c2410c', lineWidth: 2 } }));
+  }}
+/>
+```
+
+`<IceCanvas>` 只在客户端（BrowserOnly）渲染，避免 Node 端访问 DOM；它负责加载 `static/ice-render.js`、创建 `ICE` 实例、把 `setup(ICE, ice, canvas)` 交给你，并在卸载时 `ice.destroy()` 释放画布。所有图元共享 `ICEComponent` 基类，统一支持 `transform`、`draggable`、`fill`/`stroke` 开关与可序列化渐变。更多图元见[图元手册](shapes.md)。
 
 ## 组件（ICEComponent）
 
