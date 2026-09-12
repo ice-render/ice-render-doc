@@ -14,6 +14,8 @@ const config = {
   favicon: 'img/favicon.ico',
   organizationName: 'ice-render',
   projectName: 'ice-render',
+  // 全局加载 ice-render 内核，供 `jsx live` 代码块直接使用 window.ICE（defer：HTML 解析后、水合前执行）
+  scripts: [{ src: '/ice-render.js', defer: true }],
 
   markdown: {
     mermaid: true,
@@ -21,7 +23,7 @@ const config = {
       onBrokenMarkdownLinks: 'warn',
     },
   },
-  themes: ['@docusaurus/theme-mermaid'],
+  themes: ['@docusaurus/theme-mermaid', '@docusaurus/theme-live-codeblock'],
 
   presets: [
     [

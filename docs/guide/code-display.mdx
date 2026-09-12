@@ -108,30 +108,17 @@ import TabItem from '@theme/TabItem';
 
 ---
 
-## 二、需安装：可编辑运行的代码块（live-codeblock）
+## 二、可编辑运行的代码块（live-codeblock）✅ 已启用
 
 适合给读者一个**能直接改、立刻看效果**的 React/JSX 沙箱。`@docusaurus/theme-live-codeblock` 基于 `react-live`，纯前端、无服务端。
 
-**1. 安装**（在你本地，本沙箱已拦截）：
+**1. 安装**：`@docusaurus/theme-live-codeblock@3.10.2` 已装入 `dependencies`（版本与 Docusaurus 对齐）。
 
-```bash
-npm install @docusaurus/theme-live-codeblock
-```
+**2. 启用** —— `themes` 已加入 `'@docusaurus/theme-live-codeblock'`；同时把 `ice-render.js` 以 `defer` 全局脚本加载，使 `window.ICE` 在任何页面都可用。
 
-**2. 启用** —— 在 `docusaurus.config.js` 的 `themes` 数组里追加：
+**3. 作用域注入 `ICE`** —— swizzle 了 `@theme/ReactLiveScope`，用 getter 延迟暴露 `window.ICE`，因此 `jsx live` 块里能直接写 `ICE.ICERect` / `new ICE.ICE()`（首屏前 `window.ICE` 可能未就绪，块内有 `if (!window.ICE) return` 兜底）。
 
-```js title="docusaurus.config.js" {1,6}
-// 已有：themes: ['@docusaurus/theme-mermaid']
-const config = {
-  // ...
-  themes: [
-    '@docusaurus/theme-mermaid',
-    '@docusaurus/theme-live-codeblock',
-  ],
-};
-```
-
-**3. 用法** —— 语言写 `jsx live`，`title` 可选：
+**4. 用法** —— 语言写 `jsx live`，`title` 可选；完整可运行示例见 [可编辑运行](/docs/examples/live-playground)：
 
 ````mdx
 ```jsx live
@@ -141,7 +128,7 @@ function Demo() {
 ```
 ````
 
-> ⚠️ `react-live` 的默认作用域不含 `ICE`。若要在这里直接编辑 ICE 代码，需要把 `ICE` 注入 `react-live` 的 `scope`（可在 swizzle 后的 `CodeBlock` 组件里传入），或改用本仓库的 `<IceCanvas>` 方案。
+> 已通过 swizzle `@theme/ReactLiveScope` 把 `ICE` 注入 live 块作用域，可直接编辑 ICE 代码；不想引入可编辑能力时，仍可用 `<IceCanvas>` 展示固定示例（见[形状 · 实时示例](/docs/examples/shapes-live)）。
 
 ---
 
@@ -207,5 +194,5 @@ graph TD
 | 多语言 Tabs | 无（需 .mdx） | ✅ 已启用 | `<Tabs>` / `<TabItem>` |
 | Mermaid | 无（已开 `mermaid:true`） | ✅ 已启用 | ` ```mermaid ` |
 | 实时渲染 | 无（`<IceCanvas>`） | ✅ 已启用 | `<IceCanvas setup={...} />` |
-| 可编辑运行 | `@docusaurus/theme-live-codeblock` | 🔲 需安装 | ` ```jsx live ` |
+| 可编辑运行 | `@docusaurus/theme-live-codeblock` | ✅ 已启用 | ` ```jsx live ` |
 | 导入真实源码 | `remark-code-import` | 🔲 需安装 | ` ```ts code-import ` |
