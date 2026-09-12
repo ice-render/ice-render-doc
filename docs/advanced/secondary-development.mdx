@@ -1,0 +1,240 @@
+---
+sidebar_position: 1
+sidebar_label: 基于内核二次开发
+---
+
+import IceCanvas from '@site/src/components/IceCanvas';
+
+# 基于 ice-render 内核二次开发
+
+> 本页回答一个问题：**怎么在 ice-render 这个“内核”之上，做出自己的图形编辑器？**
+>
+> 标准答案：**不要重写图元，把内核当底座，往上叠「领域组件 + 应用层 +（可选）框架绑定」**。
+> 本章用官方成品 [ice-entity-designer](https://github.com/ice-render/ice-entity-designer)（ER 建模工具）作为完整范例，把每一层都对应到内核能力。
+
+---
+
+## 一、内核给你什么，不给你什么
+
+ice-render 只负责「画什么」和「怎么交互」：
+
+- 图元基类 `ICEComponent` 及一族成品图元（`ICERect` / `ICECircle` / `ICEText` / `ICEGroup` / 连线族 …）
+- 坐标 / 变换 / 事件 / 脏矩形渲染 / 序列化等通用能力
+- **不绑定任何业务语义**
+
+二次开发要补的，正是「业务语义」这一层：
+
+| 你要做的 | 内核提供的钩子 |
+|---|---|
+| 定义领域图元（实体框、流程节点…） | 继承 `ICEComponent` / `ICERect` / `ICEGroup`，实现 `static typeId` + 序列化方法 |
+| 让图元能被反序列化 | `ice.registerType(typeId, Class)` |
+| 把交互串成「应用」（增删改 / 连接 / 校验 / 导出） | 自建一个 App 类，持有 `ICE` 实例，监听事件总线 `evtBus` |
+| 工程化打包 | 把内核 inline 进产物，或让上游 `import 'ice-render'` |
+| 接入 React / Vue | 客户端组件 + 生命周期对齐（见 §五） |
+
+---
+
+## 二、最小可运行：注册一个自定义图元
+
+下面这段在浏览器里直接跑（无需服务端）：定义一个 `Badge` 继承自 `ICERect`，用 `ice.registerType` 登记，再加进画布——运行后拖动它，天生可交互。
+
+<IceCanvas
+  height={240}
+  setup={(ICE, ice) => {
+    // 1) 定义领域图元：继承成品图元
+    class Badge extends ICE.ICERect {
+      static typeId = 'Badge';
+    }
+    // 2) 登记给内核（反序列化前提，见 §四）
+    ice.registerType(Badge.typeId, Badge);
+
+    // 3) 像用普通图元一样使用
+    ice.addChild(
+      new Badge({
+        left: 60,
+        top: 40,
+        width: 170,
+        height: 110,
+        radius: 14,
+        fill: true,
+        stroke: true,
+        style: { fillStyle: '#16a34a', strokeStyle: '#14532d', lineWidth: 2 },
+      })
+    );
+    ice.addChild(
+      new ICE.ICEText({
+        text: '自定义图元 Badge',
+        left: 74,
+        top: 86,
+        style: { fontSize: 18, fillStyle: '#ffffff', fontFamily: 'Arial' },
+      })
+    );
+  }}
+/>
+
+核心就两行：
+
+```js title="注册自定义图元" {1,5}
+class Badge extends ICE.ICERect {
+  static typeId = 'Badge'; // 序列化用的类型标识，全局唯一
+}
+// 登记后才能被 Serializer/Deserializer 识别
+ice.registerType(Badge.typeId, Badge);
+```
+
+> 类型标识 `typeId` 必须全局唯一。内核的 `Serializer` / `Deserializer` 通过 `COMPONENT_TYPE_MAPPING`（类名字符串 → 构造函数）做映射；**未 `registerType` 的自定义类型在反序列化时会被跳过并告警**：
+> `console.warn('[ICE] 反序列化跳过未注册的组件类型：Badge（请先 ice.registerType() 注册）')`。
+
+---
+
+## 三、entity-designer 是怎么叠出来的（范例拆解）
+
+[ice-entity-designer](https://github.com/ice-render/ice-entity-designer) 是「内核 + 领域层」的范本，结构正好对应上面的钩子：
+
+```
+src/
+├── er-component/
+│   ├── Entity.ts     # 领域图元：继承 ICEGroup，表头 + 字段列表 + 约束标记 + TypeORM 序列化
+│   └── Relation.ts   # 领域图元：继承连线族，基数 / 箭头 / 标签语义
+├── designer/
+│   └── EntityDesigner.ts  # 应用层：选择 / 增删改 / 连接 / 校验 / 历史 / 项目存取 / 变更订阅
+├── react/            # 可选：React 绑定（EntityDesignerCanvas 等）
+└── index.ts          # 对外导出（核心，不含 React）
+```
+
+它的 `EntityDesigner` 构造函数里，正是把领域图元登记给内核：
+
+```js title="src/designer/EntityDesigner.ts"
+constructor(ice) {
+  this.ice = ice;
+  this.ice.registerType(Entity.typeId, Entity);
+  this.ice.registerType(Relation.typeId, Relation);
+  this.ice.evtBus.on('mousedown', this.__mousedownHandler, this);
+}
+```
+
+应用层把建模闭环串起来（节选自其 README）：
+
+```js title="ice-entity-designer 用法"
+import { ICE, EntityDesigner } from 'ice-entity-designer';
+
+const ice = new ICE().init('canvas-1');
+const designer = new EntityDesigner(ice);
+
+const user = designer.createEntity({ entityName: 'User' });
+const role = designer.createEntity({ entityName: 'Role' });
+designer.createRelation({
+  sourceId: user.state.id,
+  targetId: role.state.id,
+  relationType: 'many-to-many',
+  joinTableName: 'user_roles',
+});
+
+const schema = designer.toSchemaObject(); // TypeORM Schema（对象），可直接 new EntitySchema(obj)
+const issues = designer.validate();       // 校验问题列表
+designer.serializeProject();              // 项目快照（字符串，可自动保存）
+```
+
+**关键原则**：entity-designer **不重复实现底层图元**，只在 `ICEGroup`、连线族与事件总线之上，收敛出 ER 建模最常用的交互。这正是二次开发应该有的姿势——内核负责「通用图形」，你只填「业务语义」。
+
+---
+
+## 四、序列化：让自定义图元可存可取
+
+二次开发迟早要保存 / 加载项目。内核已提供 `serializeProject()` / `loadProject()`，但前提是**自定义类型先登记**：
+
+```js
+// 顺序很重要：先 registerType，再反序列化
+ice.registerType('Badge', Badge);
+
+const snapshot = ice.serializeProject();        // 整张图 → JSON 字符串
+ice.loadProject(snapshot);                      // 从 JSON 还原（内部走 Deserializer）
+```
+
+注意 `Deserializer` 对未知类型是**宽容跳过 + 告警**，不会整库崩。所以发布插件 / 自定义图元时，务必在 `init` 阶段就 `registerType`，避免用户加载旧工程时丢节点。
+
+> 想做成「可插拔」的扩展？内核还提供 `PluginHost`：插件声明自定义图元类型，宿主代为 `registerType`，插件因此自动获得序列化 / 反序列化能力（见 `src/plugin/PluginHost.ts`）。
+
+---
+
+## 五、两种消费内核的方式
+
+### A. 直接依赖 `ice-render`（自己构建）
+
+```bash
+npm install ice-render
+```
+
+```js
+import { ICE, ICERect } from 'ice-render';
+```
+
+适合你自己的工程要独立打包、且愿意把 `ice-render` 作为依赖来管版本。
+
+### B. 消费「内核已内联」的产物（如 entity-designer）
+
+entity-designer 把 `ice-render` 在构建时 inline 进 `dist`，并 `export * from 'ice-render'`，所以调用方：
+
+```js
+import { ICE, EntityDesigner } from 'ice-entity-designer'; // 同源内核，无需再装 ice-render
+```
+
+好处：调用方永远拿到与本包一致的 `ICE` 实例，**避免「两个 ice-render 版本共存导致 `instanceof` 失真」**。做对外发布的产品时推荐这种形态。
+
+---
+
+## 六、接入 React（可选）
+
+内核不绑框架。若要 SPA 集成，包一层客户端组件即可。entity-designer 已内置 `ice-entity-designer/react`：
+
+```tsx title="React 集成"
+import { EntityDesignerCanvas, useEntityDesigner } from 'ice-entity-designer/react';
+
+function Toolbar() {
+  const designer = useEntityDesigner(); // 子树内直接取 EntityDesigner 实例
+  return <button onClick={() => designer?.addEntity({ entityName: 'User' })}>新增实体</button>;
+}
+
+export default function App() {
+  return (
+    <EntityDesignerCanvas
+      width={1200}
+      height={800}
+      onChange={({ snapshot, schema }) => save(snapshot)} // 模型变更（带循环保护）
+    >
+      <Toolbar />
+    </EntityDesignerCanvas>
+  );
+}
+```
+
+- `ref` 命令式 API：`addEntity` / `connect` / `updateEntity` / `toSchemaObject` / `undo` …
+- `useEntityDesigner()`：在子树内取 `EntityDesigner` 实例
+- 受控 `value` / 非受控 `defaultValue`，`onChange` 上报带循环保护
+- **StrictMode 安全**：引擎 `init` 幂等、`destroy` 解绑全局监听，双挂载无泄漏
+
+自己做绑定时，记住三条（与 `IceCanvas` 组件一致）：
+
+1. 用 `BrowserOnly`（Docusaurus）或 `dynamic(..., { ssr: false })`（Next.js）避免 SSR 访问 canvas；
+2. 卸载时调用 `ice.destroy()` 释放全局监听与帧循环；
+3. 同一 canvas 重复 `init` 直接返回自身，换 canvas 前先 `destroy`。
+
+---
+
+## 七、落地清单 / 易错点
+
+- [ ] 自定义图元实现 `static typeId` 且全局唯一
+- [ ] **反序列化前必须 `registerType`**（顺序：先登记，再 `loadProject` / `Deserializer`）
+- [ ] 序列化方法返回纯数据，不要把运行时对象 / DOM 引用塞进快照
+- [ ] 渲染模式：`renderMode: 'dirty-rect'`（默认，局部重绘）vs `'full'`（全量）；含文本 / 点集 / 半透明场景引擎会自动回退全量，无需手动处理
+- [ ] 多版本共存：发布成品建议 inline 内核，避免 `instanceof` 失真
+- [ ] 框架绑定：生命周期对齐 + SSR 关闭 + 卸载 `destroy`
+
+---
+
+## 延伸阅读
+
+- 实时示例：[形状 · 实时示例](/docs/examples/shapes-live)
+- 代码展示规范：[代码展示规范](/docs/guide/code-display)
+- 引擎架构：[运行时链路](/docs/architecture/runtime) · [序列化](/docs/architecture/serialization)
+- 范例仓库：[ice-entity-designer](https://github.com/ice-render/ice-entity-designer) · [ice-flow](https://github.com/ice-render/ice-flow)
