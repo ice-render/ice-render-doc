@@ -2,32 +2,37 @@
 sidebar_position: 1
 ---
 
-import ERNodePlayground from '@site/src/components/ERNodePlayground';
-
 # Entity Designer · ER 图设计器
 
-**Entity Designer 是基于 ice-render 内核构建的 ER（实体-关系）建模设计器**——它不重复实现底层图元，只在 `ICEGroup`、连线族与事件总线之上，收敛出数据库建模最常用的交互：实体表、字段、主外键约束、关系连线、对齐参考线、TypeORM Schema 实时序列化。
+**Entity Designer 是基于 ice-render 内核构建的 ER（实体-关系）建模设计器**——它不重复实现底层图元，只在 `ICEGroup`、连线族与事件总线之上，收敛出数据库建模最常用的交互：实体表、字段、主外键约束、关系连线、对齐参考线、自动布局、TypeORM Schema 实时序列化。
 
 MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
-## 一个酷炫的实时例子
+## 一个完整的实时例子（就是仓库里的 `tests/entity-editor.html`）
 
-下面这个 playground 是 `ice-entity-designer` 内部 `Entity.ts` 与 `serialization_util.ts` 的**忠实复刻**，跑在和官网同一套 UMD 内核（`window.ICE`）上。点「复制节点」会按字段列表深拷贝出一个骨架；「＋ / － 字段」对选中实体命令式增删字段；右侧面板即 `toSchemaObject()` **实时输出**的 TypeORM Schema，可直接 `new EntitySchema(obj)`：
+下面这个 iframe 直接嵌入了 `ice-entity-designer` 仓库 `tests/entity-editor.html` 的**完整代码**：工具栏（新增 / 删除 / 撤销 / 重做 / 校验 / 保存 / 加载 / 输出 Schema / 重置视图）、四种自动布局（水平 / 垂直 / 径向 / 力导向）、连接关系、滚轮缩放 + 拖拽平移，右侧 antd 面板可编辑实体字段与关系属性，并实时切换到「序列化 JSON / TypeORM Schema」标签页。初始已加载一套 30 张表的电商域模型，你可以直接改、直接连、直接看 Schema 落地：
 
-<ERNodePlayground />
+<iframe
+  src="/ied/entity-editor.html"
+  title="Entity Designer 实时编辑器"
+  loading="lazy"
+  style={{ width: '100%', height: '780px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}
+/>
 
-> 这就是 Entity Designer 的核心体验：**所见即所得地画 ER 图，画完直接拿到可落库的 TypeORM Schema。**
+> 这就是 Entity Designer 的完整能力：**所见即所得地画 ER 图，画完直接拿到可落库的 TypeORM Schema。** 首次加载会拉取 ~1.8MB 的 React / antd 运行时（已随文档静态托管，无需联网）。
 
 ## 核心能力
 
 | 能力 | 说明 |
 | --- | --- |
-| 实体表（Entity） | 表头 + 字段列表，PK / FK / UQ / AI / NN 标记一目了然 |
-| 字段编辑 | 名称、类型、长度、约束（主键、自增、唯一、非空、默认、外键） |
+| 实体表（Entity） | 表头 + 字段列表，PK / FK / UQ / AI / NN / GEN / IDX 标记一目了然 |
+| 字段编辑 | 名称、类型、长度、约束（主键、自增、唯一、非空、默认、外键、索引、注释） |
 | 关系连线 | one-to-many / many-to-one / one-to-one / many-to-many，Visio 折线或贝塞尔曲线 |
+| 自动布局 | 水平 / 垂直流程布局、径向树布局、力导向布局，一键排布 |
 | 对齐参考线 | `alignmentGuide` 自动吸附，拖拽排版像 IDE 一样顺手 |
-| 实时序列化 | `toSchemaObject()` 直接产出符合 `new EntitySchema(obj)` 的普通对象 |
-| 项目快照 | `serializeProject()` 输出可自动保存的项目 JSON，反序列化即可还原画布 |
+| 撤销 / 重做 | 完整历史栈，`Ctrl/Cmd+Z` 撤销、`Ctrl/Cmd+Y` 重做 |
+| 实时序列化 | `toSchemaObject()` / `toSchemaString()` 直接产出符合 `new EntitySchema(obj)` 的对象 |
+| 项目快照 | `serializeProject()` / `loadProject()` 输出并还原可自动保存的项目 JSON |
 | TypeORM 校验 | `validate()` 列出重复实体、悬空关系、缺外键等问题 |
 
 ## 快速开始
@@ -41,11 +46,10 @@ npm install ice-render ice-entity-designer
 
 ### 在浏览器里（无构建，UMD 全局 `IED`）
 
-把 `ice-entity-designer/dist/index.umd.js` 与 `ice-render` 的 UMD 放到页面里，用全局 `IED` 命名空间：
+把 `ice-entity-designer/dist/index.umd.js` 放到页面里（内核已 inline 进该 UMD，无需单独引 ice-render），用全局 `IED` 命名空间：
 
 ```html
-<canvas id="canvas-1" width="900" height="600"></canvas>
-<script src="./ice-render.umd.js"></script>
+<canvas id="canvas-1" width="1200" height="800"></canvas>
 <script src="./ice-entity-designer.umd.js"></script>
 <script>
   const ice = new IED.ICE().init('canvas-1');
@@ -55,9 +59,9 @@ npm install ice-render ice-entity-designer
   const user = designer.createEntity({ entityName: 'User' });
   const role = designer.createEntity({ entityName: 'Role' });
   designer.createRelation({
+    relationType: 'many-to-many',
     sourceId: user.state.id,
     targetId: role.state.id,
-    relationType: 'many-to-many',
     joinTableName: 'user_roles',
   });
 
@@ -78,9 +82,9 @@ const designer = new EntityDesigner(ice);
 const user = designer.createEntity({ entityName: 'User' });
 const role = designer.createEntity({ entityName: 'Role' });
 designer.createRelation({
+  relationType: 'many-to-many',
   sourceId: user.state.id,
   targetId: role.state.id,
-  relationType: 'many-to-many',
   joinTableName: 'user_roles',
 });
 
