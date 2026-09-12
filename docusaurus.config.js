@@ -71,6 +71,12 @@ const config = {
             label: '架构设计',
           },
           {
+            type: 'doc',
+            docId: 'entity-designer/index',
+            position: 'left',
+            label: 'Entity Designer',
+          },
+          {
             href: 'https://github.com/ice-render/ice-render',
             label: 'GitHub',
             position: 'right',
