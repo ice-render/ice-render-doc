@@ -1,0 +1,71 @@
+---
+sidebar_position: 1
+sidebar_label: 形状（实时）
+---
+
+import IceCanvas from '@site/src/components/IceCanvas';
+
+# 形状 · 实时示例
+
+下面的画布由 **ice-render 内核在你的浏览器里实时渲染**，不依赖任何服务端、不发任何请求——
+`ICE` 引擎与 gl-matrix 已在构建期内联进 `static/ice-render.js`，纯前端加载。
+
+<IceCanvas
+  height={300}
+  setup={(ICE, ice) => {
+    const { ICERect, ICECircle, ICEText } = ICE;
+
+    ice.addChild(
+      new ICERect({
+        left: 40,
+        top: 40,
+        width: 160,
+        height: 110,
+        fill: true,
+        stroke: true,
+        style: {
+          fillStyle: '#4f8cff',
+          strokeStyle: '#1f4fb0',
+          lineWidth: 2,
+        },
+      })
+    );
+
+    ice.addChild(
+      new ICECircle({
+        left: 270,
+        top: 40,
+        radius: 55,
+        fill: true,
+        stroke: true,
+        style: {
+          fillStyle: '#ff7a59',
+          strokeStyle: '#c2410c',
+          lineWidth: 2,
+        },
+      })
+    );
+
+    ice.addChild(
+      new ICEText({
+        text: 'ICE Render',
+        left: 40,
+        top: 200,
+        style: {
+          fontSize: 40,
+          fillStyle: '#1f2937',
+          fontFamily: 'Arial',
+        },
+      })
+    );
+  }}
+/>
+
+上面演示了三个核心图元：
+
+- `ICERect` —— 矩形，`{ left, top, width, height, style:{ fillStyle, strokeStyle } }`
+- `ICECircle` —— 正圆，`{ left, top, radius }`（`radius` 也可由 `width`/`height` 推导）
+- `ICEText` —— 文本，`{ text, left, top, style:{ fontSize, fillStyle } }`
+
+所有图元共享 `ICEComponent` 基类，统一支持 `transform`（平移/缩放/旋转/斜切）、
+`draggable`、`fill`/`stroke` 开关与可序列化渐变。试着拖动上面的矩形或圆——它们天生可交互。
