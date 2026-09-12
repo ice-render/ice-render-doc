@@ -1,0 +1,109 @@
+---
+sidebar_position: 3
+sidebar_label: 直线与坐标系（实时）
+---
+
+import IceCanvas from '@site/src/components/IceCanvas';
+
+# 直线与坐标系 · 实时示例
+
+对应 `line-basic.html`（对角线）、`line-arrow.html`（带箭头坐标轴）与 `y-kx+b.html`（在坐标系里画
+多条直线）。ice-render 用 `ICEPolyLine` 表达一切折线/直线，支持箭头、虚线、贝塞尔曲线与流动蚂蚁线。
+
+## 一条对角线
+
+`line-basic.html` 里 `moveTo(0,0)` → `lineTo(width,height)` 的对角线，对应一个只有两个端点的
+`ICEPolyLine`（两点折线退化为直线）。
+
+<IceCanvas
+  height={240}
+  setup={(ICE, ice) => {
+    const { ICEPolyLine } = ICE;
+    ice.addChild(
+      new ICEPolyLine({
+        points: [[40, 40], [700, 200]],
+        stroke: true,
+        style: { strokeStyle: '#1f4fb0', lineWidth: 3 },
+      })
+    );
+  }}
+/>
+
+```jsx title="两点成线" {1-6}
+const { ICEPolyLine } = ICE;
+ice.addChild(new ICEPolyLine({
+  points: [[40, 40], [700, 200]],
+  stroke: true,
+  style: { strokeStyle: '#1f4fb0', lineWidth: 3 },
+}));
+```
+
+## 带箭头的直角坐标系
+
+`line-arrow.html` 用 `calcRadian` / `calcPoints` 手算箭头。ice-render 直接给 `arrow: 'end'`
+（或 `'start'` / `'both'`）即可，箭头长度与角度由 `arrowLength` / `arrowAngel`（弧度）控制。
+
+<IceCanvas
+  height={280}
+  setup={(ICE, ice) => {
+    const { ICEPolyLine } = ICE;
+    const ox = 80, oy = 230, L = 580;
+    // X 轴
+    ice.addChild(new ICEPolyLine({
+      points: [[ox, oy], [ox + L, oy]], arrow: 'end',
+      stroke: true, style: { strokeStyle: '#64748b', lineWidth: 2 },
+    }));
+    // Y 轴
+    ice.addChild(new ICEPolyLine({
+      points: [[ox, oy], [ox, oy - L]], arrow: 'end',
+      stroke: true, style: { strokeStyle: '#64748b', lineWidth: 2 },
+    }));
+  }}
+/>
+
+```jsx title="坐标轴箭头" {3-6}
+// arrow: 'none' | 'start' | 'end' | 'both'
+ice.addChild(new ICEPolyLine({
+  points: [[ox, oy], [ox + L, oy]], arrow: 'end',
+  stroke: true, style: { strokeStyle: '#64748b', lineWidth: 2 },
+}));
+```
+
+## 在坐标系里画 y = kx + b
+
+`y-kx+b.html` 的 `drawLine(k,b,minX,maxX,step,color)` 本质是「按步长采样直线上的屏幕点」。
+下面把数学坐标（y 向上为正）映射到画布坐标（y 向下为正）：`screenY = oy - (k*x + b)`。
+
+<IceCanvas
+  height={300}
+  setup={(ICE, ice) => {
+    const { ICEPolyLine } = ICE;
+    const ox = 80, oy = 250, L = 580;
+    ice.addChild(new ICEPolyLine({ points: [[ox, oy], [ox + L, oy]], arrow: 'end',
+      stroke: true, style: { strokeStyle: '#64748b', lineWidth: 2 } }));
+    ice.addChild(new ICEPolyLine({ points: [[ox, oy], [ox, oy - L]], arrow: 'end',
+      stroke: true, style: { strokeStyle: '#64748b', lineWidth: 2 } }));
+
+    const drawLine = (k, b, minX, maxX, color) => {
+      const pts = [];
+      for (let x = minX; x <= maxX; x += 1) pts.push([ox + x, oy - (k * x + b)]);
+      ice.addChild(new ICEPolyLine({ points: pts, stroke: true,
+        style: { strokeStyle: color, lineWidth: 2 } }));
+    };
+    drawLine(1, 0, -60, 60, '#ff3300');
+    drawLine(2, 0, -40, 40, '#16a34a');
+    drawLine(-1, 0, -60, 60, '#2563eb');
+  }}
+/>
+
+```jsx title="y = kx + b" {3-7}
+const drawLine = (k, b, minX, maxX, color) => {
+  const pts = [];
+  for (let x = minX; x <= maxX; x += 1) pts.push([ox + x, oy - (k * x + b)]);
+  ice.addChild(new ICEPolyLine({ points: pts, stroke: true,
+    style: { strokeStyle: color, lineWidth: 2 } }));
+};
+```
+
+> 注意：画布 y 轴向下为正，数学 y 轴向上为正，所以样本点的屏幕纵坐标要取 `oy - (k*x + b)`。
+> `ICEPolyLine` 的 `left/top` 永远等于 `points[0]`，你只需关心点集本身。
