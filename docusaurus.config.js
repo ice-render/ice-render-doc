@@ -30,7 +30,7 @@ const config = {
       ({
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
-          editUrl: 'https://github.com/ice-render/ice-render/tree/main/ice-render-doc',
+          editUrl: 'https://github.com/ice-render/ice-render-doc/tree/master',
         },
         blog: false,
         theme: {

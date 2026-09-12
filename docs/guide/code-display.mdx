@@ -1,0 +1,211 @@
+---
+sidebar_position: 14
+sidebar_label: 代码展示规范
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# 代码展示规范
+
+本文档站统一用 **Docusaurus + Prism** 展示代码。分两类能力：
+
+- **零依赖（已启用）**：普通围栏代码块的高级写法（标题 / 行号 / 高亮 / diff / 多语言 Tabs）、Mermaid 图。开箱即用，不需要装任何包。
+- **需安装（升级路径）**：`@docusaurus/theme-live-codeblock`（可编辑运行的代码块）、`remark-code-import`（从真实源码文件导入代码）。本沙箱禁止 `npm install`，配置已写好，**你只需在本地 `npm install` 后即可生效**。
+
+---
+
+## 一、零依赖：把代码块写“优雅”
+
+### 1. 标题 + 行号
+
+围栏信息串加 `title="..."` 与 `showLineNumbers`，右上角出现文件名，左侧出现行号：
+
+````md
+```js title="examples/basic/rect.js" showLineNumbers
+const rect = new ICE.ICERect({ left: 0, top: 0, width: 160, height: 90 });
+ice.addChild(rect);
+```
+````
+
+```js title="examples/basic/rect.js" showLineNumbers
+const rect = new ICE.ICERect({ left: 0, top: 0, width: 160, height: 90 });
+ice.addChild(rect);
+```
+
+### 2. 高亮指定行
+
+`{行号}` 或 `{起-止}` 高亮关键代码；`{-起-止}` 表示“除这些行外全部高亮”：
+
+````md
+```js {2-3}
+const a = 1;
+const rect = new ICE.ICERect({ left: 0, top: 0, width: 160 });
+ice.addChild(rect);
+```
+````
+
+```js {2-3}
+const a = 1;
+const rect = new ICE.ICERect({ left: 0, top: 0, width: 160 });
+ice.addChild(rect);
+```
+
+### 3. diff 片段
+
+语言后加 `diff`，以 `+` / `-` 开头的行自动着色，适合展示“改动前后”：
+
+````md
+```diff
+- const rect = new ICE.ICERect({ width: 160 });
++ const rect = new ICE.ICERect({ left: 0, top: 0, width: 160, height: 90 });
+```
+````
+
+```diff
+- const rect = new ICE.ICERect({ width: 160 });
++ const rect = new ICE.ICERect({ left: 0, top: 0, width: 160, height: 90 });
+```
+
+### 4. 多语言 Tabs
+
+用 `<Tabs>` + `<TabItem>` 给同一段逻辑提供多语言视角（需 `.mdx`）：
+
+````mdx
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs>
+  <TabItem value="js" label="JavaScript" default>
+    ```js
+    const ice = new ICE.ICE();
+    ```
+  </TabItem>
+  <TabItem value="ts" label="TypeScript">
+    ```ts
+    const ice: ICE.ICE = new ICE.ICE();
+    ```
+  </TabItem>
+</Tabs>
+````
+
+<Tabs>
+  <TabItem value="js" label="JavaScript" default>
+    ```js
+    const ice = new ICE.ICE();
+    ```
+  </TabItem>
+  <TabItem value="ts" label="TypeScript">
+    ```ts
+    const ice: ICE.ICE = new ICE.ICE();
+    ```
+  </TabItem>
+</Tabs>
+
+### 5. 实时渲染（本仓库特色）
+
+普通代码块只展示文本；要“既看代码又看效果”，用本仓库封装的 `<IceCanvas>`（见[形状·实时示例](/docs/examples/shapes-live)）。它本质是一个 `BrowserOnly` 包裹的客户端组件，加载 `static/ice-render.js` 后即可在浏览器里跑真实 ICE 代码。
+
+---
+
+## 二、需安装：可编辑运行的代码块（live-codeblock）
+
+适合给读者一个**能直接改、立刻看效果**的 React/JSX 沙箱。`@docusaurus/theme-live-codeblock` 基于 `react-live`，纯前端、无服务端。
+
+**1. 安装**（在你本地，本沙箱已拦截）：
+
+```bash
+npm install @docusaurus/theme-live-codeblock
+```
+
+**2. 启用** —— 在 `docusaurus.config.js` 的 `themes` 数组里追加：
+
+```js title="docusaurus.config.js" {1,6}
+// 已有：themes: ['@docusaurus/theme-mermaid']
+const config = {
+  // ...
+  themes: [
+    '@docusaurus/theme-mermaid',
+    '@docusaurus/theme-live-codeblock',
+  ],
+};
+```
+
+**3. 用法** —— 语言写 `jsx live`，`title` 可选：
+
+````mdx
+```jsx live
+function Demo() {
+  return <button style={{ padding: 8 }}>点我</button>;
+}
+```
+````
+
+> ⚠️ `react-live` 的默认作用域不含 `ICE`。若要在这里直接编辑 ICE 代码，需要把 `ICE` 注入 `react-live` 的 `scope`（可在 swizzle 后的 `CodeBlock` 组件里传入），或改用本仓库的 `<IceCanvas>` 方案。
+
+---
+
+## 三、需安装：从真实源码导入代码（remark-code-import）
+
+适合 API 文档——让展示的代码**永远等于仓库里真实存在的源码**，杜绝文档与代码漂移。
+
+**1. 安装**：
+
+```bash
+npm install remark-code-import
+```
+
+**2. 配置** —— 在 `docusaurus.config.js` 的 `markdown.remarkPlugins` 注册：
+
+```js title="docusaurus.config.js" {1,4}
+const remarkCodeImport = require('remark-code-import');
+
+const config = {
+  markdown: {
+    remarkPlugins: [remarkCodeImport],
+  },
+};
+```
+
+**3. 用法** —— 围栏信息串写 `code-import`，指向相对于当前 `.mdx` 的文件：
+
+````mdx
+```ts code-import title="src/core/ICE.ts#L10-L40"
+../src/core/ICE.ts
+```
+````
+
+---
+
+## 四、Mermaid 图（已启用）
+
+`markdown.mermaid: true` 已开。用 ` ```mermaid ` 画架构/时序/流程图：
+
+````mdx
+```mermaid
+graph TD
+  A[FrameManager rAF] --> B[EventBus]
+  B --> C[各 Manager]
+  C --> D[CanvasRenderer]
+```
+````
+
+```mermaid
+graph TD
+  A[FrameManager rAF] --> B[EventBus]
+  B --> C[各 Manager]
+  C --> D[CanvasRenderer]
+```
+
+---
+
+## 速查
+
+| 能力 | 依赖 | 状态 | 写法 |
+|---|---|---|---|
+| 标题 / 行号 / 高亮 / diff | 无 | ✅ 已启用 | ` ```js title="..." showLineNumbers {2-3} ` |
+| 多语言 Tabs | 无（需 .mdx） | ✅ 已启用 | `<Tabs>` / `<TabItem>` |
+| Mermaid | 无（已开 `mermaid:true`） | ✅ 已启用 | ` ```mermaid ` |
+| 实时渲染 | 无（`<IceCanvas>`） | ✅ 已启用 | `<IceCanvas setup={...} />` |
+| 可编辑运行 | `@docusaurus/theme-live-codeblock` | 🔲 需安装 | ` ```jsx live ` |
+| 导入真实源码 | `remark-code-import` | 🔲 需安装 | ` ```ts code-import ` |

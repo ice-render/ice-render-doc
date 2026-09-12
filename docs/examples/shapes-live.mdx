@@ -69,3 +69,67 @@ import IceCanvas from '@site/src/components/IceCanvas';
 
 所有图元共享 `ICEComponent` 基类，统一支持 `transform`（平移/缩放/旋转/斜切）、
 `draggable`、`fill`/`stroke` 开关与可序列化渐变。试着拖动上面的矩形或圆——它们天生可交互。
+
+## 源码
+
+驱动上面画布的其实就是一段普通的 ICE API 调用，没有任何特殊封装。`<IceCanvas>` 这个组件
+（源码在 `src/components/IceCanvas.jsx`）只负责加载 `static/ice-render.js`、创建 `ICE` 实例、
+把 `setup(ICE, ice, canvas)` 交给调用方，并在卸载时调用 `ice.destroy()` 释放画布。
+
+```jsx title="docs/examples/shapes-live.mdx" showLineNumbers {15-61}
+import IceCanvas from '@site/src/components/IceCanvas';
+
+// <IceCanvas> 在客户端（BrowserOnly）渲染，避免 Node 端访问 DOM
+<IceCanvas
+  height={300}
+  setup={(ICE, ice) => {
+    const { ICERect, ICECircle, ICEText } = ICE;
+
+    ice.addChild(
+      new ICERect({
+        left: 40,
+        top: 40,
+        width: 160,
+        height: 110,
+        fill: true,
+        stroke: true,
+        style: {
+          fillStyle: '#4f8cff',
+          strokeStyle: '#1f4fb0',
+          lineWidth: 2,
+        },
+      })
+    );
+
+    ice.addChild(
+      new ICECircle({
+        left: 270,
+        top: 40,
+        radius: 55,
+        fill: true,
+        stroke: true,
+        style: {
+          fillStyle: '#ff7a59',
+          strokeStyle: '#c2410c',
+          lineWidth: 2,
+        },
+      })
+    );
+
+    ice.addChild(
+      new ICEText({
+        text: 'ICE Render',
+        left: 40,
+        top: 200,
+        style: {
+          fontSize: 40,
+          fillStyle: '#1f2937',
+          fontFamily: 'Arial',
+        },
+      })
+    );
+  }}
+/>
+```
+
+把 `setup` 里的图元换成 `ICEEllipse` / `ICEStar` / `ICEIsogon` 等，刷新页面即可看到新的实时渲染结果。
