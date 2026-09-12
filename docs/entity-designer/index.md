@@ -6,6 +6,8 @@ sidebar_position: 1
 
 **Entity Designer 是基于 ice-render 内核构建的 ER（实体-关系）建模设计器**——它不重复实现底层图元，只在 `ICEGroup`、连线族与事件总线之上，收敛出数据库建模最常用的交互：实体表、字段、主外键约束、关系连线、对齐参考线、自动布局、TypeORM Schema 实时序列化。
 
+本页聚焦**默认域包 ER**。同一套引擎与同一套应用层机制（选择 / 增删改 / 连线 / 撤销重做 / 快照 / 语义校验 / 矢量导出）之上，现在还承载另外 7 个域包，合计 8 个 —— 见文末[「同一套内核的其它域包」](#同一套内核的其它域包)。
+
 MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
 ## 一个完整的实时例子（就是仓库里的 `examples/entity-editor.html`）
@@ -193,6 +195,22 @@ if (issues.length === 0) {
 :::info
 这套「用户意图 → AI Agent → JSON DSL → 引擎」的接入思路，和 [DSL 与 AI Agent 接入](/docs/guide/dsl) 里 ice-render 通用 DSL 是同一套哲学——**Agent 只产出数据，引擎负责渲染与序列化**。ER 建模用 `ice-entity-designer-dsl`，通用图形用 `ice-render-dsl`，二者互不混用。
 :::
+
+## 同一套内核的其它域包
+
+域包 = **一个领域的记法 + 应用层 + 语义校验**。除默认的 ER 之外，现已落地 7 个（`ice-entity-designer` 仓库 `examples/` 下都有可直接打开的完整示例页与对应的 e2e 回归）：
+
+| 域包 | 记法与能力 | 示例 |
+| --- | --- | --- |
+| 流程图 | 起止 / 处理 / 判定 / 输入输出四类节点，正交或贝塞尔连线 + 分支标签 | [`flowchart-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/flowchart-editor.html) |
+| BPMN 2.0 | 池 / 泳道真嵌套、事件 / 网关 / 任务角标 / 数据对象 / 注释、语义校验、BPMN 2.0 XML 导入导出（含 BPMNDI） | [`bpmn-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/bpmn-editor.html) |
+| UML 类图 | 三段式类框、六种关系、继承成环校验、PlantUML / Mermaid 文本互操作 | [`uml-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/uml-editor.html) |
+| 状态机 | 伪状态 / 普通状态 / **复合状态容器**、转移标签 `事件 [守卫] / 动作`、PlantUML 状态图互操作 | [`statechart-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/statechart-editor.html) |
+| 甘特图 | 时间轴与按天吸附、依赖线、自动排程与关键路径、资源冲突校验、Mermaid gantt 互操作 | [`gantt-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/gantt-editor.html) |
+| 电力一次系统图 | 23 种一次设备符号（JB/T 5872-1991、GB/T 4728）、开关分合、带电分析与电压色标、母线 T 接、五防相关校验 | [`power-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/power-editor.html) · [`power-symbols.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/power-symbols.html) |
+| 电力二次回路 | 保护电流回路：CT 二次绕组 → 三相回路 → 端子排（真容器）→ 保护装置；回路编号 / 三相成组 / 端子号 / 接地校验 | [`secondary-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/secondary-editor.html) |
+
+这些域包同样有对应的 JSON DSL（`kind` 取 `'flowchart'` / `'bpmn'` / `'uml'` / `'statechart'` / `'gantt'` / `'power'`），详见 [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl)。
 
 ## 相关链接
 

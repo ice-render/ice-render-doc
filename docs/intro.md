@@ -37,7 +37,7 @@ sidebar_label: 介绍
 - **交互与连接线**：统一 Pointer 输入层、变换控制面板、`linkShape: 'visio' | 'bezier'` 连线、箭头样式、视口缩放平移
 - **扩展与无障碍**：插件三层注册点（组件 / 渲染钩子 / 工具）、无障碍原语（`getAccessibilityTree`）
 - **序列化与动画**：稳定 typeId、keyframes 关键帧动画、弹簧缓动（spring 三档）
-- **工程化**：80 个测试文件 / 654 个用例、Playwright 视觉回归、publint + attw 发布门禁
+- **工程化**：91 个测试文件 / 710 个用例、Playwright 视觉回归、publint + attw 发布门禁
 
 ## 生态
 
@@ -45,7 +45,8 @@ sidebar_label: 介绍
 |---|---|
 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档） |
 | [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎** |
-| [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化 ER 建模工具，可导出 TypeORM EntitySchema |
+| [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集：8 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次），随包附带 ice-render 内核 |
+| [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
 | ice-web-components | 仿 Swing 风格的 Canvas 原生 UI 组件库 |
 
 ## AI Agent 接入：JSON-first DSL ⭐

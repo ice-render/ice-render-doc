@@ -81,7 +81,7 @@ ice-render 家族提供两套互补的 DSL，按场景选择：
 | DSL | 适用场景 | Agent 产出 | 渲染入口 |
 |---|---|---|---|
 | **ice-render-dsl** | 通用节点 / 边图：流程图、拓扑图、依赖图、分组容器、图片、渐变、简单动画 | `nodes` / `edges` / `options` | `ICEDSL.renderDsl(canvas, dsl)` |
-| **ice-entity-designer-dsl** | ER / 数据库建模：实体、字段、约束、关系（one-to-many …）、外键、join 表 | `entities` / `relations` / `layout` | `ICEDSL.renderDsl(canvas, dsl)` |
+| **ice-entity-designer-dsl** | 领域建模，七种 `kind`：ER（实体 / 字段 / 约束 / 关系 / 外键 / join 表）、流程图、BPMN 2.0、UML 类图、状态机、甘特、电力一次系统图 | `kind` + `nodes` / `edges`（ER 用 `entities` / `relations`） | `ICEDSL.renderDsl(canvas, dsl)` |
 
 两者都遵守同一套「JSON-first、零命令式 API」原则：Agent 只写数据，引擎负责渲染。
 
@@ -105,9 +105,12 @@ ice-render 家族提供两套互补的 DSL，按场景选择：
 }
 ```
 
-### 2. ice-entity-designer-dsl（ER 建模）
+### 2. ice-entity-designer-dsl（领域建模：ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力）
 
-直接描述「实体 + 字段 + 关系」，引擎会渲染标准 ER 图并归一化成 TypeORM `EntitySchema`：
+七种文档共用一个入口：`kind` 缺省时按 ER 处理，其余取值 `'flowchart'` / `'bpmn'` / `'uml'` /
+`'statechart'` / `'gantt'` / `'power'`。坐标大多可省略，由编译器按记法自动布局。
+
+ER 文档直接描述「实体 + 字段 + 关系」，引擎会渲染标准 ER 图并归一化成 TypeORM `EntitySchema`：
 
 ```json title="电商 ER 模型（节选）"
 {
@@ -162,7 +165,7 @@ const { valid, errors } = validateDsl(dsl); // 重复 id / 未知节点类型 / 
 ## 给 Agent 的接入建议
 
 - **能写 DSL 就别写命令式 API**：Agent 产出 JSON 比手写 `ICE.*` 构造函数更稳、更可校验、更可复用。
-- **通用图用 `ice-render-dsl`，ER 用 `ice-entity-designer-dsl`**——不要混用两套字段（前者用 `nodes`/`edges`，后者用 `entities`/`relations`）。
+- **通用图用 `ice-render-dsl`，领域建模用 `ice-entity-designer-dsl`**——不要混用两套字段（前者的 `nodes`/`edges` 是通用图元；后者的 ER 文档用 `entities`/`relations`，其余 `kind` 用 `nodes`/`edges`）。
 - **先 `validateDsl` 再 `renderDsl`**：把 schema 校验当成 Agent 的「编译期」。
 - **需要交互式编辑器**（拖拽 / 增删字段 / 导出 TypeORM）时，用 `ice-entity-designer` 的命令式或 React API，而非单纯渲染 DSL。
 

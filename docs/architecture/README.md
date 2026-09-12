@@ -34,6 +34,7 @@ ICERender 是一款 **Canvas 2D 交互图形渲染引擎**（MIT 协议，作者
 | [14 · 无障碍原语](14-accessibility.md) | a11y 边界（引擎给原语、应用层做 DOM 镜像）、`getAccessibilityTree` / `setFocusedComponent` 契约 |
 | [15 · 应用驱动的评估](15-app-driven-review.md) | 用两个真实案例（六页后台 + 全屏 Windows XP 桌面）反推：引擎扛住了什么、在哪里把人卡住、每条短板的归属与优先级 |
 | [16 · 连线端点扩展评估](16-link-port-evaluation.md) | 母线「T 接」这类「沿边任意点连接」要不要动引擎：端点语义的完整调用链、三套方案的改动面与风险、动引擎前必须先满足的验收条件 |
+| [15 · 应用驱动的评估](15-app-driven-review.md) | 用两个真实案例（六页后台 + 全屏 Windows XP 桌面）反推：引擎扛住了什么、在哪里把人卡住、每条短板的归属与优先级 |
 
 ## 运行时全景（一图概览）
 

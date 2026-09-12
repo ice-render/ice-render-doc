@@ -75,7 +75,7 @@ ice.getFocusedComponent();
 
 ## 4. 应用层要做什么（参考实现）
 
-完整可运行示例见 [`examples/a11y/a11y-mirror.html`](https://github.com/ice-render/ice-render/tree/main/ice-render/examples/a11y/a11y-mirror.html)：
+完整可运行示例见 [`examples/a11y/a11y-mirror.html`](https://github.com/ice-render/ice-render/blob/master/examples/a11y/a11y-mirror.html)：
 
 1. 在 canvas 上方覆盖一个 `position:relative` 的容器，镜像元素绝对定位（`pointer-events` 按需设置）。
 2. 调 `getAccessibilityTree()`，按 `box` 生成/更新镜像元素：
