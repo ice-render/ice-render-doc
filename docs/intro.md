@@ -44,9 +44,39 @@ sidebar_label: 介绍
 | 项目 | 说明 |
 |---|---|
 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档） |
-| [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎 |
+| [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎** |
 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化 ER 建模工具，可导出 TypeORM EntitySchema |
 | ice-web-components | 仿 Swing 风格的 Canvas 原生 UI 组件库 |
+
+## AI Agent 接入：JSON-first DSL ⭐
+
+> **不想写命令式图形代码？用 DSL。**
+> ice-render 家族在引擎之上提供一层 **JSON-first DSL**——AI Agent（或任何代码生成器）只需产出一份结构化 JSON（`nodes` / `edges` / `options`，或 ER 场景的 `entities` / `relations`），引擎就能直接渲染，**完全不需要触碰 `ICE.ICERect` / `ICEPolyLine` 这类构造函数**。
+
+这意味着接入 AI Agent 的成本极低：
+
+- Agent 产出**数据（JSON）**，而不是拼接一长串引擎调用；同一份文档浏览器 / Node 通用
+- 自带 `validateDsl()` schema 校验（重复 id、未知节点类型、悬空边），Agent 产出可即时自检
+- 两层 DSL 覆盖主要场景：**`ice-render-dsl`**（流程图 / 拓扑图 / 依赖图）+ **`ice-entity-designer-dsl`**（ER / 数据库建模，可归一化为 TypeORM `EntitySchema`）
+
+下面这条链路就是一份真实可渲染的 DSL 文档：
+
+```json
+{ "schemaVersion": 1,
+  "nodes": [
+    { "id": "a", "type": "rect", "left": 80, "top": 160, "width": 180, "height": 90,
+      "style": { "fillStyle": "#dbeafe", "strokeStyle": "#2563eb", "lineWidth": 2 } },
+    { "id": "b", "type": "star", "left": 520, "top": 150, "outerRadius": 70, "innerRadius": 30, "spikes": 6,
+      "style": { "fillStyle": "#fde68a", "strokeStyle": "#d97706", "lineWidth": 2 } }
+  ],
+  "edges": [ { "id": "flow", "source": "a", "target": "b", "type": "visio",
+               "sourcePort": "R", "targetPort": "L", "arrow": "end", "label": "render" } ],
+  "options": { "fitViewport": true, "fitViewportPadding": 48 } }
+```
+
+渲染只需一行：`ICEDSL.renderDsl('canvas', dsl)`（浏览器）或 `import { renderDsl }`（Node）。
+
+👉 完整说明、live 示例与 Agent 接入建议见 [DSL 与 AI Agent 接入](/docs/guide/dsl)。
 
 ## 下一步
 
