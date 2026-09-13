@@ -39,7 +39,7 @@
 | 3 | 命中检测每次全量 flattenTree + sort + 逐组件判定 | **P0** | 完全没做 | ⚠️ **部分**：已做视口裁剪 + O(1) 包围盒预筛（实测 1.89x）；画布点击与 `ICE.hitTest()` 已收敛为**同一实现** `hitTestComponents()`。**空间索引（四叉树 / R-tree）仍未做**（上万节点且大部分在屏内时才划算） |
 | 4 | dirty-rect 遇文本 / 点集 / 半透明整场景回退全量 | **P0** | 已做但用不上 | ✅ **已修**（两层）：门控放宽到「相交级」；**并解开「非单位视口」与「dpr≠1」两个回退**（脏区世界坐标收集 → 渲染坐标裁剪），分散脏区改为**多块裁剪**。回归见 §8（zoom / dpr2 / multi 四个像素场景全部「局部执行 > 0 且逐像素一致」） |
 | 5 | 主画布无 devicePixelRatio / HiDPI 处理 | **P0** | 完全没做 | ✅ **已做**：`ICE.init(el, { dpr })`（默认 1，零行为变化）；且 `dpr>1` 下**不再牺牲局部重绘** |
-| 6 | 文本无自动换行 / 省略，超宽时横向压缩字形 | P1 | 完全没做 | ✅ **已做**（`wrap` / `maxLines` / `ellipsis` / grapheme 分段，默认关闭）。仍缺 `letterSpacing` / RTL / 富文本 / CJK 避头尾 |
+| 6 | 文本无自动换行 / 省略，超宽时横向压缩字形 | P1 | 完全没做 | ✅ **已做**（`wrap` / `maxLines` / `ellipsis` / grapheme 分段，默认关闭；`letterSpacing` / `lineHeight` / `textDecoration` / RTL / CJK 避头尾 / 无空格脚本断行均已落地）。仍缺**富文本**（同行混排粗体 / 颜色 / 字号） |
 | 7 | 文本含 HTML 注入；非 DOM 环境量不出尺寸 | P1 | 缺陷 | ✅ **已修**：改用 `textContent`；量测改为 canvas 优先 + DOM 降级 |
 | 8 | 无 SVG / PDF 导出，无 SVG 导入 | P1 | 部分 | ✅ **SVG 导出 + 无头出图已做**（`ice.toSvg()` / `exportSvg()` 与画布共用命令流；`ICE.headless()` 让 Node 建树出图不依赖 DOM / rAF；`examples/node/export.mjs` 落盘 SVG、可选转 PNG）。**仍未做**：PDF 导出、SVG 导入、剪贴板 / 打印（见 §6 与 §8） |
 | 9 | 无障碍零实现（无 ARIA / DOM 镜像 / 键盘焦点） | P1 | 完全没做 | ✅ **已给原语**：`getAccessibilityTree()` / `setFocusedComponent()`（方案 B：DOM 镜像交应用层，见 [14](14-accessibility.md)） |
@@ -129,13 +129,13 @@
 - `wrap: true` 按 `state.width` 贪心断行；`maxLines` 限制行数，末行逐 grapheme 回退加 `ellipsis`，保证「内容+省略号」不超宽
 - 断行按 grapheme cluster 切分（优先 `Intl.Segmenter`，不可用则退化为码点），emoji / ZWJ 序列不被拆开
 - 编辑态不换行（`caretIndex` 按原始文本计，换行会错位）
-- 仍缺：`letterSpacing` / `wordSpacing` 的**正式配置**（目前只是随 `style` 透传给 ctx，量测与 SVG 导出没纳入口径）、可配 `lineHeight`、`textDecoration`、富文本（混排粗体/颜色）
+- 仍缺：`wordSpacing`、富文本（同行混排粗体 / 颜色 / 字号）
 
-> **状态（2026-09-13）**：RTL / `ctx.direction`、CJK 断行规则（标点避头尾）与无空格脚本（泰 / 老挝 / 高棉 / 缅甸）词典分词断行**已落地**（见 [17 · i18n 边界](17-i18n-boundary.md)），无 DOM 运行时的编辑也已改为 grapheme 感知。「正式配置」那一类（量测 / SVG 导出口径一致）留待下一轮。
+> **状态（2026-09-13）**：RTL / `ctx.direction`、CJK 断行规则（标点避头尾）与无空格脚本（泰 / 老挝 / 高棉 / 缅甸）词典分词断行**已落地**（见 [17 · i18n 边界](17-i18n-boundary.md)）；`letterSpacing` / `lineHeight` / `textDecoration` 已按「正式配置」落地（量测 / 换行 / 渲染 / SVG 导出同口径）；无 DOM 运行时的编辑 / 光标 / 选区已改为 grapheme 感知并支持多行。
 
 **grapheme 问题**：`caretIndex` 按 UTF-16 码元计数（`ICEText.ts:242-273`），`ICEPolyLine.ts:787` 降级宽度估算用 `label.length * fontSize`——中文/emoji/ZWJ 序列下**光标定位与估算均不正确**。对标：主流引擎的新版本已引入 grapheme 感知布局；标准解法是 `Intl.Segmenter`（Baseline 2024）。
 
-> **状态（2026-09-13）**：断行按 grapheme 切分、无 DOM 运行时的编辑（Backspace / Delete / 方向键）与光标定位已改为 grapheme 感知（RTL / 多行 / 对齐一并修正）；`caretIndex` 仍是 UTF-16 下标（与 DOM 输入法保持一致），`ICEPolyLine` 的降级宽度估算仍按 `label.length`。
+> **状态（2026-09-13）**：断行按 grapheme 切分、无 DOM 运行时的编辑（Backspace / Delete / 方向键）与光标 / 选区定位已改为 grapheme 感知（RTL / 多行 / 对齐一并修正，并新增「按字形命中」`getCaretIndexAt()`）；`caretIndex` 仍是 UTF-16 下标（与 DOM 输入法保持一致），`ICEPolyLine` 的降级宽度估算仍按 `label.length`。
 
 ### P1-2 文本量测的 HTML 注入与非 DOM 退化（**安全缺陷**）
 

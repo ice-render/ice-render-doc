@@ -47,6 +47,32 @@ new ICE.ICEText({
 - `maxLines`（默认 `0`）：行数上限，超出部分截断
 - `ellipsis`（默认 `'…'`）：截断时追加的省略号文本，传空串可关闭
 
+## 行高 / 字间距 / 装饰线
+
+三项都是**正式排版属性**：量测（盒子宽高）、换行、渲染、SVG 导出共用同一口径。
+
+```js
+new ICE.ICEText({
+  text: '第一行\n第二行',
+  style: {
+    fontSize: 20,
+    lineHeight: 32,              // 数字 = px；'2' = 倍数、'1.5em' / '150%' 也行；0 / 'normal' = 引擎默认
+    letterSpacing: 2,            // 数字 = px；'0.2em' / '20%' 相对字号；盒子宽度会含这个间距
+    textDecoration: 'underline', // 'none' | 'underline' | 'line-through' | 'overline'（可空格组合）
+    textDecorationColor: '',     // 留空跟随 fillStyle
+    textDecorationWidth: 0,      // 0 = 自动（字号 / 14）
+  },
+});
+```
+
+- `lineHeight`：不配时行高 = `max(字形墨迹高, 字号 × 1.35)`（保持既有观感）；**显式配置后单行也按它算盒高**，
+  盒子高度因此可预测。
+- `letterSpacing`：引擎在量测前把它写进 `ctx.letterSpacing`（canvas 的 `measureText` 会把间距算进宽度，
+  含最后一个字符之后的间距），所以**盒子宽度 = 浏览器实际排版宽度**，换行与省略号也按含间距的宽度断；
+  SVG 导出输出 `letter-spacing`。
+- `textDecoration`：canvas 没有原生装饰线，由引擎按行自绘（下划线在基线下 `0.12em`，会略微溢出几何盒，
+  脏矩形 / 离屏缓存的落墨盒已把它算进去）。SVG 导出输出 `text-decoration`。
+
 ## 文字方向（RTL / BiDi）
 
 ```js
@@ -79,8 +105,29 @@ text.setState({ editing: true, caretIndex: 5 });
 |---|---|
 | `editing` | 是否处于编辑态 |
 | `caretIndex` | 光标位置 |
+| `multiline` | `true` 时编辑态改用 `<textarea>`：回车插入 `\n`，`Esc` / `Ctrl(⌘)+Enter` 提交 |
+| `selectionStart` / `selectionEnd` | 选区（-1 = 没有选区）；无 DOM 运行时由引擎自绘（`style.selectionColor`） |
 
-配合键盘事件可实现画布内文本编辑，参考 `examples/text/text-edit.html`。
+配合键盘事件可实现画布内文本编辑，参考 `examples/text/text-edit.html`；行高 / 字间距 / 装饰线 / 多行编辑 /
+选区的完整演示见 `examples/text/text-advanced.html`。
+
+### 选区与按字形命中
+
+```js
+text.selectAll();                 // 全选
+text.setSelection(2, 5);          // [2,5)
+console.log(text.getSelection()); // { start: 2, end: 5 }
+text.clearSelection();
+
+// 鼠标点击 → 光标下标：行带（按 textBaseline 与真实字形度量推导）+ grapheme 边界中点，RTL 反向量
+const local = text.globalToLocal(globalX, globalY);
+text.setSelection(text.getCaretIndexAt(local[0], local[1]));
+```
+
+- **多行编辑**（`multiline: true`，或文本里已经有 `\n`）：回车换行而不是提交，输入法（IME）由浏览器接管；
+- **选区**：DOM 编辑态由浏览器的 input / textarea 自己画；无 DOM 运行时（小程序 / Node）由引擎自绘；
+- **命中**：编辑态下 `containsLocalPoint` 按**文本行**判定（点在 padding、盒子空白处不算命中），
+  非编辑态仍是整个盒子 —— 拖动、框选、双击进入编辑这些交互不受影响。
 
 ## 其他
 
