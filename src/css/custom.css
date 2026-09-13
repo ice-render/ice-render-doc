@@ -30,15 +30,15 @@
   --ifm-color-primary-lightest: #9ec5fe;
 }
 
-.docusaurus-highlight-code-line {
-  background-color: rgba(0, 0, 0, 0.1);
-  display: block;
-  margin: 0 calc(-1 * var(--ifm-pre-padding));
-  padding: 0 var(--ifm-pre-padding);
+/* 高亮代码行（// highlight-next-line）：Infima 默认在 light 模式下也用深石板灰底
+   rgb(72 77 91)（Docusaurus 已知 bug facebook/docusaurus#3678，且样式故意写成
+   零特异性以便用户在 custom.css 覆盖）。原 v2 类名 .docusaurus-highlight-code-line
+   在 v3 已失效，这里改覆盖变量本身，给 light/dark 分别配浅/深底色，两端都可读。 */
+:root {
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 }
-
-[data-theme='dark'] .docusaurus-highlight-code-line {
-  background-color: rgba(0, 0, 0, 0.3);
+[data-theme='dark'] {
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.35);
 }
 
 /* ============================================================

@@ -46,6 +46,11 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      // 默认深色模式（用户偏好）；保留右上角切换按钮，切到 light 也已修好高亮行配色
+      colorMode: {
+        defaultMode: 'dark',
+        respectPrefersColorScheme: false,
+      },
       navbar: {
         title: 'ICE Render',
         logo: {
