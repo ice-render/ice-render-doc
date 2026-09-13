@@ -1,4 +1,4 @@
-// 校验 ice-chart / ice-web-components 文档页的 navbar / sidebar / iframe 实时渲染
+// 校验 ice-chart / ice-web-components 文档页的 navbar / sidebar / 内联实时示例
 // 用法：node verify-family.cjs  （需先 npm run serve 在某端口，默认 3100）
 const { chromium } = require('playwright');
 
@@ -18,7 +18,7 @@ const paintOf = async (frame) => frame.evaluate(() => {
   return total;
 });
 
-async function checkPage(browser, path, { label, globalName, iframeUrl, expectGlobal }) {
+async function checkPage(browser, path, { label }) {
   const page = await browser.newPage();
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
@@ -33,49 +33,87 @@ async function checkPage(browser, path, { label, globalName, iframeUrl, expectGl
   const sideText = await page.locator('aside').innerText().catch(() => '');
   const sideOk = sideText.includes(label);
 
-  // iframe 实时渲染
-  const frame = page.frame({ url: new RegExp(iframeUrl) });
-  let globalOk = false, paint = 0;
-  if (frame) {
-    await frame.waitForFunction((g) => window[g] && document.querySelector('canvas'), expectGlobal, { timeout: 15000 }).catch(() => {});
-    globalOk = await frame.evaluate((g) => !!window[g], expectGlobal).catch(() => false);
-    paint = await paintOf(frame).catch(() => 0);
-  }
+  // 页面里的内联实时示例（LiveExample 注入的 [data-live-example] 容器）与画布落墨
+  const live = await page.locator('[data-live-example]').count().catch(() => 0);
+  await page
+    .waitForFunction(
+      () => {
+        let total = 0;
+        document.querySelectorAll('[data-live-example] canvas').forEach((c) => {
+          try {
+            const ctx = c.getContext('2d');
+            if (!ctx || !c.width || !c.height) return;
+            const d = ctx.getImageData(0, 0, c.width, c.height).data;
+            for (let i = 3; i < d.length; i += 4) if (d[i] > 10) total += 1;
+          } catch (e) { /* tainted / 未就绪忽略 */ }
+        });
+        return total > 1000;
+      },
+      null,
+      { timeout: 25000 },
+    )
+    .catch(() => {});
+  const paint = await paintOf(page).catch(() => 0);
+  const iframes = await page.locator('iframe').count().catch(() => 0);
   await page.close();
-  return { path, label, navOk, sideOk, globalOk, paint, errors };
+  return { path, label, navOk, sideOk, live, iframes, paint, errors };
 }
 
-// 校验 ice-web-components 文档页里 5 个「趣味示例」iframe 的实时渲染
-// （docusaurus serve 会把 /x.html 301 到 /x，所以 frame url 正则放掉 .html 后缀）
-async function checkFunIframes(browser) {
-  const page = await browser.newPage();
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-  await page.goto(BASE + '/docs/ice-web-components', { waitUntil: 'networkidle' });
-  const demos = ['windows-xp', 'arcade', 'pixel-editor', 'algorithm-sandbox', 'dos-terminal'];
+// 校验 5 个「趣味示例」能真实跑起来。
+//
+// 口径说明（2026-09-14 重写）：这些示例**已经不用 iframe**（见 src/components/LiveExample.jsx：
+// 把示例 HTML 的 body/style 内联注入文档页、执行其初始化脚本）。但**不能**按「文档页里的内联画布」
+// 判定——6 个示例同页同时跑（gallery 的画布是 1400×5540），主线程被最重的那个占满，
+// 其余画布长时间不落墨（实测新旧 bundle 都一样，非回归）。所以这里**逐个独立打开示例页**验证
+// 「加载 → 初始化 → 画布落墨 → 零控制台报错」，文档页里的内联挂载与零报错由 verify-inline.cjs 负责。
+async function checkFunDemos(browser) {
+  // name 对应 /ice-web-components/<name>.html；handle 是示例脚本自己挂到 window 上的句柄
+  // （XP 示例挂的是 `__result = { ice, desktop, ... }`，不是 `__xp`）
+  const demos = [
+    { name: 'windows-xp', handle: '__result' },
+    { name: 'arcade', handle: '__arcade' },
+    { name: 'pixel-editor', handle: '__pixel' },
+    { name: 'algorithm-sandbox', handle: '__algo' },
+    { name: 'dos-terminal', handle: '__dos' },
+  ];
   const out = [];
-  for (const name of demos) {
-    // 触发懒加载：先把对应 iframe 滚进视口（否则 lazy 的框还没开始加载）
-    const loc = page.locator(`iframe[src*="/ice-web-components/${name}.html"]`);
-    await loc.scrollIntoViewIfNeeded().catch(() => {});
-    let frame = null;
-    for (let t = 0; t < 40; t++) {
-      frame = page.frame({ url: new RegExp('/ice-web-components/' + name + '(\\.html)?') });
-      if (frame) break;
-      await page.waitForTimeout(300);
+  const errors = [];
+  for (const { name, handle } of demos) {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(name + ' console: ' + m.text()); });
+    page.on('pageerror', (e) => errors.push(name + ' pageerror: ' + e.message));
+    await page.goto(`${BASE}/ice-web-components/${name}.html`, { waitUntil: 'load' });
+
+    // 示例脚本挂自己的 window 句柄；再轮询等画布落墨（重场景首帧可能要几秒）
+    await page.waitForFunction((h) => !!window[h], handle, { timeout: 20000 }).catch(() => {});
+    let paint = 0;
+    for (let t = 0; t < 24; t++) {
+      paint = await page
+        .evaluate(() => {
+          const c = document.querySelector('canvas');
+          if (!c) return 0;
+          try {
+            const ctx = c.getContext('2d');
+            if (!ctx || !c.width || !c.height) return 0;
+            const d = ctx.getImageData(0, 0, c.width, c.height).data;
+            let n = 0;
+            for (let i = 3; i < d.length; i += 4) if (d[i] > 10) n += 1;
+            return n;
+          } catch (e) {
+            return 0;
+          }
+        })
+        .catch(() => 0);
+      if (paint > 1000) break;
+      await page.waitForTimeout(500);
     }
-    let globalOk = false, paint = 0;
-    if (frame) {
-      await frame.waitForFunction(() => window.ICEWEB && document.querySelector('canvas'), { timeout: 15000 }).catch(() => {});
-      globalOk = await frame.evaluate(() => !!window.ICEWEB).catch(() => false);
-      paint = await paintOf(frame).catch(() => 0);
-    } else {
-      errors.push('frame missing: ' + name);
-    }
-    out.push({ name, globalOk, paint });
+
+    const globalOk = await page.evaluate((h) => !!window[h], handle).catch(() => false);
+    if (!globalOk) errors.push('handle missing: ' + handle);
+    if (!(paint > 1000)) errors.push('canvas not painted: ' + name + ' (' + paint + 'px)');
+    out.push({ name, handle, globalOk, paint });
+    await page.close();
   }
-  await page.close();
   return { out, errors };
 }
 
@@ -83,12 +121,12 @@ async function checkFunIframes(browser) {
   const browser = await chromium.launch();
   const results = [];
   results.push(await checkPage(browser, '/docs/ice-chart', {
-    label: 'ice-chart', globalName: 'ICEChart', iframeUrl: 'dashboard-market', expectGlobal: 'ICEChart',
+    label: 'ice-chart',
   }));
   results.push(await checkPage(browser, '/docs/ice-web-components', {
-    label: 'ice-web-components', globalName: 'ICEWEB', iframeUrl: 'gallery', expectGlobal: 'ICEWEB',
+    label: 'ice-web-components',
   }));
-  const fun = await checkFunIframes(browser);
+  const fun = await checkFunDemos(browser);
   // intro 页 navbar 也应包含两个新入口
   const page = await browser.newPage();
   await page.goto(BASE + '/docs/intro', { waitUntil: 'networkidle' });
@@ -99,17 +137,19 @@ async function checkFunIframes(browser) {
 
   let allOk = true;
   for (const r of results) {
-    const ok = r.navOk && r.sideOk && r.globalOk && r.paint > 1000 && r.errors.length === 0;
+    const ok = r.navOk && r.sideOk && r.iframes === 0 && r.live > 0 && r.paint > 1000 && r.errors.length === 0;
     allOk = allOk && ok;
     console.log(`\n[${ok ? 'PASS' : 'FAIL'}] ${r.label}  (${r.path})`);
-    console.log(`   navbar=${r.navOk}  sidebar=${r.sideOk}  global(${r.globalName})=${r.globalOk}  paintedPixels=${r.paint}`);
+    console.log(
+      `   navbar=${r.navOk}  sidebar=${r.sideOk}  liveExamples=${r.live}  iframes=${r.iframes}  paintedPixels=${r.paint}`,
+    );
     if (r.errors.length) console.log('   ERRORS:\n   - ' + r.errors.join('\n   - '));
   }
   for (const d of fun.out) {
     const ok = d.globalOk && d.paint > 1000;
     allOk = allOk && ok;
     console.log(`\n[${ok ? 'PASS' : 'FAIL'}] fun demo: ${d.name}`);
-    console.log(`   global(ICEWEB)=${d.globalOk}  paintedPixels=${d.paint}`);
+    console.log(`   handle(window.${d.handle})=${d.globalOk}  paintedPixels=${d.paint}`);
   }
   if (fun.errors.length) {
     allOk = false;

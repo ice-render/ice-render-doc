@@ -60,9 +60,24 @@ const ice = new ICE();
 
 | 方法 | 说明 |
 |---|---|
-| `registerType(className, Clazz)` | 注册自定义组件类型（可序列化的前提） |
-| `getTypeId(Clazz)` | 取组件类的稳定 typeId |
-| `getType(className)` | 按 className 反查构造器 |
+| `registerType(typeId, Clazz)` | 注册自定义组件类型（可序列化的前提）。`typeId` 必须是 `namespace:Type`（如 `my-app:Badge`）；同一个 typeId 注册**不同**构造函数、或同一个构造函数注册**第二个** typeId 都会抛错 |
+| `getTypeId(Clazz)` | 构造函数 → canonical typeId（序列化写出用；未注册返回 `undefined`） |
+| `getType(typeId)` | 按 canonical typeId 反查构造器 |
+| `hasType(typeId)` | 是否注册了该 canonical typeId |
+| `getRegisteredTypeIds()` | 当前实例已注册的 canonical typeId 列表 |
+
+内置类型的 typeId 形如 `ice-render:Rect`、`ice-render:Group`。类型名**只有 canonical 一种形式**，
+引擎不兼容无 namespace 的旧类名。冲突规则与未注册类型的处理见 [06 · 序列化](../architecture/06-serialization.md)。
+
+格式契约随包导出，下游包可直接复用（不必各处手写正则）：
+
+| 导出 | 说明 |
+|---|---|
+| `TYPE_ID_PATTERN` | `/^[a-z][a-z0-9-]*:[A-Za-z_][A-Za-z0-9_-]*$/` |
+| `isTypeId(value)` | 是否满足格式 |
+| `assertTypeId(value, label?)` | 不满足则抛错（`label` 出现在错误信息里） |
+| `parseTypeId(typeId)` | → `{ namespace, type }` |
+| `makeTypeId(namespace, type)` | 拼装并校验，如 `makeTypeId('ice-chart', 'PlotArea')` |
 
 ## 插件与选中
 

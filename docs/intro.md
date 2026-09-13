@@ -42,7 +42,7 @@ sidebar_label: 介绍
 - **坐标系与变换**：完整仿射变换、任意嵌套坐标系、HiDPI 支持
 - **交互与连接线**：统一 Pointer 输入层、变换控制面板、`linkShape: 'visio' | 'bezier'` 连线、箭头样式、视口缩放平移
 - **扩展与无障碍**：插件三层注册点（组件 / 渲染钩子 / 工具）、无障碍原语（`getAccessibilityTree`）
-- **序列化与动画**：稳定 typeId、keyframes 关键帧动画、弹簧缓动（spring 三档）
+- **序列化与动画**：稳定 typeId（`namespace:Type`，如 `ice-render:Rect`，重复注册明确抛错）、keyframes 关键帧动画、弹簧缓动（spring 三档）
 - **子树不透明度**：`state.opacity ∈ [0,1]` 作用于组件自身及所有后代，淡入淡出 Modal / Drawer / Message 整棵子树生效（`opacity≠1` 自动走非不透明落墨，不进离屏缓存）
 - **生命周期**：`ICE.destroy()` 与幂等 `init()`（可直接传 `HTMLCanvasElement` / `CanvasRenderingContext2D`），适配 React StrictMode 双挂载与 SPA 卸载重挂，销毁后可重新 init
 - **工程化**：93 个测试文件、700+ 个用例、Playwright 视觉回归、publint + attw 发布门禁

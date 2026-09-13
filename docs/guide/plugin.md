@@ -20,7 +20,7 @@ ice.getPlugins();                    // 已注册插件列表
 
 | 注册点 | 说明 |
 |---|---|
-| `components` | 自定义图元。自动注册 typeId 反查，**可序列化** |
+| `components` | 自定义图元。键是 canonical typeId（`namespace:Type`，如 `'my-app:Badge'`），值是构造函数；自动注册 typeId 反查，**可序列化**。格式非法 / 与已注册类型冲突时明确抛错，错误信息带插件名 |
 | `render(frame)` | 每帧钩子，拿到世界坐标上下文叠加绘制。全量与局部两条渲染路径都会调用 |
 | `tools` | 交互工具。按 `match(component)` 挂载到命中组件；`exclusive: true` 可屏蔽内置变换面板 |
 

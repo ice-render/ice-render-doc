@@ -28,7 +28,7 @@ ice-render 只负责「画什么」和「怎么交互」：
 | 你要做的 | 内核提供的钩子 |
 |---|---|
 | 定义领域图元（实体框、流程节点…） | 继承 `ICEComponent` / `ICERect` / `ICEGroup`，实现 `static typeId` + 序列化方法 |
-| 让图元能被反序列化 | `ice.registerType(typeId, Class)` |
+| 让图元能被反序列化 | `ice.registerType('my-app:Badge', Class)` |
 | 把交互串成「应用」（增删改 / 连接 / 校验 / 导出） | 自建一个 App 类，持有 `ICE` 实例，监听事件总线 `evtBus` |
 | 工程化打包 | 把内核 inline 进产物，或让上游 `import 'ice-render'` |
 | 接入 React / Vue | 客户端组件 + 生命周期对齐（见 §五） |
@@ -44,7 +44,7 @@ ice-render 只负责「画什么」和「怎么交互」：
   setup={(ICE, ice) => {
     // 1) 定义领域图元：继承成品图元
     class Badge extends ICE.ICERect {
-      static typeId = 'Badge';
+      static typeId = 'my-app:Badge';
     }
     // 2) 登记给内核（反序列化前提，见 §四）
     ice.registerType(Badge.typeId, Badge);
@@ -77,14 +77,23 @@ ice-render 只负责「画什么」和「怎么交互」：
 
 ```js title="注册自定义图元" {1,5}
 class Badge extends ICE.ICERect {
-  static typeId = 'Badge'; // 序列化用的类型标识，全局唯一
+  static typeId = 'my-app:Badge'; // 序列化用的类型标识：namespace:Type
 }
 // 登记后才能被 Serializer/Deserializer 识别
 ice.registerType(Badge.typeId, Badge);
 ```
 
-> 类型标识 `typeId` 必须全局唯一。内核的 `Serializer` / `Deserializer` 通过 `COMPONENT_TYPE_MAPPING`（类名字符串 → 构造函数）做映射；**未 `registerType` 的自定义类型在反序列化时会被跳过并告警**：
-> `console.warn('[ICE] 反序列化跳过未注册的组件类型：Badge（请先 ice.registerType() 注册）')`。
+> 类型标识 `typeId` 统一为 **`namespace:Type`**：namespace 用你自己的小写包名
+> （引擎内置 `ice-render:*`、设计器 `ice-entity-designer:*`、图表 `ice-chart:*`），
+> 因此不同厂商 / 不同包之间的自定义图元**不会撞名**。同一个 namespace 内仍然要求唯一，
+> 而且冲突是**明确抛错**的：同一个 typeId 注册不同构造函数、或同一个构造函数注册第二个 typeId
+> 都会立刻失败（不再静默覆盖）。
+>
+> 类型名**只有 canonical 这一种形式**：引擎不做「旧的无 namespace 类名」兼容（家族仍在发布初期，
+> 引用者少、没有历史包袱）。
+>
+> 两个方向的告警都要留意：**未注册的类型反序列化时会被跳过**（记入 `Deserializer.unknownTypes`），
+> **未注册的类型序列化时只能回退写类名**（记入 `Serializer.unregisteredTypes`，而类名可能在打包时被 mangle）。
 
 ---
 
@@ -108,6 +117,7 @@ src/
 ```js title="src/designer/EntityDesigner.ts"
 constructor(ice) {
   this.ice = ice;
+  // typeId 形如 'ice-entity-designer:Entity'
   this.ice.registerType(Entity.typeId, Entity);
   this.ice.registerType(Relation.typeId, Relation);
   this.ice.evtBus.on('mousedown', this.__mousedownHandler, this);
@@ -234,7 +244,7 @@ function toSchemaObject(nodes) {
 
 ```js
 // 顺序很重要：先 registerType，再反序列化
-ice.registerType('Badge', Badge);
+ice.registerType('my-app:Badge', Badge);
 
 const snapshot = ice.serializeProject();        // 整张图 → JSON 字符串
 ice.loadProject(snapshot);                      // 从 JSON 还原（内部走 Deserializer）
@@ -242,7 +252,9 @@ ice.loadProject(snapshot);                      // 从 JSON 还原（内部走 D
 
 注意 `Deserializer` 对未知类型是**宽容跳过 + 告警**，不会整库崩。所以发布插件 / 自定义图元时，务必在 `init` 阶段就 `registerType`，避免用户加载旧工程时丢节点。
 
-> 想做成「可插拔」的扩展？内核还提供 `PluginHost`：插件声明自定义图元类型，宿主代为 `registerType`，插件因此自动获得序列化 / 反序列化能力（见 `src/plugin/PluginHost.ts`）。
+> 想做成「可插拔」的扩展？内核还提供 `PluginHost`：插件用 `components: { 'my-app:Badge': Badge }`
+> 声明自定义图元类型，宿主代为 `registerType`，
+> 插件因此自动获得序列化 / 反序列化能力；注册失败的错误信息会带上插件名（见 `src/plugin/PluginHost.ts`）。
 
 ---
 
@@ -312,7 +324,7 @@ export default function App() {
 
 ## 七、落地清单 / 易错点
 
-- [ ] 自定义图元实现 `static typeId` 且全局唯一
+- [ ] 自定义图元实现 `static typeId`，格式是 `namespace:Type`（namespace 用自己包名，本 namespace 内唯一）
 - [ ] **反序列化前必须 `registerType`**（顺序：先登记，再 `loadProject` / `Deserializer`）
 - [ ] 序列化方法返回纯数据，不要把运行时对象 / DOM 引用塞进快照
 - [ ] 渲染模式：`renderMode: 'dirty-rect'`（默认，局部重绘）vs `'full'`（全量）；含文本 / 点集 / 半透明场景引擎会自动回退全量，无需手动处理

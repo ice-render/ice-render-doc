@@ -20,7 +20,9 @@ const SCOPE = 'ice-example';
 
 // 已知示例在 window 上挂的句柄，用于卸载时 best-effort 销毁 ICE 实例，避免 rAF 泄漏
 const EXAMPLE_HANDLES = [
-  '__pixel', '__arcade', '__xp', '__dos', '__algo', '__gallery',
+  // `__result` 是 windows-xp / arcade 等示例统一挂的句柄（形如 `{ ice, ... }`），
+  // 卸载时靠它销毁 ICE 实例；曾经这里写的是 `__xp`——示例里根本没有这个名字，XP 实例因此从没被销毁。
+  '__pixel', '__arcade', '__result', '__dos', '__algo', '__gallery',
   '__dashboard', '__dsl', '__ied', '__chart', '__charts', '__link',
 ];
 

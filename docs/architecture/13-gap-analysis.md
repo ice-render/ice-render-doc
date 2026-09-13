@@ -44,7 +44,7 @@
 | 8 | 无 SVG / PDF 导出，无 SVG 导入 | P1 | 部分 | ✅ **SVG 导出 + 无头出图已做**（`ice.toSvg()` / `exportSvg()` 与画布共用命令流；`ICE.headless()` 让 Node 建树出图不依赖 DOM / rAF；`examples/node/export.mjs` 落盘 SVG、可选转 PNG）。**仍未做**：PDF 导出、SVG 导入、剪贴板 / 打印（见 §6 与 §8） |
 | 9 | 无障碍零实现（无 ARIA / DOM 镜像 / 键盘焦点） | P1 | 完全没做 | ✅ **已给原语**：`getAccessibilityTree()` / `setFocusedComponent()`（方案 B：DOM 镜像交应用层，见 [14](14-accessibility.md)） |
 | 10 | 无插件 / 扩展点（仅 `registerType`） | P1 | 完全没做 | ✅ **已做**：`ICE.use()` 三层注册点。仍缺「自定义命中判定」注册协议（见 [09 路线图](09-roadmap.md)） |
-| 11 | 序列化以 `constructor.name` 为类型键；映射漏项 | P1 | 隐患 | ✅ **已修**：`getTypeId()` 反查 + 补 `ICERose` + 反序列化容错 + 迁移表。⚠️ 该缺陷**随后在下游应用层复现过一次**（引擎修了、应用层漏改），见 §8 末条 |
+| 11 | 序列化以 `constructor.name` 为类型键；映射漏项 | P1 | 隐患 | ✅ **已修**：`getTypeId()` 反查 + 补 `ICERose` + 反序列化容错 + 迁移表；**2026-09-13 进一步**把 typeId 统一为 `namespace:Type`、冲突明确抛错、且只认 canonical 一种形式。⚠️ 该缺陷**随后在下游应用层复现过一次**（引擎修了、应用层漏改），见 §8 末条 |
 | 12 | 发行契约缺失；CI 不跑可视化回归 | P1 | 部分 | ✅ **已做**：`exports` / `sideEffects` / CHANGELOG / `publint`+`attw` / 覆盖率门槛 / CI 接可视化回归。**2026-09-12 复核**：GitHub Actions 上的 `ci.yml` 是真在跑的（累计 121 次运行，dev / master 最近全绿），镜像也已是同步状态；⚠️ **下游两仓（ice-entity-designer / ice-entity-designer-dsl）尚无 CI**，各自的门禁目前只靠本地 `npm run` 系列 |
 | 13 | 动画无 delay / 序列 / spring，且 `Math.floor` 掉精度 | P2 | 部分 | ✅ **已做**（另加关键帧时间轴、数组字段补间，结束判定改按时间） |
 | 14 | 布局不随增删自动重排；容器 setState 递归置脏全部后代 | P2 | 部分 | ✅ **已做**（自动重排 + 排布前 measure + `dirty`/`paramsDirty` 拆级） |
@@ -180,7 +180,7 @@
 
 | 层 | 注册点 | 实现 |
 |---|---|---|
-| ① 组件 | `components: { typeId: Ctor }` | 宿主代为 `registerType`，因此自动获得 typeId 反查 → 自定义图元可序列化 |
+| ① 组件 | `components: { 'my-app:Badge': Ctor }` | 宿主代为 `registerType`（键必须是 canonical `namespace:Type`），因此自动获得 typeId 反查 → 自定义图元可序列化 |
 | ② 渲染 | `render(frame)` | 每帧调用；坐标系为世界坐标（CTM = dpr·viewport，与组件一致）；两条渲染路径都调用，局部帧在 `clip` 之内 |
 | ③ 交互 | `tools: [{ id, match(c), create(), exclusive?, onTargetChange? }]` | 复用既有 `toolNodes`：命中 `addTool`、失配 `removeTool`，实例跨选中复用；`exclusive` 命中时禁用内置变换/连线面板 |
 
@@ -197,14 +197,23 @@
 - `persistence/Deserializer.ts:54-58` 对未知类型直接 `new Clazz(state)`（`Clazz` 为 `undefined`）→ 抛错，无跳过/容错。
 - `consts/COMPONENT_TYPE_MAPPING.ts:27-39` **漏了 `ICERose`**（另有 `ICELinkSlot` / `ICELinkHook`）——这些类型**存得下、读不回**。
 
-**方向（2026-09-10 已落地）**：改为「构造函数 → 注册名」**反查**（`ICE.getTypeId()`），与类的 JS 名解耦：
+**方向（2026-09-10 已落地；2026-09-13 补齐命名空间）**：改为「构造函数 → 注册名」**反查**（`ICE.getTypeId()`），与类的 JS 名解耦：
 - 已注册类型：序列化写出注册名，terser 压缩改名不再破坏已存数据
-- 未注册的自定义类型：仍回退 `constructor.name`（保持既有约定，不破坏下游）
+- 未注册的自定义类型：仍回退 `constructor.name`（保持既有约定，不破坏下游），但**记录进
+  `Serializer.unregisteredTypes` 并告警**——回退名在下游打包后可能读不回来，静默写出去等于埋雷
 - 补齐漏注册的 **`ICERose`**（此前存得下、读不回）
 - 反序列化容错：未注册类型**跳过该节点（含子树）并记录到 `deserializer.unknownTypes`**，
   不再 `new undefined(...)` 抛错导致整份数据打不开
 - 版本迁移改为可扩展的 `SERIALIZATION_MIGRATIONS`（按 `to` 升序逐级执行）；高于当前版本仍明确抛错
-- 旧数据（type 写类名、无 version 字段）继续可加载
+- 无 version 字段的数据继续可加载（但 `type` 必须是 canonical typeId；无 namespace 的旧类名按未注册类型处理）
+
+**命名空间化（2026-09-13）**：反查解决了「改名」，没解决「撞名」——无 namespace 的 typeId 是
+一张全局平面表，ICE 家族（引擎 / 实体设计器 / 图表 / 第三方）各自的自定义类型迟早同名。
+现在统一为 **`namespace:Type`**（`ice-render:*` / `ice-entity-designer:*` / `ice-chart:*` /
+第三方小写包名），并把注册表收敛成一套可解释的契约：同 typeId 注册不同构造函数、同构造函数
+注册第二个 typeId 都**明确抛错**；类型名**只有 canonical 一种形式**——家族仍在发布初期，
+因此不为旧的无 namespace 类名维护别名（旧数据里的节点按未注册类型处理）；注册表本身改用
+无原型对象，`getType('constructor')` 不会命中 `Object.prototype`。详见 [06 · 序列化](06-serialization.md)。
 
 ### P1-7 发行契约与质量门禁
 
