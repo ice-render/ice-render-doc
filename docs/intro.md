@@ -1,6 +1,6 @@
 ---
 sidebar_position: 0
-sidebar_label: 介绍
+sidebar_label: 1.1 介绍
 ---
 
 # ICE Render · 雪花渲染器
