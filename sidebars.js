@@ -21,12 +21,15 @@
 
 // @ts-check
 
+// 各包版本号单一来源（见 site-versions.js）；左侧菜单的引擎分组与产品项都从这里取
+const V = require('./site-versions');
+
 /** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
 const sidebars = {
   tutorialSidebar: [
     {
       type: 'category',
-      label: '1. ice-render 引擎',
+      label: `1. ice-render 引擎 v${V.iceRender}`,
       items: [
         { type: 'doc', id: 'intro', label: '1.1 介绍' },
         {
@@ -105,9 +108,9 @@ const sidebars = {
       type: 'category',
       label: '2. 家族产品 · 应用层',
       items: [
-        { type: 'doc', id: 'entity-designer/index', label: '2.1 Entity Designer' },
-        { type: 'doc', id: 'ice-chart/index', label: '2.2 ice-chart' },
-        { type: 'doc', id: 'ice-web-components/index', label: '2.3 ice-web-components' },
+        { type: 'doc', id: 'entity-designer/index', label: `2.1 Entity Designer v${V.entityDesigner}` },
+        { type: 'doc', id: 'ice-chart/index', label: `2.2 ice-chart v${V.iceChart}` },
+        { type: 'doc', id: 'ice-web-components/index', label: `2.3 ice-web-components v${V.iceWebComponents}` },
       ],
     },
   ],

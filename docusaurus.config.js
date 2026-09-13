@@ -3,6 +3,8 @@
 const { themes } = require('prism-react-renderer');
 const lightCodeTheme = themes.github;
 const darkCodeTheme = themes.dracula;
+// 各包版本号单一来源（见 site-versions.js）；顶部导航与左侧菜单都从这里取
+const V = require('./site-versions');
 
 // 部署到 GitHub Pages 项目页：站点挂在 https://ice-render.github.io/ice-render-doc/ 下。
 // baseUrl 必须以斜杠开头和结尾。注意：Docusaurus 不会对 siteConfig.scripts/stylesheets
@@ -59,7 +61,8 @@ const config = {
         respectPrefersColorScheme: false,
       },
       navbar: {
-        title: 'ICE Render',
+        // 顶部导航标题直接带引擎版本，读者一进站点就知道文档对应哪版内核
+        title: `ICE Render v${V.iceRender}`,
         logo: {
           alt: 'ICE Render Logo',
           src: 'img/logo.svg',
@@ -87,19 +90,19 @@ const config = {
             type: 'doc',
             docId: 'entity-designer/index',
             position: 'left',
-            label: 'Entity Designer',
+            label: `Entity Designer v${V.entityDesigner}`,
           },
           {
             type: 'doc',
             docId: 'ice-chart/index',
             position: 'left',
-            label: 'ice-chart',
+            label: `ice-chart v${V.iceChart}`,
           },
           {
             type: 'doc',
             docId: 'ice-web-components/index',
             position: 'left',
-            label: 'ice-web-components',
+            label: `ice-web-components v${V.iceWebComponents}`,
           },
           {
             href: 'https://github.com/ice-render/ice-render',
