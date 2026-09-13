@@ -1,19 +1,20 @@
 import BrowserOnly from '@docusaurus/BrowserOnly';
 import React, { useEffect, useRef } from 'react';
+import useAssetResolver from '../utils/assetUrl';
 
 // ice-render 以 UMD 形式放在 static/ice-render.js，全局挂载到 window.ICE。
 // 文档站纯前端、不依赖任何服务端，这里只在客户端动态加载并渲染。
 let icePromise = null;
-function ensureIce() {
+function ensureIce(src) {
   if (typeof window === 'undefined') return Promise.resolve(null);
   if (window.ICE) return Promise.resolve(window.ICE);
   if (icePromise) return icePromise;
   icePromise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = '/ice-render.js';
+    s.src = src;
     s.async = true;
     s.onload = () => resolve(window.ICE);
-    s.onerror = () => reject(new Error('ice-render.js 加载失败'));
+    s.onerror = () => reject(new Error(`${src} 加载失败`));
     document.head.appendChild(s);
   });
   return icePromise;
@@ -21,12 +22,13 @@ function ensureIce() {
 
 function IceCanvasInner({ height = 360, setup, background = '#ffffff' }) {
   const ref = useRef(null);
+  const resolveAsset = useAssetResolver();
 
   useEffect(() => {
     let ice = null;
     let cancelled = false;
 
-    ensureIce()
+    ensureIce(resolveAsset('/ice-render.js'))
       .then((ICE) => {
         if (cancelled || !ref.current || !ICE) return;
         const canvas = ref.current;

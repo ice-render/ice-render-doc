@@ -123,7 +123,7 @@
       fill: none;
     }
     .side {
-      width: 400px;
+      width: 560px;
       padding: 14px;
       border-left: 1px solid #e2e8f0;
       background: #ffffff;
@@ -281,8 +281,8 @@
       </aside>
     </div>
 
-    <!-- 设计器 UMD 把 ice-render 当 peer 依赖（不打进自己的包），所以先加载引擎 UMD -->
-    <script src="/ice-render.js"></script>
+    <!-- 站点部署在子路径（/ice-render-doc/）下，这里必须用相对路径，根绝对路径会 404 -->
+    <script src="../ice-render.js"></script>
     <script src="./index.umd.js"></script>
     <script type="text/javascript">
       const ice = new IED.ICE().init('canvas-1');
@@ -304,20 +304,15 @@
       });
 
       // 画布默认支持滚轮缩放 + 空白/中键拖拽。
-      function zoomAtClientPoint(clientX, clientY, factor) {
-        const oldScale = ice.viewport.scale;
-        const nextScale = Math.max(0.3, Math.min(3, oldScale * factor));
-        const rect = canvasEl.getBoundingClientRect();
-        const cx = clientX - rect.left;
-        const cy = clientY - rect.top;
-        const tx = cx - ((cx - ice.viewport.tx) * nextScale) / oldScale;
-        const ty = cy - ((cy - ice.viewport.ty) * nextScale) / oldScale;
-        ice.setViewport(nextScale, tx, ty);
-      }
-      canvasEl.addEventListener('wheel', (evt) => {
-        evt.preventDefault();
-        zoomAtClientPoint(evt.clientX, evt.clientY, evt.deltaY > 0 ? 0.9 : 1.1);
-      });
+      // 锚点缩放直接用引擎原语 ICE.zoomAt（内部用 screenToWorld 反解平移并钳制 scale）。
+      canvasEl.addEventListener(
+        'wheel',
+        (evt) => {
+          evt.preventDefault();
+          ice.zoomAt(evt.offsetX, evt.offsetY, evt.deltaY > 0 ? 1 / 1.1 : 1.1, 0.3, 3);
+        },
+        { passive: false }
+      );
 
       let panning = false;
       let lastX = 0;
@@ -331,9 +326,8 @@
           root = root.parentNode;
         }
         //判类型不要用 constructor.name：下游打包会 mangle 类名（Entity → Xr），判断会静默失效。
-        //Entity / Relation 上挂了稳定标识 typeId（`ice-entity-designer:Entity`），
-        //并且直接拿类上的静态值比较 —— 不写字面量，typeId 改名时这里不会静默失效。
-        return root && root.constructor && root.constructor.typeId === IED.Entity.typeId ? root : null;
+        //Entity / Relation 上挂了稳定标识 typeId，用它判断（压缩安全）。
+        return root && root.constructor && root.constructor.typeId === 'ice-entity-designer:Entity' ? root : null;
       }
 
       function entityCenterInCanvas(entity) {
@@ -1267,7 +1261,7 @@
           }
           //判类型不要用 constructor.name：下游打包会 mangle 类名（Relation → Br），判断会静默失效。
           //Relation / Entity 上都挂了稳定标识 typeId，用它判断（压缩安全）。
-          if (selected.constructor && selected.constructor.typeId === IED.Relation.typeId) {
+          if (selected.constructor && selected.constructor.typeId === 'ice-entity-designer:Relation') {
             // key 绑定选中项 id：面板里的输入框是**非受控**（defaultValue）的，
             // 不换 key 的话 React 复用旧 DOM，切换选中后仍显示上一个对象的旧值
             //（用户照着旧值编辑，会写到新选中的对象上）。
@@ -1360,7 +1354,7 @@
           relShapeSelect &&
           selectedRel &&
           selectedRel.constructor &&
-          selectedRel.constructor.typeId === IED.Relation.typeId &&
+          selectedRel.constructor.typeId === 'ice-entity-designer:Relation' &&
           selectedRel.state.linkShape
         ) {
           relShapeSelect.value = selectedRel.state.linkShape;
@@ -1472,7 +1466,11 @@
       //工具栏「连线形态」：选中连线时直接改这条线；没选中时只作为新建连线的默认形态。
       document.getElementById('rel-shape').addEventListener('change', (evt) => {
         const selectedRel = designer.selected;
-        if (selectedRel && selectedRel.constructor && selectedRel.constructor.typeId === IED.Relation.typeId) {
+        if (
+          selectedRel &&
+          selectedRel.constructor &&
+          selectedRel.constructor.typeId === 'ice-entity-designer:Relation'
+        ) {
           designer.updateRelation(selectedRel.state.id, { linkShape: evt.target.value });
           renderPanel();
           refreshHistoryButtons();

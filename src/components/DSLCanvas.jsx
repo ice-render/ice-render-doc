@@ -1,5 +1,6 @@
 import BrowserOnly from '@docusaurus/BrowserOnly';
 import React, { useEffect, useRef } from 'react';
+import useAssetResolver from '../utils/assetUrl';
 
 // ice-render DSL 以 UMD 形式放在 static/ice-render-dsl.js，全局挂载到 window.ICEDSL。
 // 它依赖 static/ice-render.js（window.ICE），故需先后加载两个脚本。
@@ -21,28 +22,29 @@ function loadScript(src) {
   });
 }
 
-function ensureIce() {
+function ensureIce(src) {
   if (typeof window === 'undefined') return Promise.resolve(null);
   if (window.ICE) return Promise.resolve(window.ICE);
   if (icePromise) return icePromise;
-  icePromise = loadScript('/ice-render.js').then(() => window.ICE);
+  icePromise = loadScript(src).then(() => window.ICE);
   return icePromise;
 }
 
-function ensureDsl() {
+function ensureDsl(src) {
   if (typeof window === 'undefined') return Promise.resolve(null);
   if (window.ICEDSL) return Promise.resolve(window.ICEDSL);
-  return loadScript('/ice-render-dsl.js').then(() => window.ICEDSL);
+  return loadScript(src).then(() => window.ICEDSL);
 }
 
 function DSLCanvasInner({ height = 360, dsl, background = '#ffffff' }) {
   const ref = useRef(null);
+  const resolveAsset = useAssetResolver();
 
   useEffect(() => {
     let ice = null;
     let cancelled = false;
 
-    Promise.all([ensureIce(), ensureDsl()])
+    Promise.all([ensureIce(resolveAsset('/ice-render.js')), ensureDsl(resolveAsset('/ice-render-dsl.js'))])
       .then(([ICE, ICEDSL]) => {
         if (cancelled || !ref.current || !ICE || !ICEDSL) return;
         const canvas = ref.current;
