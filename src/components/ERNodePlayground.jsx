@@ -87,15 +87,15 @@ function mergeDeep(target, ...sources) {
   return target;
 }
 
-function ensureIce() {
+function ensureIce(src) {
   if (typeof window === 'undefined') return Promise.resolve(null);
   if (window.ICE) return Promise.resolve(window.ICE);
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = '/ice-render.js';
+    s.src = src;
     s.async = true;
     s.onload = () => resolve(window.ICE);
-    s.onerror = () => reject(new Error('ice-render.js 加载失败'));
+    s.onerror = () => reject(new Error(`${src} 加载失败`));
     document.head.appendChild(s);
   });
 }
@@ -103,6 +103,7 @@ function ensureIce() {
 function ERNodePlaygroundInner() {
   const canvasRef = useRef(null);
   const iceRef = useRef(null);
+  const resolveAsset = useAssetResolver();
   const nodesRef = useRef([]);
   const [ready, setReady] = useState(false);
   const [selected, setSelected] = useState(0);
@@ -131,7 +132,7 @@ function ERNodePlaygroundInner() {
     let cancelled = false;
     let ice = null;
 
-    ensureIce()
+    ensureIce(resolveAsset('/ice-render.js'))
       .then((ICE) => {
         if (cancelled || !canvasRef.current || !ICE) return;
 
