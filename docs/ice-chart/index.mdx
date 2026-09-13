@@ -2,6 +2,8 @@
 sidebar_position: 1
 ---
 
+import LiveExample from '@site/src/components/LiveExample';
+
 # ice-chart · 交互式图表库
 
 **ice-chart 是构建在 ice-render 引擎之上的交互式图表库（当前 `@damoqiongqiu/ice-chart` v0.17.2）。** 它不是「把数据画成图」的又一个图表库——命中测试、事件派发、嵌套坐标系、脏矩形局部重绘**全部交给 ice-render 引擎**，图表层只负责把「数据 ↔ 像素 ↔ 语义事件」这三件事打通。
@@ -12,13 +14,18 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
 ## 一个完整的实时大屏例子（就是仓库里的 `examples/dashboard-market.html`）
 
-下面这个 iframe 直接嵌入了 `ice-chart` 仓库 `examples/dashboard-market.html` 的**完整代码**：行情监控大屏（K 线、深度、资金流、板块、委托队列等一整屏图表），所有交互（悬停十字准星、框选缩放、图例联动、键盘导航）都由引擎内建。首次加载会从文档静态托管拉取 ~450KB 的 ice-render + ice-chart UMD 运行时（无需联网）：
+下面这个例子**直接由文档静态托管的 ice-render + ice-chart UMD 运行时在文档页里画出**（无需联网）：行情监控大屏（K 线、深度、资金流、板块、委托队列等一整屏图表），所有交互（悬停十字准星、框选缩放、图例联动、键盘导航）都由引擎内建。
 
-<iframe
-  src="/ice-chart/dashboard-market.html"
-  title="ice-chart 行情监控大屏"
-  loading="lazy"
-  style={{ width: '100%', height: '820px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#0b1020' }}
+<LiveExample
+  html="/ice-chart/dashboard-market.html"
+  bundles={[
+    '/ice-chart/vendor/ice-render.umd.js',
+    '/ice-chart/vendor/ice-chart.umd.js',
+    '/ice-chart/assets/snapshot-panel.js',
+    '/ice-chart/assets/dash-kit.js',
+  ]}
+  height={820}
+  background="#0b1020"
 />
 
 > 这就是 ice-chart 的核心卖点：**图表层不碰 DOM 事件，只声明「数据 → 像素 → 语义事件」，命中与派发全部由引擎承担。** 同一份引擎实例池还能让多张图共享统一的事件语义，跨图联动因此水到渠成。
@@ -156,13 +163,18 @@ if (diagnostics.length === 0) {
 这套「用户意图 → AI Agent → JSON DSL → 引擎」的接入思路，和 [DSL 与 AI Agent 接入](/docs/guide/dsl) 里 ice-render 通用 DSL 是同一套哲学——**Agent 只产出数据，引擎负责渲染与交互**。ER 建模用 `ice-entity-designer-dsl`，通用图形用 `ice-render-dsl`，图表用 `ice-chart-dsl`，三者互不混用。
 :::
 
-下面这个 iframe 嵌入了仓库里的 `examples/dsl-vs-option.html`，左边手写 `option`、右边 DSL 编译，**两张图逐像素一致**（右下角自检面板会实时打印诊断）：
+下面这个例子**由打包好的运行时在文档页里直接画出**了仓库里的 `examples/dsl-vs-option.html`：左边手写 `option`、右边 DSL 编译，**两张图逐像素一致**（右下角自检面板会实时打印诊断）：
 
-<iframe
-  src="/ice-chart/dsl-vs-option.html"
-  title="ice-chart · 手写 option vs DSL"
-  loading="lazy"
-  style={{ width: '100%', height: '760px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}
+<LiveExample
+  html="/ice-chart/dsl-vs-option.html"
+  bundles={[
+    '/ice-chart/vendor/ice-render.umd.js',
+    '/ice-chart/vendor/ice-chart.umd.js',
+    '/ice-chart/vendor/ice-chart-dsl.umd.js',
+    '/ice-chart/assets/snapshot-panel.js',
+  ]}
+  height={760}
+  background="#f8fafc"
 />
 
 ## 相关链接

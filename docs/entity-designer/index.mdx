@@ -2,6 +2,8 @@
 sidebar_position: 1
 ---
 
+import LiveExample from '@site/src/components/LiveExample';
+
 # Entity Designer · ER 图设计器（当前 v0.0.40）
 
 **Entity Designer 是基于 ice-render 内核构建的 ER（实体-关系）建模设计器**——它不重复实现底层图元，只在 `ICEGroup`、连线族与事件总线之上，收敛出数据库建模最常用的交互：实体表、字段、主外键约束、关系连线、对齐参考线、自动布局、TypeORM Schema 实时序列化。
@@ -12,16 +14,22 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
 ## 一个完整的实时例子（就是仓库里的 `examples/entity-editor.html`）
 
-下面这个 iframe 直接嵌入了 `ice-entity-designer` 仓库 `examples/entity-editor.html` 的**完整代码**：工具栏（新增 / 删除 / 撤销 / 重做 / 校验 / 保存 / 加载 / 输出 Schema / 重置视图）、四种自动布局（水平 / 垂直 / 径向 / 力导向）、连接关系、滚轮缩放 + 拖拽平移，右侧 antd 面板可编辑实体字段与关系属性，并实时切换到「序列化 JSON / TypeORM Schema」标签页。初始已加载一套 30 张表的电商域模型，你可以直接改、直接连、直接看 Schema 落地：
+下面这个例子**直接由文档静态托管的 ice-entity-designer 运行时（已 inline 进 UMD，含 ice-render 内核 + React / antd）在文档页里画出**（无需联网）：工具栏（新增 / 删除 / 撤销 / 重做 / 校验 / 保存 / 加载 / 输出 Schema / 重置视图）、四种自动布局（水平 / 垂直 / 径向 / 力导向）、连接关系、滚轮缩放 + 拖拽平移，右侧 antd 面板可编辑实体字段与关系属性，并实时切换到「序列化 JSON / TypeORM Schema」标签页。初始已加载一套 30 张表的电商域模型，你可以直接改、直接连、直接看 Schema 落地：
 
-<iframe
-  src="/ied/entity-editor.html"
-  title="Entity Designer 实时编辑器"
-  loading="lazy"
-  style={{ width: '100%', height: '780px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}
+<LiveExample
+  html="/ied/entity-editor.html"
+  bundles={[
+    '/ied/vendor/react.production.min.js',
+    '/ied/vendor/react-dom.production.min.js',
+    '/ied/vendor/dayjs.min.js',
+    '/ied/vendor/antd.min.js',
+    '/ied/index.umd.js',
+  ]}
+  height={780}
+  background="#f8fafc"
 />
 
-> 这就是 Entity Designer 的完整能力：**所见即所得地画 ER 图，画完直接拿到可落库的 TypeORM Schema。** 首次加载会拉取 ~1.8MB 的 React / antd 运行时（已随文档静态托管，无需联网）。
+> 这就是 Entity Designer 的完整能力：**所见即所得地画 ER 图，画完直接拿到可落库的 TypeORM Schema。**
 
 ## 核心能力
 
@@ -205,7 +213,7 @@ if (issues.length === 0) {
 | 流程图 | 起止 / 处理 / 判定 / 输入输出四类节点，正交或贝塞尔连线 + 分支标签 | [`flowchart-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/flowchart-editor.html) |
 | BPMN 2.0 | 池 / 泳道真嵌套、事件 / 网关 / 任务角标 / 数据对象 / 注释、语义校验、BPMN 2.0 XML 导入导出（含 BPMNDI） | [`bpmn-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/bpmn-editor.html) |
 | UML 类图 | 三段式类框、六种关系、继承成环校验、PlantUML / Mermaid 文本互操作 | [`uml-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/uml-editor.html) |
-| 状态机 | 伪状态 / 普通状态 / **复合状态容器**、转移标签 `事件 [守卫] / 动作`、PlantUML 状态图互操作 | [`statechart-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/statechart-editor.html) |
+| 状态机 | 伪状态 / 普通状态 / **复合状态容器**、转移标签 `事件 [守卫] / 动作`、PlantUML 状态图互操作 | [`statechart-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/statechart-editor.html) |
 | 甘特图 | 时间轴与按天吸附、依赖线、自动排程与关键路径、资源冲突校验、Mermaid gantt 互操作 | [`gantt-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/gantt-editor.html) |
 | 电力一次系统图 | 23 种一次设备符号（JB/T 5872-1991、GB/T 4728）、开关分合、带电分析与电压色标、母线 T 接、五防相关校验 | [`power-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/power-editor.html) · [`power-symbols.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/power-symbols.html) |
 | 电力二次回路 | 保护电流回路：CT 二次绕组 → 三相回路 → 端子排（真容器）→ 保护装置；回路编号 / 三相成组 / 端子号 / 接地校验 | [`secondary-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/secondary-editor.html) |

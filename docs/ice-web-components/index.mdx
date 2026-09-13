@@ -2,6 +2,8 @@
 sidebar_position: 1
 ---
 
+import LiveExample from '@site/src/components/LiveExample';
+
 # ice-web-components · Canvas 原生 UI 组件库
 
 **ice-web-components 是构建在 ice-render 引擎之上的 Swing 风格 Canvas UI 组件库（当前 `ice-web-components` v1.4.0）。** 它把所有 UI 像素——按钮、输入框、表格、弹窗、乃至焦点环与阴影——**全部画在一个 `<canvas>` 上**：没有 DOM widget，没有 CSS 框架，每一像素都由引擎绘制。
@@ -14,74 +16,74 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
 ## 一个完整的实时例子（就是仓库里的 `examples/gallery.html`）
 
-下面这个 iframe 直接嵌入了 `ice-web-components` 仓库 `examples/gallery.html` 的**完整代码**：86 个组件在一张画布上逐个排布，按钮点击、输入框、下拉、表格、弹窗、通知等交互全部可用。首次加载会从文档静态托管拉取 ~550KB 的 ice-render + ice-web-components UMD 运行时（无需联网）：
+下面这个例子**直接由文档静态托管的 ice-render + ice-web-components UMD 运行时在文档页里画出**（无需联网）：86 个组件在一张画布上逐个排布，按钮点击、输入框、下拉、表格、弹窗、通知等交互全部可用。
 
-<iframe
-  src="/ice-web-components/gallery.html"
-  title="ice-web-components 组件画廊"
-  loading="lazy"
-  style={{ width: '100%', height: '1000px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}
+<LiveExample
+  html="/ice-web-components/gallery.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={1000}
+  background="#f8fafc"
 />
 
 ## 趣味示例（Just for fun）
 
-下面这些都是**用 ice-web-components 写的完整小应用**，直接以 iframe 嵌入（鼠标、键盘全部可用，运行时从本站静态托管拉取，无需联网）。它们最能体现「一个 canvas 上能画出多好玩的东西」：
+下面这些都是**用 ice-web-components 写的完整小应用**，同样由打包好的运行时在文档页里直接画出（鼠标、键盘全部可用，运行时从本站静态托管加载，无需联网）。它们最能体现「一个 canvas 上能画出多好玩的东西」：
 
-> 📐 这些 demo 的画布比文档栏更宽，iframe 内会出现**横向滚动条**——把框往右拖就能看到完整画面（鼠标 / 键盘交互始终准确，因为引擎按 CSS 像素做坐标映射，不做缩放）。
+> 📐 这些 demo 的画布比文档栏更宽，容器内会出现**横向滚动条**——把框往右拖就能看到完整画面（鼠标 / 键盘交互始终准确，因为引擎按 CSS 像素做坐标映射，不做缩放）。
 
 ### 🖥️ ICE Desktop · Windows XP
 
 纯 ICE 组件复刻的 XP 桌面：开机自检 → 启动菜单 → 桌面 + 任务栏 + 开始菜单 + 可拖拽窗口。它顺便演示了组件库的主题系统（`iceUIManager.registerTheme('xp', ICE_XP_THEME)`），一套令牌切出整台机器的皮肤。
 
-<iframe
-  src="/ice-web-components/windows-xp.html"
-  title="ICE Desktop · Windows XP"
-  loading="lazy"
-  style={{ width: '100%', height: '900px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#000' }}
+<LiveExample
+  html="/ice-web-components/windows-xp.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={900}
+  background="#000"
 />
 
 ### 🎮 ICE Arcade
 
 一台纯组件绘制的掌机，卡带即插即换：**2048 / 贪吃蛇 / 俄罗斯方块 / 扫雷**。游戏规则全部落在纯逻辑模型里（各自有单测），画面里**没有一个位图资源**——机壳、屏幕框、HUD、按键全是 ICE 组件。
 
-<iframe
-  src="/ice-web-components/arcade.html"
-  title="ICE Arcade"
-  loading="lazy"
-  style={{ width: '100%', height: '800px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#080a0f' }}
+<LiveExample
+  html="/ice-web-components/arcade.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={800}
+  background="#080a0f"
 />
 
 ### 🎨 ICE Pixel Studio
 
 像素画板：铅笔 / 橡皮 / 直线 / 矩形 / 油漆桶，**撤销重做** + **PNG / SVG 导出**，全部由 canvas 组件绘制。
 
-<iframe
-  src="/ice-web-components/pixel-editor.html"
-  title="ICE Pixel Studio"
-  loading="lazy"
-  style={{ width: '100%', height: '920px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}
+<LiveExample
+  html="/ice-web-components/pixel-editor.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={920}
+  background="#f8fafc"
 />
 
 ### 🧪 ICE Algorithm Sandbox
 
 算法可视化：排序（冒泡 / 插入 / 选择 / 归并 / 快速）+ 寻路（BFS / DFS / Dijkstra / A\*），可**播放、单步、倒带、变速**，回放每一步的轨迹。
 
-<iframe
-  src="/ice-web-components/algorithm-sandbox.html"
-  title="ICE Algorithm Sandbox"
-  loading="lazy"
-  style={{ width: '100%', height: '920px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}
+<LiveExample
+  html="/ice-web-components/algorithm-sandbox.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={920}
+  background="#f8fafc"
 />
 
 ### 💻 ICE-DOS Terminal
 
 一个能敲的 DOS 终端：**虚拟文件系统** + 16 条命令 + 历史记录 / TAB 补全 / 清屏，逻辑全在纯模型里（点一下框内、直接用键盘 input）。
 
-<iframe
-  src="/ice-web-components/dos-terminal.html"
-  title="ICE-DOS Terminal"
-  loading="lazy"
-  style={{ width: '100%', height: '920px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}
+<LiveExample
+  html="/ice-web-components/dos-terminal.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={920}
+  background="#f8fafc"
 />
 
 > 还有更多能力向 demo 没放进上面（避免页面过长）：`examples/admin.html`（管理后台）、`examples/workbench.html`（工作台）、`examples/custom-component.html`（自定义组件）。它们同样零外部依赖，需要时也能以同样方式嵌入。
