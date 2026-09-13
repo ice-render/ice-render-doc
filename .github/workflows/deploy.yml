@@ -1,0 +1,50 @@
+name: Deploy to GitHub Pages
+
+on:
+  # 推到 master 即构建并部署（本仓库流程：dev 合并到 master 后推送）
+  push:
+    branches: [master]
+  # 仅做构建校验，不部署
+  pull_request:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 允许一个并发部署，跳过进行中的旧部署
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build website
+        run: npm run build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./build
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

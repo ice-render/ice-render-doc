@@ -4,19 +4,26 @@ const { themes } = require('prism-react-renderer');
 const lightCodeTheme = themes.github;
 const darkCodeTheme = themes.dracula;
 
+// 部署到 GitHub Pages 项目页：站点挂在 https://ice-render.github.io/ice-render-doc/ 下。
+// baseUrl 必须以斜杠开头和结尾。注意：Docusaurus 不会对 siteConfig.scripts/stylesheets
+// 的 src 自动套用 useBaseUrl（synthetic.js 原样输出），所以脚本路径必须手动带上 baseUrl
+// 前缀，否则 `jsx live` 示例块在子路径部署下会 404。这里用同一常量驱动，避免两者漂移。
+const baseUrl = '/ice-render-doc/';
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'ICE Render',
   tagline: '雪花渲染器 · 高性能 Canvas 2D 交互图形引擎',
   url: 'https://ice-render.github.io',
-  baseUrl: '/',
+  baseUrl,
   onBrokenLinks: 'throw',
   // 文件名带 -ice 后缀用于破坏浏览器 favicon 缓存（旧恐龙图标一直被浏览器按 URL 缓存）
   favicon: 'img/favicon-ice.ico',
   organizationName: 'ice-render',
   projectName: 'ice-render',
   // 全局加载 ice-render 内核，供 `jsx live` 代码块直接使用 window.ICE（defer：HTML 解析后、水合前执行）
-  scripts: [{ src: '/ice-render.js', defer: true }],
+  // src 必须带 baseUrl 前缀（见上方说明）；baseUrl 改了这里也要跟着改，故用同一常量。
+  scripts: [{ src: `${baseUrl}ice-render.js`, defer: true }],
 
   markdown: {
     mermaid: true,
