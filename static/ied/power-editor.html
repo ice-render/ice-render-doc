@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>IED-Power-editor</title>
+  <style>
+    body { margin: 0; font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; color: #0f172a; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; background: #fff; }
+    button, select, input { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; font: inherit; }
+    .hint { color: #64748b; font-size: 12px; }
+    .layout { display: grid; grid-template-columns: 1fr 300px; height: calc(100vh - 53px); }
+    .canvas-wrap { overflow: hidden; background: #fff; }
+    canvas { display: block; }
+    aside { padding: 12px 14px; border-left: 1px solid #e2e8f0; background: #fff; overflow: auto; font-size: 13px; }
+    aside h3 { margin: 14px 0 6px; font-size: 13px; color: #64748b; }
+    .issue.error { color: #b91c1c; }
+    .issue.warning { color: #b45309; }
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .row label { width: 64px; color: #475569; font-size: 13px; }
+    .row input, .row select { flex: 1; }
+  </style>
+  <body>
+    <div class="toolbar">
+      <select id="in-kind" title="新增设备类型">
+        <option value="breaker">断路器 QF</option>
+        <option value="disconnector">隔离开关 QS</option>
+        <option value="loadSwitch">负荷开关 QL</option>
+        <option value="earthingSwitch">接地开关 QE</option>
+        <option value="busbar">母线</option>
+        <option value="currentTransformer">电流互感器 TA</option>
+        <option value="voltageTransformer">电压互感器 TV</option>
+        <option value="transformer">变压器 TM</option>
+        <option value="fuse">熔断器 FU</option>
+        <option value="arrester">避雷器 F</option>
+        <option value="reactor">电抗器 L</option>
+        <option value="generator">发电机 G</option>
+        <option value="motor">电动机 M</option>
+        <option value="load">负荷 / 出线</option>
+      </select>
+      <button id="btn-add">新增设备</button>
+      <button id="btn-delete">删除选中</button>
+      <button id="btn-undo">撤销</button>
+      <button id="btn-redo">重做</button>
+      <span class="hint">|</span>
+      <select id="in-voltage" title="新设备电压等级">
+        <option>110kV</option>
+        <option>220kV</option>
+        <option>500kV</option>
+        <option>35kV</option>
+        <option>10kV</option>
+      </select>
+      <button id="btn-link">导体</button>
+      <button id="btn-toggle">分 / 合</button>
+      <button id="btn-topology">带电分析</button>
+      <button id="btn-fit">适应视图</button>
+      <button id="btn-reset">复位视图</button>
+      <button id="btn-validate">校验</button>
+      <button id="btn-export-svg">导出 SVG</button>
+      <button id="btn-export-json">导出 JSON</button>
+      <button id="btn-import-json">导入 JSON</button>
+      <span class="hint">拖动设备会自动重排导体；「分 / 合」按钮切换选中开关的运行状态</span>
+    </div>
+    <div class="layout">
+      <div class="canvas-wrap"><canvas id="canvas-1" width="1400" height="1000"></canvas></div>
+      <aside>
+        <h3>属性</h3>
+        <div id="panel" class="hint">点击设备 / 导体进行编辑</div>
+        <h3>校验（结构 + 电压等级 + 五防）</h3>
+        <div id="validate-output" class="hint">点击「校验」运行语义检查</div>
+        <h3>运行提示</h3>
+        <div id="topology-output" class="hint">点击「带电分析」按电压等级色标着色（不带电变灰）</div>
+      </aside>
+    </div>
+
+    <script src="../ice-render.js"></script>
+    <script src="./index.umd.js"></script>
+    <script src="./canvas-interactions.js"></script>
+    <script type="text/javascript">
+      const { ICE, PowerDesigner, POWER_VOLTAGE_LEVELS } = IED;
+      const ice = new ICE().init('canvas-1');
+      const designer = new PowerDesigner(ice);
+      const canvasEl = document.getElementById('canvas-1');
+      const viewport = IedCanvasViewport.install({ ice, canvas: canvasEl, designer });
+      ice.alignmentGuide.enable({ threshold: 6 });
+      window.__ice = ice;
+      window.__designer = designer;
+
+      const panel = document.getElementById('panel');
+      const validateOutput = document.getElementById('validate-output');
+      const topologyOutput = document.getElementById('topology-output');
+      let linking = false;
+      let linkSource = null;
+
+      /** 一条间隔（串联设备链）垂直排布：第一个由 attachToBus 定位，其余按固定步长往下排 */
+      function layoutBay(chain, step) {
+        const box = chain[0].getMinBoundingBox(true);
+        const worldLeft = box.tl[0];
+        const worldTop = box.tl[1];
+        chain.forEach((node, index) => {
+          if (index === 0) {
+            return;
+          }
+          node.setState({ left: worldLeft, top: worldTop + index * step });
+        });
+      }
+
+      /* ---------------- 案例：110kV 变电站（双母线 + 母联 + 两回进线 + 两台主变） ---------------- */
+      function buildCase() {
+        designer.clear();
+        const V110 = '110kV';
+        const V10 = '10kV';
+        const add = (kind, props) => designer.createSymbol(kind, { ...props });
+
+        /** 一条 110kV 间隔（双母线）：Ⅰ母刀闸 + Ⅱ母刀闸 + 断路器 + 电流互感器 + 线路侧刀闸 + 出线/主变
+         *  线路侧再挂接地刀闸与避雷器；正常运行方式：只合一把母线刀闸，另一把分位。 */
+        function bay110(x, name, terminalKind, terminalName, voltageOfTerminal, activeBus) {
+          const prefix = name;
+          const ds1 = add('disconnector', { name: `${prefix}1`, voltageLevel: V110, left: x, top: 320 });
+          const ds2 = add('disconnector', { name: `${prefix}2`, voltageLevel: V110, left: x, top: 320 });
+          const qf = add('breaker', { name: prefix, voltageLevel: V110, left: x, top: 350 });
+          const ct = add('currentTransformer', { name: `${prefix}TA`, voltageLevel: V110, left: x, top: 440 });
+          const ds3 = add('disconnector', { name: `${prefix}3`, voltageLevel: V110, left: x, top: 520 });
+          const terminal = add(terminalKind, { name: terminalName, voltageLevel: voltageOfTerminal, left: x, top: 620 });
+          const es = add('earthingSwitch', { name: `${prefix}9`, voltageLevel: V110, left: x + 80, top: 560 });
+          const fa = add('arrester', { name: `${prefix}F`, voltageLevel: V110, left: x - 80, top: 560 });
+
+          designer.createLine({ sourceId: ds1.state.id, targetId: qf.state.id });
+          designer.createLine({ sourceId: ds2.state.id, targetId: qf.state.id });
+          designer.createLine({ sourceId: qf.state.id, targetId: ct.state.id });
+          designer.createLine({ sourceId: ct.state.id, targetId: ds3.state.id });
+          designer.createLine({ sourceId: ds3.state.id, targetId: terminal.state.id });
+          designer.createLine({ sourceId: ds3.state.id, targetId: es.state.id });
+          designer.createLine({ sourceId: ds3.state.id, targetId: fa.state.id });
+          designer.attachToBus(ds1, bus1, { centerX: x });
+          designer.attachToBus(ds2, bus2, { centerX: x });
+          // 正常运行方式：间隔只接一条母线（另一把母线刀闸分位），双母线并列运行靠母联
+          designer.setSwitchState(ds1.state.id, activeBus === 1 ? 'closed' : 'open');
+          designer.setSwitchState(ds2.state.id, activeBus === 2 ? 'closed' : 'open');
+          [qf, ds3].forEach((device) => designer.setSwitchState(device.state.id, 'closed'));
+          designer.setSwitchState(es.state.id, 'open');
+          return { qf, terminal, ds3 };
+        }
+
+        // ---- 110kV 双母线 ----
+        const bus1 = add('busbar', { name: '#1M', voltageLevel: V110, left: 140, top: 120, width: 1320 });
+        const bus2 = add('busbar', { name: '#2M', voltageLevel: V110, left: 140, top: 220, width: 1320 });
+
+        const line1 = bay110(240, '1101', 'generator', '甲线', V110, 1);
+        const line2 = bay110(440, '1102', 'generator', '乙线', V110, 1);
+        const t1 = bay110(640, '1011', 'transformer', 'T1', V110, 1);
+        const t2 = bay110(960, '1012', 'transformer', 'T2', V110, 2);
+
+        // ---- 母联间隔 1013：两条母线之间，带 CT 与接地刀闸（正常运行合位）----
+        const tieDs1 = add('disconnector', { name: '10131', voltageLevel: V110, left: 1160, top: 320 });
+        const tieQf = add('breaker', { name: '1013', voltageLevel: V110, left: 1160, top: 350 });
+        const tieCt = add('currentTransformer', { name: '1013TA', voltageLevel: V110, left: 1160, top: 440 });
+        const tieDs2 = add('disconnector', { name: '10132', voltageLevel: V110, left: 1160, top: 520 });
+        const tieEs = add('earthingSwitch', { name: '10139', voltageLevel: V110, left: 1250, top: 470 });
+        designer.createLine({ sourceId: tieDs1.state.id, targetId: tieQf.state.id });
+        designer.createLine({ sourceId: tieQf.state.id, targetId: tieCt.state.id });
+        designer.createLine({ sourceId: tieCt.state.id, targetId: tieDs2.state.id });
+        designer.createLine({ sourceId: tieCt.state.id, targetId: tieEs.state.id });
+        designer.attachToBus(tieDs1, bus1, { centerX: 1160 });
+        designer.attachToBus(tieDs2, bus2, { centerX: 1160 });
+        [tieDs1, tieQf, tieDs2].forEach((device) => designer.setSwitchState(device.state.id, 'closed'));
+        designer.setSwitchState(tieEs.state.id, 'open');
+
+        // ---- 母线 PT 间隔 1014：刀闸 + 熔断器 + 电压互感器（+ 避雷器），挂 Ⅰ 母 ----
+        const ptDs = add('disconnector', { name: '10141', voltageLevel: V110, left: 1340, top: 320 });
+        const ptFu = add('fuse', { name: '1014FU', voltageLevel: V110, left: 1340, top: 400 });
+        const ptTv = add('voltageTransformer', { name: '1014TV', voltageLevel: V110, left: 1340, top: 480 });
+        const ptFa = add('arrester', { name: '1014F', voltageLevel: V110, left: 1420, top: 480 });
+        designer.createLine({ sourceId: ptDs.state.id, targetId: ptFu.state.id });
+        designer.createLine({ sourceId: ptFu.state.id, targetId: ptTv.state.id });
+        designer.createLine({ sourceId: ptTv.state.id, targetId: ptFa.state.id });
+        designer.attachToBus(ptDs, bus1, { centerX: 1340 });
+        designer.setSwitchState(ptDs.state.id, 'closed');
+
+        // ---- 10kV 侧：两台主变低压侧（断路器 + CT）接单母线分段 ----
+        const lv1Qf = add('breaker', { name: '901', voltageLevel: V10, left: 640, top: 780 });
+        const lv1Ct = add('currentTransformer', { name: '901TA', voltageLevel: V10, left: 640, top: 860 });
+        const lv2Qf = add('breaker', { name: '902', voltageLevel: V10, left: 960, top: 780 });
+        const lv2Ct = add('currentTransformer', { name: '902TA', voltageLevel: V10, left: 960, top: 860 });
+        designer.createLine({ sourceId: t1.terminal.state.id, targetId: lv1Qf.state.id });
+        designer.createLine({ sourceId: lv1Qf.state.id, targetId: lv1Ct.state.id });
+        designer.createLine({ sourceId: t2.terminal.state.id, targetId: lv2Qf.state.id });
+        designer.createLine({ sourceId: lv2Qf.state.id, targetId: lv2Ct.state.id });
+        [lv1Qf, lv2Qf].forEach((device) => designer.setSwitchState(device.state.id, 'closed'));
+
+        // 10kV 单母线分段：#3M（左段）— 分段断路器 900 — #4M（右段）
+        const bus3 = add('busbar', { name: '#3M', voltageLevel: V10, left: 240, top: 960, width: 500 });
+        const bus4 = add('busbar', { name: '#4M', voltageLevel: V10, left: 900, top: 960, width: 560 });
+        const secQf = add('breaker', { name: '900', voltageLevel: V10, left: 830, top: 960 });
+        const secCt = add('currentTransformer', { name: '900TA', voltageLevel: V10, left: 770, top: 960 });
+        designer.attachToBus(lv1Ct, bus3, { centerX: 640 });
+        designer.attachToBus(lv2Ct, bus4, { centerX: 960 });
+        // 分段「导体 — CT — 断路器 — 导体」串联（CT 是串联元件，不是死头分支）
+        designer.createLine({ sourceId: bus3.state.id, targetId: secCt.state.id, sourcePort: 'R', targetPort: 'L' });
+        designer.createLine({ sourceId: secCt.state.id, targetId: secQf.state.id, sourcePort: 'R', targetPort: 'L' });
+        designer.createLine({ sourceId: secQf.state.id, targetId: bus4.state.id, sourcePort: 'R', targetPort: 'L' });
+        // 真实运行方式：10kV 分段断路器**分位**（两段分裂运行，避免 10kV 侧合环；备自投负责失电切换）
+        designer.setSwitchState(secQf.state.id, 'open');
+
+        /** 一条 10kV 间隔：断路器 + CT + 末端设备（开关柜的隔离由手车实现，单线图不画隔离开关）*/
+        function bay10(x, name, terminalKind, terminalName, bus) {
+          const qf = add('breaker', { name, voltageLevel: V10, left: x, top: 940 });
+          const ct = add('currentTransformer', { name: `${name}TA`, voltageLevel: V10, left: x, top: 1010 });
+          const terminal = add(terminalKind, { name: terminalName, voltageLevel: V10, left: x, top: 1080 });
+          designer.createLine({ sourceId: qf.state.id, targetId: ct.state.id });
+          designer.createLine({ sourceId: ct.state.id, targetId: terminal.state.id });
+          designer.attachToBus(qf, bus, { centerX: x });
+          designer.setSwitchState(qf.state.id, 'closed');
+          return { qf, terminal };
+        }
+
+        bay10(300, '601', 'load', '1 号出线', bus3);
+        bay10(460, '602', 'load', '2 号出线', bus3);
+        bay10(1080, '603', 'load', '3 号出线', bus4);
+        bay10(1220, '604', 'load', '4 号出线', bus4);
+        // 无功补偿（#3M）与站用变（#4M）—— 用上这一批新补的符号
+        bay10(560, '605', 'capacitor', '电容器组', bus3);
+        bay10(1360, '606', 'groundingTransformer', '站用变', bus4);
+
+        // 电源点：两回 110kV 进线
+        designer.setEnergizedSource(line1.terminal.state.id, true);
+        designer.setEnergizedSource(line2.terminal.state.id, true);
+
+        // 出线间隔的线路侧设备（接地刀闸 / 避雷器）已按分位布置，这里统一再算一次带电范围
+        designer.select(null);
+        designer.applyTopology();
+        designer.fitViewport();
+      }
+
+      /* ---------------- 工具栏 ---------------- */
+      document.getElementById('btn-add').addEventListener('click', () => {
+        const kind = document.getElementById('in-kind').value;
+        const voltageLevel = document.getElementById('in-voltage').value;
+        designer.createSymbol(kind, { voltageLevel, name: '' });
+        renderPanel();
+      });
+      document.getElementById('btn-delete').addEventListener('click', () => {
+        if (designer.selectedId) {
+          designer.remove(designer.selectedId);
+          designer.applyTopology();
+          renderPanel();
+        }
+      });
+      document.getElementById('btn-undo').addEventListener('click', () => {
+        designer.undo();
+        renderPanel();
+      });
+      document.getElementById('btn-redo').addEventListener('click', () => {
+        designer.redo();
+        renderPanel();
+      });
+      document.getElementById('btn-fit').addEventListener('click', () => viewport.fitViewport());
+      document.getElementById('btn-reset').addEventListener('click', () => viewport.reset());
+
+      // 分 / 合：切换选中开关的运行状态
+      document.getElementById('btn-toggle').addEventListener('click', () => {
+        const node = designer.nodes.find((item) => item.state.id === designer.selectedId);
+        if (!node) {
+          validateOutput.className = 'hint';
+          validateOutput.textContent = '先选中一个开关（断路器 / 隔离开关 / 负荷开关 / 接地开关）';
+          return;
+        }
+        try {
+          designer.setSwitchState(node.state.id, node.state.switchState === 'closed' ? 'open' : 'closed');
+          renderPanel();
+          validateOutput.className = 'hint';
+          validateOutput.textContent = `✅ 「${node.state.name || node.state.kind}」已${
+            node.state.switchState === 'closed' ? '合闸' : '分闸'
+          }，已重新计算带电范围`;
+        } catch (error) {
+          validateOutput.className = 'issue error';
+          validateOutput.textContent = `❌ ${error.message}`;
+        }
+      });
+
+      document.getElementById('btn-topology').addEventListener('click', () => {
+        const topology = designer.applyTopology();
+        topologyOutput.className = 'hint';
+        topologyOutput.textContent = `✅ 带电设备 ${topology.energized.length} / ${designer.nodes.length}；电气连通域 ${topology.islands.length} 个`;
+      });
+
+      document.getElementById('btn-validate').addEventListener('click', () => {
+        const issues = designer.validatePower();
+        validateOutput.innerHTML = '';
+        validateOutput.className = issues.length ? '' : 'hint';
+        if (!issues.length) {
+          validateOutput.textContent = '✅ 未发现问题';
+          return;
+        }
+        issues.forEach((issue) => {
+          const div = document.createElement('div');
+          div.className = `issue ${issue.level}`;
+          div.textContent = `${issue.level === 'error' ? '❌' : '⚠️'} ${issue.message}`;
+          validateOutput.appendChild(div);
+        });
+      });
+
+      document.getElementById('btn-export-svg').addEventListener('click', () => {
+        const svg = designer.toSvg({ padding: 16, background: '#ffffff' });
+        window.__exportedSvg = svg;
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'substation-110kv.svg';
+        a.click();
+        URL.revokeObjectURL(url);
+        validateOutput.className = 'hint';
+        validateOutput.textContent = `✅ 已导出 SVG（${svg.length} 字节）`;
+      });
+
+      document.getElementById('btn-export-json').addEventListener('click', () => {
+        const json = designer.serialize();
+        window.__exportedJson = json;
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'substation-110kv.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      document.getElementById('btn-import-json').addEventListener('click', () => {
+        if (!window.__exportedJson) {
+          return;
+        }
+        const report = designer.load(window.__exportedJson);
+        designer.applyTopology();
+        designer.fitViewport();
+        validateOutput.className = 'hint';
+        validateOutput.textContent = `✅ 已导入 ${report.nodes} 个设备 / ${report.edges} 段导体`;
+        renderPanel();
+      });
+
+      document.getElementById('btn-link').addEventListener('click', () => {
+        linking = !linking;
+        linkSource = null;
+        document.getElementById('btn-link').classList.toggle('active', linking);
+      });
+
+      function renderPanel() {
+        const node = designer.nodes.find((item) => item.state.id === designer.selectedId);
+        const edge = designer.edges.find((item) => item.state.id === designer.selectedId);
+        panel.innerHTML = '';
+        if (edge) {
+          panel.textContent = `导体（电压等级 ${edge.state.voltageLevel || '未标'}）`;
+          return;
+        }
+        if (!node) {
+          panel.textContent = '点击设备 / 导体进行编辑';
+          return;
+        }
+        const preset = IED.POWER_SYMBOL_PRESETS[node.state.kind];
+        const row = (label, child) => {
+          const div = document.createElement('div');
+          div.className = 'row';
+          const span = document.createElement('label');
+          span.textContent = label;
+          div.appendChild(span);
+          div.appendChild(child);
+          panel.appendChild(div);
+          return div;
+        };
+        const title = document.createElement('div');
+        title.className = 'hint';
+        title.textContent = `${preset.label}（${preset.tag}）`;
+        panel.appendChild(title);
+
+        const nameInput = document.createElement('input');
+        nameInput.value = node.state.name || '';
+        nameInput.addEventListener('change', () => {
+          node.applyPatch({ name: nameInput.value });
+        });
+        row('编号', nameInput);
+
+        const voltageSelect = document.createElement('select');
+        POWER_VOLTAGE_LEVELS.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.level;
+          option.textContent = `${item.level}（${item.colorName}）`;
+          voltageSelect.appendChild(option);
+        });
+        voltageSelect.value = node.state.voltageLevel || '110kV';
+        voltageSelect.addEventListener('change', () => {
+          node.applyPatch({ voltageLevel: voltageSelect.value });
+          designer.edges.forEach((edgeItem) => edgeItem.applyVoltageColor(designer.voltageColors));
+          designer.applyTopology();
+        });
+        row('电压', voltageSelect);
+
+        // 不可变换 → 需要变尺寸的元素（母线长度、柜体宽高）在这里用数值改
+        if (node.state.kind === 'busbar' || node.state.kind === 'cubicle') {
+          const widthInput = document.createElement('input');
+          widthInput.type = 'number';
+          widthInput.min = '80';
+          widthInput.value = String(Math.round(node.state.width));
+          widthInput.addEventListener('change', () => {
+            node.applyPatch({ width: Math.max(80, Number(widthInput.value) || node.state.width) });
+            designer.applyTopology();
+          });
+          row(node.state.kind === 'busbar' ? '母线段长' : '宽', widthInput);
+          if (node.state.kind === 'cubicle') {
+            const heightInput = document.createElement('input');
+            heightInput.type = 'number';
+            heightInput.min = '60';
+            heightInput.value = String(Math.round(node.state.height));
+            heightInput.addEventListener('change', () => {
+              node.applyPatch({ height: Math.max(60, Number(heightInput.value) || node.state.height) });
+            });
+            row('高', heightInput);
+          }
+        }
+
+        const stateSelect = document.createElement('select');
+        ['open', 'closed'].forEach((value) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = value === 'closed' ? '合闸' : '分闸';
+          stateSelect.appendChild(option);
+        });
+        stateSelect.value = node.state.switchState || 'open';
+        stateSelect.disabled = ['breaker', 'disconnector', 'loadSwitch', 'earthingSwitch'].indexOf(node.state.kind) === -1;
+        stateSelect.addEventListener('change', () => {
+          designer.setSwitchState(node.state.id, stateSelect.value);
+        });
+        row('状态', stateSelect);
+      }
+
+      /* ---------------- 画布交互：连线模式 ---------------- */
+      ice.evtBus.on('mousedown', (evt) => {
+        const target = evt.target;
+        if (!target) {
+          return;
+        }
+        const domain = designer.nodes.concat(designer.edges).filter((item) => {
+          let node = target;
+          while (node) {
+            if (node === item) {
+              return true;
+            }
+            node = node.parentNode;
+          }
+          return false;
+        })[0];
+        if (linking) {
+          if (!domain) {
+            return;
+          }
+          if (!linkSource) {
+            linkSource = domain;
+          } else if (linkSource !== domain) {
+            designer.createLine({ sourceId: linkSource.state.id, targetId: domain.state.id });
+            linkSource = null;
+            linking = false;
+            document.getElementById('btn-link').classList.remove('active');
+            designer.applyTopology();
+          }
+          return;
+        }
+        designer.select(domain ? domain.state.id : null);
+        renderPanel();
+      });
+      ice.evtBus.on('mouseup', () => renderPanel());
+
+      buildCase();
+      renderPanel();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>IED-Gantt-editor</title>
+  <style>
+    body { margin: 0; font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; color: #0f172a; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; background: #fff; }
+    button, select, input { padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; font: inherit; }
+    .layout { display: grid; grid-template-columns: 1fr 300px; height: calc(100vh - 53px); }
+    .canvas-wrap { overflow: hidden; background: #fff; }
+    canvas { display: block; }
+    aside { padding: 12px 14px; border-left: 1px solid #e2e8f0; background: #fff; overflow: auto; }
+    aside h3 { margin: 14px 0 6px; font-size: 13px; color: #64748b; }
+    .hint { color: #64748b; font-size: 12px; }
+    .issue.error { color: #b91c1c; }
+    .issue.warning { color: #b45309; }
+    #text-output {
+      width: 100%;
+      min-height: 200px;
+      box-sizing: border-box;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+  </style>
+  <body>
+    <div class="toolbar">
+      <button id="btn-add">新增任务</button>
+      <button id="btn-delete">删除选中</button>
+      <button id="btn-undo">撤销</button>
+      <button id="btn-redo">重做</button>
+      <span class="hint">|</span>
+      <label class="hint">每日像素 <input id="in-daywidth" type="number" value="28" min="8" max="80" style="width: 64px" /></label>
+      <button id="btn-link">依赖</button>
+      <button id="btn-schedule">自动排程</button>
+      <button id="btn-critical">关键路径</button>
+      <button id="btn-fit">适应视图</button>
+      <button id="btn-reset">复位视图</button>
+      <button id="btn-validate">校验</button>
+      <button id="btn-export-svg">导出 SVG</button>
+      <button id="btn-export-text">导出 Mermaid</button>
+      <button id="btn-import-text">导入 Mermaid</button>
+      <span class="hint">拖动任务条会按天吸附（排期语义）</span>
+    </div>
+    <div class="layout">
+      <div class="canvas-wrap"><canvas id="canvas-1" width="1800" height="1100"></canvas></div>
+      <aside>
+        <h3>属性</h3>
+        <div id="panel" class="hint">点击任务条 / 依赖线进行编辑</div>
+        <h3>排期校验</h3>
+        <div id="validate-output" class="hint">点击「校验」运行语义检查</div>
+        <h3>Mermaid gantt 文本</h3>
+        <textarea id="text-output" spellcheck="false" placeholder="点「导出 Mermaid」生成，或粘贴文本后点「导入 Mermaid」"></textarea>
+      </aside>
+    </div>
+
+    <script src="../ice-render.js"></script>
+    <script src="./index.umd.js"></script>
+    <script src="./canvas-interactions.js"></script>
+    <script type="text/javascript">
+      const { ICE, GanttDesigner } = IED;
+      const ice = new ICE().init('canvas-1');
+      const designer = new GanttDesigner(ice);
+      const canvasEl = document.getElementById('canvas-1');
+      const viewport = IedCanvasViewport.install({ ice, canvas: canvasEl, designer });
+      ice.alignmentGuide.enable({ threshold: 6 });
+      window.__ice = ice;
+      window.__designer = designer;
+
+      const panel = document.getElementById('panel');
+      const validateOutput = document.getElementById('validate-output');
+      let linking = false;
+      let linkSource = null;
+
+      /* ---------------- 案例：移动端 2.0 发布排期 ---------------- */
+      function buildCase() {
+        designer.clear();
+        const tasks = [
+          // resource = 负责人/团队：用于资源冲突校验，也对应 Mermaid gantt 的 section
+          { title: '需求评审', start: '2026-03-02', days: 4, progress: 1, resource: '产品' },
+          { title: '交互设计', start: '2026-03-05', days: 6, progress: 0.8, resource: '设计' },
+          { title: '前端开发', start: '2026-03-10', days: 12, progress: 0.35, resource: '前端' },
+          { title: '后端接口', start: '2026-03-09', days: 14, progress: 0.5, resource: '后端' },
+          { title: '联调测试', start: '2026-03-24', days: 6, progress: 0, resource: '测试' },
+          { title: '灰度发布', start: '2026-03-30', days: 4, progress: 0, resource: '运维' },
+        ];
+        const created = tasks.map((task, row) => designer.createTask({ ...task, row }));
+        designer.createDependency({ sourceId: created[0].state.id, targetId: created[1].state.id });
+        designer.createDependency({ sourceId: created[1].state.id, targetId: created[2].state.id });
+        designer.createDependency({ sourceId: created[0].state.id, targetId: created[3].state.id });
+        designer.createDependency({ sourceId: created[2].state.id, targetId: created[4].state.id });
+        designer.createDependency({ sourceId: created[3].state.id, targetId: created[4].state.id });
+        designer.createDependency({ sourceId: created[4].state.id, targetId: created[5].state.id });
+        designer.select(null);
+        designer.fitViewport();
+      }
+
+      /* ---------------- 工具栏 ---------------- */
+      function nextStart() {
+        const last = designer.nodes[designer.nodes.length - 1];
+        return last ? IED.addDays(last.state.start, last.state.days + 1) : '2026-03-02';
+      }
+      document.getElementById('btn-add').addEventListener('click', () => {
+        designer.createTask({ title: `任务 ${designer.nodes.length + 1}`, start: nextStart(), days: 5, row: designer.nodes.length });
+        renderPanel();
+      });
+      document.getElementById('btn-delete').addEventListener('click', () => {
+        if (designer.selectedId) { designer.remove(designer.selectedId); renderPanel(); }
+      });
+      document.getElementById('btn-undo').addEventListener('click', () => { designer.undo(); renderPanel(); });
+      document.getElementById('btn-redo').addEventListener('click', () => { designer.redo(); renderPanel(); });
+      document.getElementById('btn-fit').addEventListener('click', () => viewport.fitViewport());
+      document.getElementById('btn-reset').addEventListener('click', () => viewport.reset());
+
+      // 自动排程：按依赖把任务推到「前置结束之后」（只推后、不提前）
+      document.getElementById('btn-schedule').addEventListener('click', () => {
+        designer.autoSchedule();
+        designer.fitViewport();
+        renderPanel();
+        validateOutput.className = 'hint';
+        validateOutput.textContent = '✅ 已按依赖自动排程（完成 → 开始）';
+      });
+      // 关键路径：浮时为 0 的任务高亮（用选中态标出，便于在画布上找到）
+      document.getElementById('btn-critical').addEventListener('click', () => {
+        const critical = designer.criticalPath();
+        validateOutput.className = critical.length ? '' : 'hint';
+        validateOutput.innerHTML =
+          critical.length === 0
+            ? '没有关键路径（依赖成环或没有任务）'
+            : `关键路径：${critical.map((task) => task.state.title).join(' → ')}`;
+      });
+      document.getElementById('in-daywidth').addEventListener('change', (evt) => {
+        designer.setDayWidth(Number(evt.target.value) || 28);
+        designer.fitViewport();
+      });
+      document.getElementById('btn-link').addEventListener('click', () => {
+        linking = !linking;
+        linkSource = null;
+        document.getElementById('btn-link').classList.toggle('active', linking);
+      });
+      document.getElementById('btn-validate').addEventListener('click', () => {
+        const issues = designer.validateGantt();
+        validateOutput.innerHTML = '';
+        validateOutput.className = issues.length ? '' : 'hint';
+        if (!issues.length) { validateOutput.textContent = '✅ 未发现问题'; return; }
+        issues.forEach((issue) => {
+          const div = document.createElement('div');
+          div.className = `issue ${issue.level}`;
+          div.textContent = `${issue.level === 'error' ? '❌' : '⚠️'} ${issue.message}`;
+          validateOutput.appendChild(div);
+        });
+      });
+      document.getElementById('btn-export-svg').addEventListener('click', () => {
+        const svg = designer.toSvg({ padding: 16, background: '#ffffff' });
+        window.__exportedSvg = svg;
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'release-gantt.svg';
+        a.click();
+        URL.revokeObjectURL(url);
+        validateOutput.className = 'hint';
+        validateOutput.textContent = `✅ 已导出 SVG（${svg.length} 字节）`;
+      });
+
+      // Mermaid gantt 文本互操作：导出可直接贴进 Markdown/PR，导入可搬别人的排期
+      document.getElementById('btn-export-text').addEventListener('click', () => {
+        const text = IED.toMermaidGantt(designer, { title: '移动端 2.0 发布排期' });
+        document.getElementById('text-output').value = text;
+        window.__exportedText = text;
+      });
+      document.getElementById('btn-import-text').addEventListener('click', () => {
+        try {
+          const result = IED.fromMermaidGantt(document.getElementById('text-output').value, designer);
+          designer.fitViewport();
+          validateOutput.className = result.warnings.length ? '' : 'hint';
+          validateOutput.textContent = `✅ 已导入 ${result.tasks} 个任务 / ${result.dependencies} 条依赖${
+            result.warnings.length ? `（${result.warnings.length} 条提示）` : ''
+          }`;
+        } catch (error) {
+          validateOutput.className = 'issue error';
+          validateOutput.textContent = `❌ 导入失败：${error.message}`;
+        }
+        renderPanel();
+      });
+
+      /* ---------------- 画布交互：命中 / 拖拽 / 依赖 ---------------- */
+      ice.evtBus.on('mousedown', (evt) => {
+        const target = evt.target;
+        if (!target) { return; }
+        const domain = designer.nodes.concat(designer.edges).filter((item) => {
+          let node = target;
+          while (node) { if (node === item) { return true; } node = node.parentNode; }
+          return false;
+        })[0];
+        if (!domain) { return; }
+        if (linking) {
+          if (!linkSource) { linkSource = domain; }
+          else if (linkSource !== domain) {
+            designer.createDependency({ sourceId: linkSource.state.id, targetId: domain.state.id });
+            linkSource = null;
+          }
+          designer.select(domain.state.id);
+          renderPanel();
+          return;
+        }
+        designer.select(domain.state.id);
+        renderPanel();
+      });
+      ice.evtBus.on('mouseup', () => renderPanel());
+
+      /* ---------------- 属性面板 ---------------- */
+      function row(label, control) {
+        const div = document.createElement('div');
+        div.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
+        const span = document.createElement('label');
+        span.textContent = label;
+        span.style.cssText = 'width:64px;color:#475569;font-size:13px';
+        div.appendChild(span);
+        div.appendChild(control);
+        return div;
+      }
+      function input(value, onChange, type) {
+        const el = document.createElement('input');
+        el.type = type || 'text';
+        el.value = value;
+        el.step = type === 'number' ? '0.1' : '';
+        el.style.cssText = 'flex:1;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font:inherit';
+        el.addEventListener('change', () => onChange(el.value));
+        return el;
+      }
+      function applyAndRender(action) { action(); designer.captureHistory(); renderPanel(); }
+      function renderPanel() {
+        panel.innerHTML = '';
+        const selected = designer.selected;
+        if (!selected) { panel.className = 'hint'; panel.textContent = '点击任务条 / 依赖线进行编辑'; return; }
+        panel.className = '';
+        if (designer.nodes.indexOf(selected) !== -1) {
+          panel.appendChild(row('名称', input(selected.state.title, (v) => applyAndRender(() => selected.applyPatch({ title: v })))));
+          panel.appendChild(row('开始', input(selected.state.start, (v) => applyAndRender(() => selected.applyPatch({ start: v })))));
+          panel.appendChild(row('天数', input(selected.state.days, (v) => applyAndRender(() => selected.applyPatch({ days: Number(v) || 1 })), 'number')));
+          panel.appendChild(row('进度', input(selected.state.progress, (v) => applyAndRender(() => selected.applyPatch({ progress: Number(v) || 0 })), 'number')));
+          panel.appendChild(
+            row(
+              '负责人',
+              input(selected.state.resource || '', (v) => applyAndRender(() => selected.applyPatch({ resource: v })))
+            )
+          );
+          return;
+        }
+        panel.textContent = '依赖线（完成 → 开始）';
+      }
+
+      buildCase();
+      renderPanel();
+    </script>
+  </body>
+</html>

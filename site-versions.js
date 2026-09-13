@@ -10,4 +10,8 @@ module.exports = {
   entityDesigner: '0.2.5',
   iceChart: '0.19.0',
   iceWebComponents: '1.5.3',
+  // DSL 兄弟包（ice-chart / ice-entity-designer 落地页与生态表引用）
+  iceChartDsl: '0.1.3',
+  entityDesignerDsl: '0.0.19',
+  iceRenderDsl: '0.0.8',
 };

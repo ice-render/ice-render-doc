@@ -45,6 +45,11 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 | 像素契约 | `rebuildPixels()` 重算一次点集，`render()` 与 `hitTestIndex()` 消费同一份缓存——「看得见的点」与「点得到的点」不可能漂移 |
 | AI Agent DSL | `ice-chart-dsl`：一张表 + `encoding` 直接编译成 `ChartOption`，带结构化诊断（见下节） |
 
+:::info 0.19.0 两个值得注意的点
+- **`option.labels`：内置文案可覆盖（i18n 友好）**。图表内建 UI 文本（无障碍标题、扇区 / 数值 / 占比、坐标读数、液位等）由一份 `ChartLabels` 默认表提供，应用层通过 `option.labels` 整体覆盖即可换语言 / 换措辞，图表包本身不做 i18n 运行时——与引擎「引擎不做 i18n」的契约一致。
+- **类型注册已命名空间化到 `ice-chart:*`**。ICEChart 把内部图元（PlotArea / GridLines / Axis / Legend / Title / Tooltip / Crosshair / Highlight / Brush 等）注册为 `ice-chart:PlotArea` 这类 canonical typeId，与引擎的 `ice-render:*`、设计器的 `ice-entity-designer:*` 互不撞名，序列化 / 反序列化安全。
+:::
+
 ## 快速开始
 
 ### 安装
@@ -180,6 +185,50 @@ if (diagnostics.length === 0) {
   height={760}
   background="#f8fafc"
 />
+
+## 示例画廊（全部可实时把玩，仓库共 28 个）
+
+下面这些不是截图，是文档内实时跑起来的 ice-chart 运行时——覆盖主流图表类型，外加两个「引擎卖点」演示（大数据局部重绘、跨图联动）。拖一拖、框选一下、悬停看十字准星：
+
+### 折线图
+
+<LiveExample html="/ice-chart/basic-line.html" height={420} note="类目 / 时间轴、悬停高亮 + 压暗其它系列、框选缩放" />
+
+### 堆叠柱状图
+
+<LiveExample html="/ice-chart/bar-stack.html" height={460} note="多系列堆叠、图例联动显隐" />
+
+### 饼图 / 玫瑰图
+
+<LiveExample html="/ice-chart/pie.html" height={420} note="扇区悬停放大、点击选中" />
+
+### 雷达图
+
+<LiveExample html="/ice-chart/radar.html" height={460} note="多维度对比、轴线命中" />
+
+### 漏斗 + 仪表盘
+
+<LiveExample html="/ice-chart/funnel-gauge.html" height={500} note="漏斗转化 + 仪表盘阈值色带" />
+
+### 桑基图
+
+<LiveExample html="/ice-chart/sankey.html" height={500} note="流量编排、节点拖拽" />
+
+### K 线（金融）
+
+<LiveExample html="/ice-chart/finance.html" height={460} note="蜡烛 + 成交量、十字光标、框选缩放" />
+
+### 时序图
+
+<LiveExample html="/ice-chart/time-series.html" height={460} note="大规模时间序列、滚轮缩放 + 拖拽平移" />
+
+### 大数据（局部重绘）
+
+<LiveExample html="/ice-chart/large-data.html" height={460} note="脏矩形局部重绘，十万点滚动不卡" />
+
+### 跨图联动
+
+<LiveExample html="/ice-chart/linked-charts.html" height={500} note="同一引擎实例池下多图共享事件语义，框选一张联动其余" />
 
 ## 相关链接
 

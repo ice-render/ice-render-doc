@@ -213,19 +213,39 @@ if (issues.length === 0) {
 
 ## 同一套内核的其它域包
 
-域包 = **一个领域的记法 + 应用层 + 语义校验**。除默认的 ER 之外，现已落地 7 个（`ice-entity-designer` 仓库 `examples/` 下都有可直接打开的完整示例页与对应的 e2e 回归）：
+域包 = **一个领域的记法 + 应用层 + 语义校验**。除默认的 ER 之外，现已落地 7 个——仓库 `examples/` 下都有完整示例页。下面每一个都是**文档内实时运行的 live demo**（不是截图、不是外链），直接拖、直接连、直接看 Schema 落地：
 
-| 域包 | 记法与能力 | 示例 |
-| --- | --- | --- |
-| 流程图 | 起止 / 处理 / 判定 / 输入输出四类节点，正交或贝塞尔连线 + 分支标签 | [`flowchart-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/flowchart-editor.html) |
-| BPMN 2.0 | 池 / 泳道真嵌套、事件 / 网关 / 任务角标 / 数据对象 / 注释、语义校验、BPMN 2.0 XML 导入导出（含 BPMNDI） | [`bpmn-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/bpmn-editor.html) |
-| UML 类图 | 三段式类框、六种关系、继承成环校验、PlantUML / Mermaid 文本互操作 | [`uml-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/uml-editor.html) |
-| 状态机 | 伪状态 / 普通状态 / **复合状态容器**、转移标签 `事件 [守卫] / 动作`、PlantUML 状态图互操作 | [`statechart-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/statechart-editor.html) |
-| 甘特图 | 时间轴与按天吸附、依赖线、自动排程与关键路径、资源冲突校验、Mermaid gantt 互操作 | [`gantt-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/gantt-editor.html) |
-| 电力一次系统图 | 23 种一次设备符号（JB/T 5872-1991、GB/T 4728）、开关分合、带电分析与电压色标、母线 T 接、五防相关校验 | [`power-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/power-editor.html) · [`power-symbols.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/power-symbols.html) |
-| 电力二次回路 | 保护电流回路：CT 二次绕组 → 三相回路 → 端子排（真容器）→ 保护装置；回路编号 / 三相成组 / 端子号 / 接地校验 | [`secondary-editor.html`](https://github.com/ice-render/ice-entity-designer/blob/master/examples/secondary-editor.html) |
+### 流程图（Flowchart）
 
-这些域包同样有对应的 JSON DSL（`kind` 取 `'flowchart'` / `'bpmn'` / `'uml'` / `'statechart'` / `'gantt'` / `'power'`），详见 [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl)。
+<LiveExample html="/ied/flowchart-editor.html" height={640} note="起止 / 处理 / 判定 / 输入输出四类节点，正交或贝塞尔连线 + 分支标签" />
+
+### BPMN 2.0 ⭐ 2.3.0 新增
+
+<LiveExample html="/ied/bpmn-editor.html" height={700} note="池 / 泳道真嵌套、事件 / 网关 / 任务角标 / 数据对象 / 注释、按 BPMN 语义修正可连接性、BPMN 2.0 XML 导入导出（含 BPMNDI）" />
+
+### UML 类图
+
+<LiveExample html="/ied/uml-editor.html" height={640} note="三段式类框、六种关系、继承成环校验、PlantUML / Mermaid 文本互操作" />
+
+### 状态机（Statechart）
+
+<LiveExample html="/ied/statechart-editor.html" height={640} note="伪状态 / 普通状态 / 复合状态容器、转移标签 事件[守卫]/动作、PlantUML 状态图互操作" />
+
+### 甘特图（Gantt）
+
+<LiveExample html="/ied/gantt-editor.html" height={640} note="时间轴按天吸附、依赖线、自动排程与关键路径、资源冲突校验、Mermaid gantt 互操作" />
+
+### 电力一次系统图
+
+<LiveExample html="/ied/power-editor.html" height={700} note="23 种一次设备符号（JB/T 5872-1991、GB/T 4728）、开关分合、带电分析与电压色标、母线 T 接、五防相关校验" />
+
+<LiveExample html="/ied/power-symbols.html" height={520} note="标准符号图例" />
+
+### 电力二次回路（Secondary）
+
+<LiveExample html="/ied/secondary-editor.html" height={700} note="保护电流回路：CT 二次绕组 → 三相回路 → 端子排（真容器）→ 保护装置；回路编号 / 三相成组 / 端子号 / 接地校验" />
+
+> 这些域包同样有对应的 JSON DSL（`kind` 取 'flowchart' / 'bpmn' / 'uml' / 'statechart' / 'gantt' / 'power'），详见 [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl)。
 
 ## 相关链接
 

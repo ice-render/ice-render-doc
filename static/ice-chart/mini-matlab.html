@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>ice-chart · 迷你 MATLAB（函数绘图）</title>
+    <link rel="stylesheet" href="./assets/style.css" />
+    <style>
+      .fx-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 0.6rem 1rem;
+      }
+      /* 等比坐标的图（参数曲线 / 极坐标）绘图区是正方形，卡片太宽两侧就是死区。
+         并排放两张，正方形才能吃满卡片宽度。 */
+      .fx-pair {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 1.25rem;
+        align-items: start;
+      }
+      .fx-pair canvas {
+        margin: 0 auto;
+      }
+      @media (max-width: 1000px) {
+        .fx-pair {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .fx-field {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .fx-field label {
+        flex: 0 0 auto;
+        font-size: 0.8125rem;
+        color: var(--bs-secondary-color);
+      }
+      .fx-field input[type='text'] {
+        flex: 1 1 auto;
+        min-width: 8rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.8125rem;
+        padding: 0.2rem 0.45rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.25rem;
+        color: var(--bs-body-color);
+      }
+      .fx-field input[type='text'].invalid {
+        border-color: #dc3545;
+        background: rgba(220, 53, 69, 0.06);
+      }
+      .fx-field input[type='text'].warned {
+        border-color: #ffc107;
+        background: rgba(255, 193, 7, 0.08);
+      }
+      .fx-field input[type='range'] {
+        flex: 1 1 auto;
+      }
+      .fx-field button {
+        white-space: nowrap;
+        font: inherit;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.25rem;
+        background: #fff;
+        color: var(--bs-body-color);
+        cursor: pointer;
+      }
+      .fx-field button:hover {
+        border-color: var(--bs-primary);
+        color: var(--bs-primary);
+      }
+      .fx-value {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.8125rem;
+        min-width: 3.5rem;
+        text-align: right;
+      }
+      .fx-swatches {
+        display: inline-flex;
+        gap: 0.35rem;
+        align-items: center;
+      }
+      .fx-swatch {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 50%;
+      }
+      .fx-error {
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      .fx-status {
+        font-size: 0.75rem;
+        color: var(--bs-secondary-color);
+        margin-top: 0.5rem;
+      }
+      .fx-status .ok {
+        color: #198754;
+      }
+      .fx-message {
+        display: flex;
+        gap: 0.35rem;
+        align-items: flex-start;
+        padding: 0.25rem 0;
+        white-space: pre-wrap;
+      }
+      .fx-message .badge {
+        flex: 0 0 auto;
+        font-weight: 600;
+      }
+      .fx-message.error {
+        color: #dc3545;
+      }
+      .fx-message.warning {
+        color: #997404;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>迷你 MATLAB：函数绘图</h1>
+    <p class="lead">
+      直接写表达式就能画曲线：<code>sin(x)/x</code>、<code>x^2*exp(-x)</code>、<code>2x+1</code>、
+      <code>sin(a*x)</code> —— 表达式引擎自己解析（不用 eval），支持隐式乘法与
+      <code>sin/cos/exp/log/sqrt/...</code>。曲线按<b>可视区间</b>采样并在曲率大的地方自适应加点，
+      所以放大看局部会越来越细；<code>tan(x)</code>、<code>1/x</code> 的极点是真正的断点，不会连成竖线。
+      <br />
+      拖动参数 <code>a</code> 或打开「参数扫动」，曲线会连续变形 —— 那是引擎每帧重绘出来的。
+    </p>
+
+    <div class="card">
+      <div class="fx-grid">
+        <div class="fx-field">
+          <span class="fx-swatches"><i class="fx-swatch" style="background: #0d6efd"></i></span>
+          <label for="expr1">y₁ =</label>
+          <input type="text" id="expr1" value="sin(x)/x" spellcheck="false" />
+        </div>
+        <div class="fx-field">
+          <span class="fx-swatches"><i class="fx-swatch" style="background: #dc3545"></i></span>
+          <label for="expr2">y₂ =</label>
+          <input type="text" id="expr2" value="a*sin(x)*exp(-abs(x)/6)" spellcheck="false" />
+        </div>
+        <div class="fx-field">
+          <span class="fx-swatches"><i class="fx-swatch" style="background: #198754"></i></span>
+          <label for="expr3">y₃ =</label>
+          <input type="text" id="expr3" value="x^2/20 - 2" spellcheck="false" />
+        </div>
+        <div class="fx-field">
+          <label for="param-a">a =</label>
+          <input type="range" id="param-a" min="-3" max="3" step="0.05" value="1.5" />
+          <span class="fx-value" id="param-a-value">1.50</span>
+        </div>
+        <div class="fx-field">
+          <label for="domain">x 范围</label>
+          <select id="domain" style="font-size: 0.8125rem; padding: 0.2rem 0.4rem">
+            <option value="-10,10">[-10, 10]</option>
+            <option value="-6.283,6.283">[-2π, 2π]</option>
+            <option value="-1,1">[-1, 1]</option>
+            <option value="-100,100">[-100, 100]</option>
+          </select>
+        </div>
+        <div class="fx-field">
+          <label for="samples">采样</label>
+          <select id="samples" style="font-size: 0.8125rem; padding: 0.2rem 0.4rem">
+            <option value="120">120（快）</option>
+            <option value="240" selected>240</option>
+            <option value="800">800（细）</option>
+          </select>
+        </div>
+        <div class="fx-field">
+          <label for="sweep">参数扫动</label>
+          <input type="checkbox" id="sweep" />
+          <span class="snapshot-meta">让 a 在 [-3, 3] 之间来回，曲线连续变形</span>
+        </div>
+        <div class="fx-field">
+          <label for="adaptive">自适应细分</label>
+          <input type="checkbox" id="adaptive" checked />
+        </div>
+        <div class="fx-field">
+          <label>故意写错看看</label>
+          <button type="button" id="btn-bad-syntax">缺右括号</button>
+          <button type="button" id="btn-bad-var">未定义变量</button>
+          <button type="button" id="btn-bad-nan">整段开不出来</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card"><canvas id="functions" width="960" height="460"></canvas></div>
+    <div class="card">
+      <div class="fx-status" id="status"></div>
+      <div class="fx-error" id="messages"></div>
+    </div>
+
+    <div class="fx-pair">
+    <div class="card">
+      <div class="snapshot-head">
+        <span class="snapshot-title">极坐标 r(θ)</span>
+        <span class="snapshot-actions">
+          <button type="button" id="btn-polar-1">玫瑰线 cos(3θ)</button>
+          <button type="button" id="btn-polar-2">心形 1−cosθ</button>
+          <button type="button" id="btn-polar-3">螺线 θ/4</button>
+          <button type="button" id="btn-polar-4">毛毛虫 1+0.3cos(8θ)</button>
+        </span>
+        <span class="spacer"></span>
+        <span class="snapshot-meta">同心圆 + 辐条底图，r 的取值直接决定形状</span>
+      </div>
+      <canvas id="polar" width="470" height="470"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="snapshot-head">
+        <span class="snapshot-title">参数曲线（李萨如）</span>
+        <span class="snapshot-actions">
+          <button type="button" id="btn-shape-1">(sin3t, cos2t)</button>
+          <button type="button" id="btn-shape-2">螺线</button>
+          <button type="button" id="btn-shape-3">心形线</button>
+          <label class="snapshot-meta" for="aspect-equal">
+            <input type="checkbox" id="aspect-equal" checked />
+            等比坐标（axis equal）
+          </label>
+        </span>
+        <span class="spacer"></span>
+        <span class="snapshot-meta">x(t)、y(t) 两条表达式合成一条曲线；等比坐标下圆才是圆</span>
+      </div>
+      <canvas id="parametric" width="470" height="470"></canvas>
+    </div>
+    </div>
+
+    <div class="card" id="snapshot-panel"></div>
+    <div class="card"><div class="log" id="log">事件日志：</div></div>
+
+    <script src="./vendor/ice-render.umd.js"></script>
+    <script src="./vendor/ice-chart.umd.js"></script>
+    <script src="./assets/snapshot-panel.js"></script>
+    <script>
+      const log = document.getElementById('log');
+      const write = (line) => {
+        log.textContent = `${new Date().toLocaleTimeString()}  ${line}\n` + log.textContent;
+      };
+
+      const readDomain = () =>
+        document
+          .getElementById('domain')
+          .value.split(',')
+          .map((v) => Number(v));
+      const readSamples = () => Number(document.getElementById('samples').value);
+
+      const chart = ICEChart.createChart('functions', {
+        title: { text: '函数曲线叠加', subtext: '滚轮缩放 · 拖拽平移 · 悬停读数' },
+        legend: { show: true },
+        tooltip: { trigger: 'item' },
+        crosshair: { show: true, axis: 'x', showAxisLabel: true },
+        grid: { x: true },
+        xAxis: { type: 'value', name: 'x' },
+        yAxis: { name: 'y' },
+        animation: { enter: { duration: 700, easing: 'easeOutCubic' }, update: { duration: 380 } },
+        series: [
+          { id: 'f1', type: 'function', name: 'sin(x)/x', expression: 'sin(x)/x', domain: [-10, 10], lineWidth: 2 },
+          {
+            id: 'f2',
+            type: 'function',
+            name: 'a*sin(x)*exp(-|x|/6)',
+            expression: 'a*sin(x)*exp(-abs(x)/6)',
+            params: { a: 1.5 },
+            color: '#dc3545',
+            lineWidth: 2,
+          },
+          { id: 'f3', type: 'function', name: 'x^2/20 - 2', expression: 'x^2/20 - 2', color: '#198754', lineWidth: 2 },
+        ],
+      });
+
+      const parametric = ICEChart.createChart('parametric', {
+        title: { text: '参数曲线', subtext: 'x = sin(3t)、y = cos(2t)' },
+        legend: { show: false },
+        tooltip: { trigger: 'item' },
+        // 等比坐标：x/y 一个数据单位等长，圆才是圆（MATLAB 的 axis equal）
+        aspect: 'equal',
+        xAxis: { type: 'value', name: 'x(t)' },
+        yAxis: { name: 'y(t)' },
+        animation: { enter: { duration: 900, easing: 'easeOutCubic' } },
+        series: [
+          {
+            id: 'curve',
+            type: 'parametric',
+            name: 'sin(3t), cos(2t)',
+            xExpression: 'sin(3*t)',
+            yExpression: 'cos(2*t)',
+            domain: [0, Math.PI * 2],
+            lineWidth: 2,
+            color: '#0d6efd',
+          },
+        ],
+      });
+
+      // 极坐标 r(θ)：polarExpression 就是 r 的公式（自变量 θ 写成 t）
+      const polar = ICEChart.createChart('polar', {
+        title: { text: '极坐标函数', subtext: 'r = cos(3θ)' },
+        legend: { show: false },
+        tooltip: { trigger: 'item' },
+        aspect: 'equal',
+        polarGrid: { splitNumber: 4, spokeCount: 12 },
+        xAxis: { type: 'value' },
+        yAxis: {},
+        animation: { enter: { duration: 800, easing: 'easeOutCubic' } },
+        series: [
+          {
+            id: 'rp',
+            type: 'parametric',
+            name: 'r = cos(3θ)',
+            polarExpression: 'cos(3*t)',
+            domain: [0, Math.PI * 2],
+            samples: 360,
+            lineWidth: 2,
+            color: '#0d6efd',
+          },
+        ],
+      });
+
+      const polarShapes = [
+        { r: 'cos(3*t)', name: 'r = cos(3θ)', domain: [0, Math.PI * 2] },
+        { r: '1 - cos(t)', name: 'r = 1 − cosθ', domain: [0, Math.PI * 2] },
+        { r: 't/4', name: 'r = θ/4', domain: [0, Math.PI * 6] },
+        { r: '1 + 0.3*cos(8*t)', name: 'r = 1 + 0.3cos(8θ)', domain: [0, Math.PI * 2] },
+      ];
+      polarShapes.forEach((shape, index) => {
+        document.getElementById(`btn-polar-${index + 1}`).addEventListener('click', () => {
+          polar.setOption(
+            {
+              ...polar.getOption(),
+              title: { text: '极坐标函数', subtext: shape.name },
+              series: [
+                {
+                  id: 'rp',
+                  type: 'parametric',
+                  name: shape.name,
+                  polarExpression: shape.r,
+                  domain: shape.domain,
+                  samples: 360,
+                  lineWidth: 2,
+                  color: '#0d6efd',
+                },
+              ],
+            },
+            { animate: true, preserveView: false }
+          );
+          write(`切换极坐标曲线：${shape.name}`);
+        });
+      });
+
+      const shapes = [
+        { x: 'sin(3*t)', y: 'cos(2*t)', domain: [0, Math.PI * 2], name: 'sin(3t), cos(2t)' },
+        { x: 't*cos(t)/3', y: 't*sin(t)/3', domain: [0, Math.PI * 6], name: '螺线' },
+        { x: '16*sin(t)^3/16', y: '(13*cos(t)-5*cos(2*t)-2*cos(3*t)-cos(4*t))/16', domain: [0, Math.PI * 2], name: '心形线' },
+      ];
+      document.getElementById('btn-shape-1').addEventListener('click', () => applyShape(0));
+      document.getElementById('btn-shape-2').addEventListener('click', () => applyShape(1));
+      document.getElementById('btn-shape-3').addEventListener('click', () => applyShape(2));
+      function applyShape(index) {
+        const shape = shapes[index];
+        parametric.setOption(
+          {
+            ...parametric.getOption(),
+            aspect: document.getElementById('aspect-equal').checked ? 'equal' : 'auto',
+            title: { text: '参数曲线', subtext: `x = ${shape.x}，y = ${shape.y}` },
+            series: [
+              {
+                id: 'curve',
+                type: 'parametric',
+                name: shape.name,
+                xExpression: shape.x,
+                yExpression: shape.y,
+                domain: shape.domain,
+                lineWidth: 2,
+                color: '#0d6efd',
+              },
+            ],
+          },
+          { animate: true, preserveView: false }
+        );
+        write(`切换参数曲线：${shape.name}`);
+      }
+
+      document.getElementById('aspect-equal').addEventListener('change', (event) => {
+        parametric.setOption(
+          { ...parametric.getOption(), aspect: event.target.checked ? 'equal' : 'auto' },
+          { animate: false, preserveView: true }
+        );
+        write(event.target.checked ? '等比坐标：一个数据单位在屏幕上等长' : '自动比例：绘图区铺满可用空间');
+      });
+
+      /** 把表单内容同步到图上（表达式 / 参数 / 范围 / 采样密度）。 */
+      function syncFunctions(animate) {
+        const [d0, d1] = readDomain();
+        const sweepOn = document.getElementById('sweep').checked;
+        const a = Number(document.getElementById('param-a').value);
+        const expressions = ['expr1', 'expr2', 'expr3'].map((id) => document.getElementById(id).value.trim());
+        // 参数按名字自动挂上：表达式里用到了才传（否则会一直提示「参数没用上」）
+        const usesParam = (expression, name) => new RegExp(`(^|[^A-Za-z0-9_])${name}([^A-Za-z0-9_]|$)`).test(expression);
+        const adaptive = document.getElementById('adaptive').checked;
+        const samples = readSamples();
+        const colors = ['#0d6efd', '#dc3545', '#198754'];
+        const option = {
+          ...chart.getOption(),
+          series: expressions.map((expression, i) => ({
+            id: `f${i + 1}`,
+            type: 'function',
+            name: expression || `y${i + 1}`,
+            expression,
+            domain: [d0, d1],
+            samples,
+            adaptive,
+            params: usesParam(expression, 'a') ? { a } : {},
+            color: colors[i],
+            lineWidth: 2,
+            ...(i === 1 && sweepOn ? { sweep: { name: 'a', from: -3, to: 3, duration: 2600, mode: 'pingpong' } } : {}),
+          })),
+        };
+        chart.setOption(option, { animate, preserveView: true });
+        showErrors();
+      }
+
+      /**
+       * 把表达式诊断显示出来。
+       *
+       * 三层都在这里体现：语法错误（带位置指针）、未定义变量、整段画不出来；
+       * 警告级（参数没用上 / 输出恒定）用琥珀色，不阻断绘制。
+       * 注意：消息里嵌着用户输入的原文，所以一律用 textContent 构建，不用 innerHTML。
+       */
+      function showErrors() {
+        const diagnostics = chart.expressionDiagnostics();
+        const ids = ['expr1', 'expr2', 'expr3'];
+        const inputs = ids.map((id) => document.getElementById(id));
+        inputs.forEach((el) => el.classList.remove('invalid', 'warned'));
+
+        const box = document.getElementById('messages');
+        box.textContent = '';
+        let errorSeries = 0;
+        let warningSeries = 0;
+        for (const entry of diagnostics) {
+          const index = Number(String(entry.seriesId).replace('f', '')) - 1;
+          const hasError = entry.diagnostics.some((d) => d.severity === 'error');
+          if (hasError) errorSeries++;
+          else warningSeries++;
+          if (inputs[index]) inputs[index].classList.add(hasError ? 'invalid' : 'warned');
+          for (const item of entry.diagnostics) {
+            const row = document.createElement('div');
+            row.className = `fx-message ${item.severity}`;
+            const badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.textContent = item.severity === 'error' ? '✕' : '!';
+            const text = document.createElement('span');
+            text.textContent = `y${index + 1}：${item.message}`;
+            row.appendChild(badge);
+            row.appendChild(text);
+            box.appendChild(row);
+          }
+        }
+
+        const total = Number(document.getElementById('expr1') ? 3 : 0);
+        const status = document.getElementById('status');
+        status.textContent = '';
+        const summary = document.createElement('span');
+        summary.className = errorSeries ? '' : 'ok';
+        summary.textContent =
+          `已绘制 ${total - errorSeries} / ${total} 条曲线` +
+          (errorSeries ? `，${errorSeries} 条有错误（不会画出来）` : '') +
+          (warningSeries ? `，${warningSeries} 条有警告（仍会绘制）` : '');
+        status.appendChild(summary);
+      }
+
+      ['expr1', 'expr2', 'expr3'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', () => syncFunctions(true));
+      });
+      document.getElementById('param-a').addEventListener('input', (event) => {
+        document.getElementById('param-a-value').textContent = Number(event.target.value).toFixed(2);
+        syncFunctions(false);
+      });
+      document.getElementById('sweep').addEventListener('change', () => syncFunctions(false));
+      document.getElementById('domain').addEventListener('change', () => {
+        syncFunctions(false);
+        chart.resetZoom();
+      });
+      document.getElementById('samples').addEventListener('change', () => syncFunctions(false));
+      document.getElementById('adaptive').addEventListener('change', () => syncFunctions(false));
+
+      // 演示：故意写错，看看诊断怎么提示
+      const badSamples = [
+        ['#btn-bad-syntax', 'sin(x'],
+        ['#btn-bad-var', 'b*sin(x)'],
+        ['#btn-bad-nan', 'sqrt(-1-x^2)'],
+      ];
+      badSamples.forEach(([selector, expression]) => {
+        document.querySelector(selector).addEventListener('click', () => {
+          document.getElementById('expr1').value = expression;
+          syncFunctions(true);
+          write(`写了一个错误公式：${expression}`);
+        });
+      });
+
+      chart.on('item:hover', (p) => write(`函数 hover  x = ${Number(p.xValue).toFixed(3)}  y = ${Number(p.value).toFixed(3)}`));
+      chart.on('zoom:change', () => write('缩放 / 平移：曲线按新的可视区间重新采样'));
+      parametric.on('item:hover', (p) => write(`参数曲线 hover  ${p.name}`));
+
+      window.__chart = chart;
+      polar.on('item:hover', (p) => write(`极坐标 hover  ${p.name}`));
+      window.__charts = { functions: chart, parametric, polar };
+      showErrors();
+      mountSnapshotPanel();
+    </script>
+  </body>
+</html>

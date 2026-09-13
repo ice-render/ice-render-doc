@@ -47,6 +47,23 @@ sidebar_label: 1.1 介绍
 - **生命周期**：`ICE.destroy()` 与幂等 `init()`（可直接传 `HTMLCanvasElement` / `CanvasRenderingContext2D`），适配 React StrictMode 双挂载与 SPA 卸载重挂，销毁后可重新 init
 - **工程化**：93 个测试文件、700+ 个用例、Playwright 视觉回归、publint + attw 发布门禁
 
+## 2.3.0 新特性速览（动画全链 + 连线端点手柄 + 性能）
+
+2.3.0 把「动画」从「能动」推进到「可控 + 可验证」，并修掉了两个真实性能 / 连接缺陷。要点（全部带回归与真实浏览器 e2e）：
+
+- **动画写值通道（位图复用）**：`setState(patch, { paramsDirty: false })` + `ANIMATION_SAFE_KEYS` 白名单，纯绘制 / 变换键不再每帧重建离屏位图——1,000 个文本平移动画 **35.1ms → 2.7ms/帧**、复用率 100%。
+- **分层渲染原语**：`ICE.linkViewport()` / `ice.followViewport()` 双层视口同步、`ice.setInputPassthrough(true)` 覆盖层穿透、`DOMEventDispatcher` 按目标 canvas 过滤多实例事件；10,000 静态 + 200 动画实测 **≈60×**（26~34ms → 0.4~0.6ms/帧）。另含跨实例迁移 `ice.moveComponentTo()` 与多层 SVG / PNG 合成导出。
+- **帧调度与空闲停帧**：`FrameManager` 按需续帧，静止页面 500ms 内 **0 次帧回调**；动画新增 `fps` 降频、`prefers-reduced-motion` 直接落终态。
+- **动画表达力**：`easing` 可直接传函数或 `registerEasing(name, fn)`；颜色 / 带单位数字串（如 `'12px'`）插值；`onStart/onUpdate/onRepeat/onComplete` 回调；`direction: 'alternate'`（yoyo）。
+- **编排（时间轴 / 错峰）**：`ice.animationManager.timeline()` 的 `add/stagger/play/pause/restart`，以及运行时 `setAnimation(key, cfg)` / `removeAnimation(key)` / `replay()`。
+- **结构化校验（Agent 闭环）**：`validateAnimations()` 纯函数产出 `{ severity, code, message, path }[]`（`ICE_ANIM_*`），运行期 `getDiagnostics()` 同源去重，Agent 不必再靠 console 文本判断配置被跳过。
+- **连线端点手柄（应用层连接体验）**：线条组件新增 `linkEditable`（默认 `true`）单独控制端点手柄，与 `transformable`（旋转 / 缩放手柄）解耦；连接插槽改为「就近吸附」；抬起事件回到按下组件修复「拖得动、放不下」。
+- **`coalesceRegions` 聚合预算**：脏块超 `MAX_COALESCE_REGIONS = 32` 直接塌缩并集盒，1000 块脏区从 **111s → 1ms**（修掉 O(k³) 退化）。
+
+> ⚠️ **应用层迁移（破坏性行为变更）**：若你自己 `evtBus.on('ICE_FRAME_EVENT', …)` 做**逐帧计算**（时钟、令牌仿真、自绘指示器、自定义补间…），必须调 `ice.setContinuousFrames(true)`，否则引擎的空闲停帧会让逐帧逻辑停摆（"挂了监听"不再等于"帧还会来"）。用完记得 `setContinuousFrames(false)` 归还。
+
+深入实现见 [18 · 动画机制](architecture/18-animation-architecture.md)、[16 · 连线端口评估](architecture/16-link-port-evaluation.md)、[04 · 渲染性能](architecture/04-rendering-performance.md)，完整清单见引擎仓库 `CHANGELOG.md`。
+
 ## 两层架构与生态
 
 ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应用层**产品（含各自的 DSL）。「层级」一列标明每一项属于哪一层。

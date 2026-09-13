@@ -90,7 +90,33 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
   background="#f8fafc"
 />
 
-> 还有更多能力向 demo 没放进上面（避免页面过长）：`examples/admin.html`（管理后台）、`examples/workbench.html`（工作台）、`examples/custom-component.html`（自定义组件）。它们同样零外部依赖，需要时也能以同样方式嵌入。
+### 🗂️ ICE Admin · 管理后台
+
+<LiveExample
+  html="/ice-web-components/admin.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={820}
+  background="#f8fafc"
+/>
+
+### 🧰 ICE Workbench · 工作台
+
+<LiveExample
+  html="/ice-web-components/workbench.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={820}
+  background="#f8fafc"
+/>
+
+### 🧩 ICE Custom Component · 自定义组件
+
+<LiveExample
+  html="/ice-web-components/custom-component.html"
+  bundles={['/ice-web-components/ice-render.umd.js', '/ice-web-components/ice-web-components.umd.js']}
+  height={820}
+  background="#f8fafc"
+/>
+
 
 ## 核心能力
 
@@ -103,6 +129,10 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 | 主题 | Bootstrap 5 令牌主题（含深色主题），一次调用换肤 |
 | 与引擎无命名冲突 | 运行时导出与 `ice-render` 互不相交（有专门的回归测试守护） |
 | 真实测试 | 837 单测（108 套件）+ 8 个浏览器 QA 套件（277 断言，真实键鼠驱动 demo 页，console 报错即失败）+ 示例页冒烟（9 页） |
+
+:::info 1.5.3 一个值得注意的点
+- **日历首日 `weekStart` 按语言推导 + 显式覆盖**。`ICEDatePicker` / `ICECalendar` 的周首日默认由 `props.locale` 推导（如中文环境从周一开始），传入 `weekStart`（0 = 周日 … 6 = 周六）即强制覆盖——国际化场景下无需手动算偏移。
+:::
 
 ## 快速开始
 
