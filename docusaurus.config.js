@@ -11,7 +11,8 @@ const config = {
   url: 'https://ice-render.github.io',
   baseUrl: '/',
   onBrokenLinks: 'throw',
-  favicon: 'img/favicon.ico',
+  // 文件名带 -ice 后缀用于破坏浏览器 favicon 缓存（旧恐龙图标一直被浏览器按 URL 缓存）
+  favicon: 'img/favicon-ice.ico',
   organizationName: 'ice-render',
   projectName: 'ice-render',
   // 全局加载 ice-render 内核，供 `jsx live` 代码块直接使用 window.ICE（defer：HTML 解析后、水合前执行）
