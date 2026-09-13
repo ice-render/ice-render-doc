@@ -67,6 +67,8 @@ new ICE.ICEText({
 
 ## 编辑态
 
+> 尺寸与量测语义（自适应 / 显式尺寸 / 字体加载后重测）见下文「[尺寸与量测](#尺寸与量测)」。
+
 `ICEText` 内置编辑能力：
 
 ```js
@@ -85,4 +87,22 @@ text.setState({ editing: true, caretIndex: 5 });
 - `ICEText` 默认 `transformable: false`（不显示变换手柄）
 - 文本可以放进 `ICEGroup` 参与嵌套变换（见 `examples/text/text-in-group.html`）
 - `paddingTop/Right` 等内边距影响排版盒
-- 自定义字体用 `await ice.loadFont(family, source)` 预加载后再使用
+- 自定义字体用 `await ice.loadFont(family, source)` 预加载后再使用（加载完成会自动重测，见下节）
+
+## 尺寸与量测
+
+`ICEText` 的盒子尺寸按「**调用方是否显式给尺寸**」判定，不拿默认值当哨兵：
+
+```js
+new ICE.ICEText({ text: '自适应' });                    // 没给尺寸 → 量测后写回 state.width/height
+new ICE.ICEText({ text: '固定', width: 200, height: 40 }); // 显式尺寸 → 量测不会覆盖它
+
+const t = new ICE.ICEText({ text: '改尺寸' });
+t.setState({ width: 200 });   // setState 给尺寸同样算「显式」，此后宽度不再被量测覆盖
+```
+
+- 量测优先用 **canvas 真实字形边界**，无 ctx 时退化到隐藏 `div`（`textContent`，不做 HTML 注入）；
+  两者都不可用时（Node / 小程序首帧）先停在默认 `10×10`，首帧渲染时由 `calcComponentParams` 重算。
+- **自定义字体加载完成后要重测**：`await ice.loadFont(family, source)` 的 promise resolve 时，引擎会自动
+  重新量测已挂载的文本（`ice.remeasureTexts()`）；也可以手动调 `text.remeasureText()`（只标脏，
+  真正的重算发生在下一帧渲染）。
