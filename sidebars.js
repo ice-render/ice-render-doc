@@ -80,6 +80,7 @@ const sidebars = {
             { type: 'doc', id: 'architecture/accessibility', label: '1.4.14 无障碍（a11y）原语' },
             { type: 'doc', id: 'architecture/app-driven-review', label: '1.4.15 应用驱动的引擎评估' },
             { type: 'doc', id: 'architecture/link-port-evaluation', label: '1.4.16 连线端点（插槽）扩展评估' },
+            { type: 'doc', id: 'architecture/i18n-boundary', label: '1.4.17 i18n 边界（引擎 / 组件库 / 应用）' },
           ],
         },
         {
