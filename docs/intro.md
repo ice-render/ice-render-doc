@@ -7,6 +7,12 @@ sidebar_label: 介绍
 
 **ICERender** 是一个用纯 TypeScript 编写的 Canvas 2D 交互图形渲染引擎，面向 ER 图、流程图、拓扑图等图编辑场景。它借鉴了 React 的组件模型与 W3C 的事件模型，提供嵌套坐标系、序列化、动画与 Visio 风格连接线，运行时零依赖（gl-matrix 在构建期内联）。
 
+:::tip 本文档站分两层
+- **引擎层（ice-render）** —— 本站核心，左侧「ice-render 引擎」分组：介绍 / 快速上手 / 指南 / 架构设计 / API 参考 / 二次开发。讲「渲染引擎本身怎么用、怎么实现」。
+- **应用层（家族产品）** —— 基于引擎内核封装的上层产品，左侧「家族产品 · 应用层」分组：Entity Designer（ER 建模）、ice-chart（图表）、ice-web-components（Canvas UI 组件库），以及它们各自的 DSL。
+- 一句话：**引擎提供坐标系 / 事件 / 渲染 / 序列化等底座；产品在其上收敛出领域能力。** 想搞懂底层，看「ice-render 引擎」；想直接拿来用，看「家族产品」。
+:::
+
 ## 为什么选择 ICERender
 
 ### 1. 极端规模下的内存与构建效率
@@ -41,17 +47,19 @@ sidebar_label: 介绍
 - **生命周期**：`ICE.destroy()` 与幂等 `init()`（可直接传 `HTMLCanvasElement` / `CanvasRenderingContext2D`），适配 React StrictMode 双挂载与 SPA 卸载重挂，销毁后可重新 init
 - **工程化**：93 个测试文件、700+ 个用例、Playwright 视觉回归、publint + attw 发布门禁
 
-## 生态
+## 两层架构与生态
 
-| 项目 | 说明 |
-|---|---|
-| [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v1.4.9**） |
-| [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎** |
-| [ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) | 基于引擎的交互式图表库（折线 / 饼 / 雷达 / K 线 / 桑基 / 关系图等），命中测试与交互全部由引擎承担 |
-| [ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl) | 图表 DSL：一张表 + `encoding` 编译成 `ChartOption`，带结构化诊断 |
-| [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.0.40**）：8 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次），随包附带 ice-render 内核 |
-| [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
-| [ice-web-components](https://www.npmjs.com/package/ice-web-components) | 仿 Swing 风格的 Canvas 原生 UI 组件库（86 个组件，Bootstrap 5 令牌主题）；**暂无配套 DSL，走命令式组件 API** |
+ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应用层**产品（含各自的 DSL）。「层级」一列标明每一项属于哪一层。
+
+| 层级 | 项目 | 说明 |
+|---|---|---|
+| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v1.4.9**） |
+| 引擎（DSL） | [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **引擎级** JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎 |
+| 应用 | [ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) | 基于引擎的交互式图表库（折线 / 饼 / 雷达 / K 线 / 桑基 / 关系图等），命中测试与交互全部由引擎承担 |
+| 应用（DSL） | [ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl) | 图表 DSL：一张表 + `encoding` 编译成 `ChartOption`，带结构化诊断 |
+| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.0.40**）：8 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次），随包附带 ice-render 内核 |
+| 应用（DSL） | [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
+| 应用 | [ice-web-components](https://www.npmjs.com/package/ice-web-components) | 仿 Swing 风格的 Canvas 原生 UI 组件库（86 个组件，Bootstrap 5 令牌主题）；**暂无配套 DSL，走命令式组件 API** |
 
 ## AI Agent 接入：JSON-first DSL ⭐
 
@@ -62,7 +70,7 @@ sidebar_label: 介绍
 
 - Agent 产出**数据（JSON）**，而不是拼接一长串引擎调用；同一份文档浏览器 / Node 通用
 - 自带 `validateDsl()` schema 校验（重复 id、未知节点类型、悬空边），Agent 产出可即时自检
-- 两层 DSL 覆盖主要场景：**`ice-render-dsl`**（流程图 / 拓扑图 / 依赖图）+ **`ice-entity-designer-dsl`**（ER / 数据库建模，可归一化为 TypeORM `EntitySchema`）
+- **三层 DSL 各司其职**：**`ice-render-dsl`**（引擎级，通用流程图 / 拓扑图 / 依赖图）+ **`ice-entity-designer-dsl`**（应用层，ER / 数据库建模，可归一化为 TypeORM `EntitySchema`）+ **`ice-chart-dsl`**（应用层，图表：一张表 + `encoding` → `ChartOption`）。引擎级 DSL 直接驱动底层引擎；应用层 DSL 在引擎之上叠加领域语义，二者互不混用。
 
 下面这条链路就是一份真实可渲染的 DSL 文档：
 
