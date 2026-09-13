@@ -77,6 +77,18 @@ const config = {
             label: 'Entity Designer',
           },
           {
+            type: 'doc',
+            docId: 'ice-chart/index',
+            position: 'left',
+            label: 'ice-chart',
+          },
+          {
+            type: 'doc',
+            docId: 'ice-web-components/index',
+            position: 'left',
+            label: 'ice-web-components',
+          },
+          {
             href: 'https://github.com/ice-render/ice-render',
             label: 'GitHub',
             position: 'right',
@@ -115,8 +127,20 @@ const config = {
                 href: 'https://www.npmjs.com/package/ice-render-dsl',
               },
               {
+                label: 'ice-chart（图表库）',
+                href: 'https://www.npmjs.com/package/@damoqiongqiu/ice-chart',
+              },
+              {
+                label: 'ice-chart-dsl（图表 DSL）',
+                href: 'https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl',
+              },
+              {
                 label: 'ice-entity-designer（ER 设计器）',
                 href: 'https://www.npmjs.com/package/ice-entity-designer',
+              },
+              {
+                label: 'ice-web-components（Canvas UI）',
+                href: 'https://www.npmjs.com/package/ice-web-components',
               },
             ],
           },

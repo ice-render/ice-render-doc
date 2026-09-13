@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>ice-web-components gallery</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8f9fa;
+      color: #212529;
+    }
+    canvas {
+      display: block;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+  </style>
+  <body>
+    <h1 style="font-size: 20px; margin: 0 0 4px">ice-web-components gallery</h1>
+    <p style="margin: 0 0 16px; color: #6c757d">Canvas-native, Swing-style ICE components</p>
+    <canvas id="canvas" width="1400" height="1960"></canvas>
+
+    <script src="./ice-render.umd.js"></script>
+    <script src="./ice-web-components.umd.js"></script>
+    <script>
+      const ice = new ICE.ICE().init('canvas');
+      const W = ICEWEB;
+      const theme = W.iceUIManager.getTheme();
+      new W.ICEHoverManager(ice).start();
+      W.getICEFocusManager(ice).start();
+
+      const heading = (text, left, top) =>
+        new W.ICELabel({
+          left,
+          top,
+          text,
+          style: {
+            fontSize: 15,
+            fontWeight: '600',
+            fillStyle: theme.colors.text,
+          },
+        });
+
+      const caption = (text, left, top) =>
+        new W.ICELabel({ left, top, text, style: { fontSize: 12, fillStyle: theme.colors.textSecondary } });
+
+      /**
+       * 极简流式布局：把每个演示（cluster = 一组必须放在一起的组件）摆进面板。
+       *
+       * - cluster **内部保持相对位置不变**（作者按局部坐标写，整体平移即可），
+       *   所以「输入框 + 它的提示文字」「图片 + 图注」这类组合不会被打散；
+       * - 一行放不下就换行，行内**垂直居中**（高矮不一的按钮不会被顶歪）；
+       * - 每个 section 自带小标题；面板高度按内容算，不用再手工找空位。
+       *
+       * 之前靠手写绝对坐标排 60+ 个演示，结果是「新演示只能塞进缝里」，最后出现交叠。
+       */
+      const flowSections = (panel, sections, options = {}) => {
+        const padX = options.padX ?? 28;
+        const padTop = options.padTop ?? 24;
+        const padBottom = options.padBottom ?? 26;
+        const gapX = options.gapX ?? 20;
+        const gapY = options.gapY ?? 14;
+        const headingHeight = options.headingHeight ?? 20;
+        const headingGap = options.headingGap ?? 10;
+        const sectionGap = options.sectionGap ?? 22;
+        const width = Number(panel.state.width) || 0;
+        const avail = width - padX * 2;
+        // 幂等：允许重复调用（首帧渲染后再跑一次，让「渲染时才定高」的组件拿到真实尺寸）。
+        // 标题只创建一次；已在面板里的节点不再重复 addChild（否则会重复挂载）。
+        const attach = (node) => {
+          if (node.parentNode !== panel) panel.addChild(node, false);
+        };
+
+        // 量一个 cluster 的包围盒：**含后代**（例如 ICESpin 右侧的 tip 文字），
+        // 但遇到 clipChildren 容器就以它自身为界（否则轮播里排在屏外的幻灯片会撑爆宽度）。
+        const measure = (cluster) => {
+          let l = Infinity;
+          let t = Infinity;
+          let r = -Infinity;
+          let b = -Infinity;
+          const visit = (node, dx, dy) => {
+            const x = dx + (Number(node.state.left) || 0);
+            const y = dy + (Number(node.state.top) || 0);
+            const w = Number(node.state.width) || 0;
+            const h = Number(node.state.height) || 0;
+            l = Math.min(l, x);
+            t = Math.min(t, y);
+            r = Math.max(r, x + w);
+            b = Math.max(b, y + h);
+            if (node.state.clipChildren) return;
+            (node.childNodes || []).forEach((child) => {
+              if (child.state && child.state.display !== false) visit(child, x, y);
+            });
+          };
+          cluster.forEach((node) => visit(node, 0, 0));
+          return { l, t, w: r - l, h: b - t };
+        };
+        const shift = (cluster, dx, dy) =>
+          cluster.forEach((node) =>
+            node.setState({ left: (Number(node.state.left) || 0) + dx, top: (Number(node.state.top) || 0) + dy }),
+          );
+
+        // ① 组行
+        const lines = [];
+        sections.forEach((section, index) => {
+          if (section.title) lines.push({ kind: 'heading', section, title: section.title, first: index === 0 });
+          // 货架式排放（first-fit）：优先回填到「还放得下」的上一行，
+          // 而不是一味往后换行 —— 否则小徽标/小按钮会把页面撑得极高。
+          const shelves = [];
+          section.items.forEach((entry) => {
+            const cluster = Array.isArray(entry) ? entry : [entry];
+            const m = measure(cluster);
+            // +0.5 容差：宽度刚好铺满时（浮点误差）不该换行
+            let shelf = shelves.find((s) => s.used + m.w <= avail + 0.5);
+            if (!shelf) {
+              shelf = { used: 0, h: 0, items: [] };
+              shelves.push(shelf);
+            }
+            shelf.items.push({ cluster, m });
+            shelf.used += m.w + gapX;
+            shelf.h = Math.max(shelf.h, m.h);
+          });
+          shelves.forEach((shelf) => lines.push({ kind: 'row', row: shelf.items, h: shelf.h }));
+        });
+        lines.forEach((line) => {
+          if (line.h === undefined) line.h = headingHeight;
+        });
+
+        // ② 落位
+        let y = padTop;
+        lines.forEach((line, index) => {
+          if (line.kind === 'heading') {
+            if (index > 0) y += sectionGap;
+            // 标题缓存在 section 上（lines 每次调用都会重建，缓存在行上会重复创建标题）
+            const title = line.section.__heading || (line.section.__heading = heading(line.title, 0, 0));
+            title.setState({ left: padX, top: y, width: avail, height: headingHeight });
+            attach(title);
+            y += line.h + headingGap;
+            return;
+          }
+          let x = padX;
+          line.row.forEach((entry) => {
+            const dy = y + Math.max(0, (line.h - entry.m.h) / 2);
+            shift(entry.cluster, x - entry.m.l, dy - entry.m.t);
+            entry.cluster.forEach(attach);
+            x += entry.m.w + gapX;
+          });
+          y += line.h + gapY;
+        });
+        const height = y - gapY + padBottom;
+        panel.setState({ height });
+        return height;
+      };
+
+      const panel = new W.ICEPanel({ id: 'panel', left: 24, top: 24, width: 1352, height: 1912 });
+
+      // 滚动视口演示：内容比视口高，靠引擎的 clipChildren 裁掉溢出部分
+      // 注意：容器要先创建、再加子组件（引擎按全局 zIndex 排序渲染）
+      const scrollPane = new W.ICEScrollPane({ id: 'scroll-pane', left: 32, top: 736, width: 300, height: 96 });
+      const scrollContent = new W.ICEWidget({ width: 268, height: 264 });
+      for (let i = 0; i < 12; i++) {
+        const row = new W.ICEPanel({
+          left: 0,
+          top: i * 22,
+          width: 268,
+          height: 20,
+          radius: 4,
+          style: {
+            fillStyle: i % 2 ? theme.colors.background : theme.colors.surface,
+            strokeStyle: theme.colors.border,
+          },
+        });
+        row.addChild(new W.ICELabel({ left: 8, top: 3, text: 'Row #' + (i + 1), style: { fontSize: 12 } }), false);
+        scrollContent.addChild(row, false);
+      }
+      scrollPane.setContent(scrollContent);
+
+      // 表单演示：必填校验 + 提交反馈
+      const form = new W.ICEForm({ left: 420, top: 656, width: 320, gap: 12 });
+      const nameInput = new W.ICETextField({ width: 240, height: 32, placeholder: 'Your name' });
+      const agreeBox = new W.ICECheckBox({ width: 24, height: 24 });
+      form.addItems([
+        new W.ICEFormItem({
+          name: 'name',
+          label: 'Name',
+          control: nameInput,
+          // 同步必填 + 异步唯一性（"admin" 视为已占用；异步校验只在提交时触发）
+          rules: [
+            { required: true },
+            {
+              asyncValidator: (value) =>
+                new Promise((resolve) =>
+                  setTimeout(() => resolve(value === 'admin' ? '名字已被占用' : null), 400),
+                ),
+            },
+          ],
+        }),
+        new W.ICEFormItem({
+          name: 'agree',
+          label: 'Agree to terms',
+          control: agreeBox,
+          rules: [{ required: true, message: '请先同意条款' }],
+        }),
+      ]);
+      const submitTop = 656 + form.state.height + 10;
+      const submitButton = new W.ICEButton({ id: 'submit-button', left: 420, top: submitTop, width: 120, height: 32, text: 'Submit' });
+      const submitHint = new W.ICELabel({
+        left: 552,
+        top: submitTop + 8,
+        text: '',
+        style: { fontSize: 12, fillStyle: theme.colors.success },
+      });
+      submitButton.on('click', () => {
+        submitHint.setText('校验中…');
+        form.submitAsync().then((ok) => submitHint.setText(ok ? 'Submitted ✓' : ''));
+      });
+
+      // 反馈类组件演示：Tooltip（悬停）/ Popover（点击）/ Popconfirm（危险确认）
+      const tipTarget = new W.ICEButton({ id: 'tip-btn', left: 820, top: 656, width: 110, height: 32, text: 'Hover me' });
+      W.attachTooltip(ice, tipTarget, { title: '这是工具提示', placement: 'top' });
+
+      const popoverTarget = new W.ICEButton({
+        id: 'pop-btn',
+        left: 946,
+        top: 656,
+        width: 148,
+        height: 32,
+        text: 'Show popover',
+        variant: 'default',
+      });
+      W.attachPopover(ice, popoverTarget, { title: '浮层标题', content: '点击外部关闭' });
+
+      const deleteTarget = new W.ICEButton({ id: 'del-btn', left: 820, top: 700, width: 140, height: 32, text: 'Delete', danger: true });
+      const deleteHint = new W.ICELabel({
+        left: 974,
+        top: 708,
+        text: '',
+        style: { fontSize: 12, fillStyle: theme.colors.success },
+      });
+      const messageTarget = new W.ICEButton({ id: 'msg-btn', left: 820, top: 744, width: 148, height: 32, text: 'Show message' });
+      messageTarget.on('click', () => {
+        W.ICEMessage.success(ice, '已保存');
+        W.ICEMessage.info(ice, '正在同步数据');
+      });
+      const notifyTarget = new W.ICEButton({
+        id: 'notify-btn',
+        left: 974,
+        top: 744,
+        width: 140,
+        height: 32,
+        text: 'Notify',
+        variant: 'default',
+      });
+      notifyTarget.on('click', () => {
+        W.ICENotification.open(ice, { title: '部署完成', description: 'v1.4.0 已上线' });
+      });
+
+      const modalTarget = new W.ICEButton({ id: 'modal-btn', left: 1106, top: 656, width: 130, height: 32, text: 'Open modal' });
+      const modalHint = new W.ICELabel({
+        left: 1106,
+        top: 708,
+        text: '',
+        style: { fontSize: 12, fillStyle: theme.colors.success },
+      });
+      const modal = new W.ICEModal(ice, {
+        title: '确认发布？',
+        content: '发布后所有用户立即可见。',
+        width: 380,
+        onConfirm: () => modalHint.setText('已发布 ✓'),
+      });
+      modalTarget.on('click', () => modal.open());
+
+      W.attachPopconfirm(ice, deleteTarget, {
+        title: '确认删除？',
+        description: '删除后不可恢复',
+        danger: true,
+        onConfirm: () => deleteHint.setText('已删除 ✓'),
+      });
+
+      const pageHint = new W.ICELabel({
+        left: 820,
+        top: 776,
+        text: '第 1 页 / 每页 10 条',
+        style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+      });
+      const pagination = new W.ICEPagination({
+        id: 'pagination',
+        left: 820,
+        top: 800,
+        width: 420,
+        total: 238,
+        pageSize: 10,
+        showTotal: true,
+        showSizeChanger: true,
+        onChange: (page, pageSize) => pageHint.setText(`第 ${page} 页 / 每页 ${pageSize} 条`),
+      });
+
+      // 选择器演示：单选 + 搜索（放在 Feedback 区下方）
+      const cityHint = new W.ICELabel({
+        left: 1106,
+        top: 776,
+        text: '未选择城市',
+        style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+      });
+      const citySelect = new W.ICESelect({
+        id: 'city-select',
+        left: 1106,
+        top: 800,
+        width: 180,
+        height: 32,
+        placeholder: '请选择城市',
+        showSearch: true,
+        options: [
+          { value: 'hangzhou', label: '杭州' },
+          { value: 'shanghai', label: '上海' },
+          { value: 'shenzhen', label: '深圳', disabled: true },
+          { value: 'beijing', label: '北京' },
+        ],
+        onChange: (value, option) => cityHint.setText('已选择：' + option.label),
+      });
+
+      const drawerTarget = new W.ICEButton({ id: 'drawer-btn', left: 1120, top: 744, width: 130, height: 32, text: 'Open drawer' });
+      const drawer = new W.ICEDrawer(ice, {
+        title: '抽屉',
+        content: '从右侧滑入，点遮罩或 ✕ 关闭。',
+        width: 300,
+      });
+      drawerTarget.on('click', () => drawer.open());
+
+      // 列表演示：多选 + 内部滚动（内容超出高度时自动套 ICEScrollPane）
+      const listHint = new W.ICELabel({
+        left: 820,
+        top: 828,
+        text: '未选择',
+        style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+      });
+      const cityList = new W.ICEList({
+        id: 'city-list',
+        left: 820,
+        top: 860,
+        width: 300,
+        height: 120,
+        mode: 'multiple',
+        itemHeight: 36,
+        items: [
+          { key: 'a', label: '苹果' },
+          { key: 'b', label: '香蕉' },
+          { key: 'c', label: '橙子', disabled: true },
+          { key: 'd', label: '葡萄' },
+          { key: 'e', label: '西瓜' },
+          { key: 'f', label: '草莓' },
+        ],
+        onChange: (keys) => listHint.setText(keys.length ? '已选：' + keys.join('、') : '未选择'),
+      });
+
+      // 树演示：两级结构 + 展开/折叠 + 单选
+      const treeHint = new W.ICELabel({
+        left: 1140,
+        top: 828,
+        text: '未选择节点',
+        style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+      });
+      const tree = new W.ICETree({
+        id: 'tree',
+        left: 1140,
+        top: 856,
+        width: 200,
+        height: 150,
+        defaultExpandAll: true,
+        // 节点可拖拽：上 1/3 插前面、中 1/3 放进去、下 1/3 插后面
+        draggable: true,
+        nodes: [
+          {
+            key: 'root',
+            label: '数据源',
+            children: [
+              { key: 'mysql', label: 'MySQL' },
+              { key: 'pg', label: 'PostgreSQL' },
+              { key: 'cache', label: '缓存', children: [{ key: 'redis', label: 'Redis' }] },
+            ],
+          },
+          { key: 'logs', label: '日志' },
+        ],
+        onSelect: (keys, node) => treeHint.setText(node ? '已选择：' + node.label : '未选择节点'),
+      });
+
+      // 更多输入与状态：多行文本框 / 密码框 / 分段控制器 / 空状态 / 骨架屏
+      const bioArea = new W.ICETextArea({ id: 'bio', left: 32, top: 1066, width: 240, placeholder: '多行文本…' });
+      const passwordField = new W.ICEPasswordField({
+        id: 'password',
+        left: 300,
+        top: 1082,
+        width: 200,
+        value: 'secret123',
+        showToggle: true,
+      });
+      const rangeSegmented = new W.ICESegmented({
+        id: 'range',
+        left: 524,
+        top: 1082,
+        width: 240,
+        value: 'week',
+        options: [
+          { value: 'day', label: '日' },
+          { value: 'week', label: '周' },
+          { value: 'month', label: '月', disabled: true },
+        ],
+        onChange: (value) => console.log('segmented ->', value),
+      });
+      const emptyState = new W.ICEEmpty({
+        id: 'empty',
+        left: 788,
+        top: 1050,
+        width: 200,
+        height: 130,
+        description: '暂无数据',
+        actionText: '新建',
+      });
+      const skeleton = new W.ICESkeleton({
+        id: 'skeleton',
+        left: 1010,
+        top: 1060,
+        width: 320,
+        rows: 3,
+        title: true,
+        avatar: true,
+        active: true,
+      });
+
+      // 数据展示：折叠面板 / 描述列表 / 时间线
+      const collapsePanel = new W.ICECollapse({
+        id: 'collapse',
+        left: 32,
+        top: 1256,
+        width: 280,
+        activeKeys: ['a'],
+        items: [
+          { key: 'a', title: '面板 A', content: 'A 的内容（点标题切换）' },
+          { key: 'b', title: '面板 B', content: 'B 的内容' },
+        ],
+      });
+      const descriptions = new W.ICEDescriptions({
+        id: 'descriptions',
+        left: 340,
+        top: 1256,
+        width: 330,
+        column: 2,
+        items: [
+          { label: '订单号', value: '#10321' },
+          { label: '状态', value: '已支付' },
+          { label: '客户', value: 'Ava Thompson' },
+          { label: '金额', value: '$1,240.00' },
+        ],
+      });
+      const timeline = new W.ICETimeline({
+        id: 'timeline',
+        left: 700,
+        top: 1256,
+        width: 320,
+        items: [
+          { title: '创建订单', description: '用户下单', time: '09:01' },
+          { title: '支付完成', description: '微信支付', time: '09:03' },
+          { title: '已发货', time: '10:20', color: theme.colors.success },
+        ],
+      });
+
+      // 反馈与状态：加载指示器 / 评分 / 步骤条 / 结果页
+      const spin = new W.ICESpin({ id: 'spin', left: 32, top: 1540, size: 24, tip: '加载中…' });
+      const rate = new W.ICERate({
+        id: 'rate',
+        left: 200,
+        top: 1540,
+        count: 5,
+        value: 3,
+        onChange: (value) => console.log('rate ->', value),
+      });
+      const steps = new W.ICESteps({
+        id: 'steps',
+        left: 386,
+        top: 1532,
+        width: 400,
+        current: 1,
+        items: [{ title: '填写信息' }, { title: '确认订单', description: '核对商品' }, { title: '完成' }],
+      });
+      const result = new W.ICEResult({
+        id: 'result',
+        left: 780,
+        top: 1520,
+        width: 260,
+        height: 150,
+        status: 'success',
+        title: '提交成功',
+        subtitle: '我们会在 1 个工作日内联系你',
+        actions: [{ key: 'ok', text: '返回首页', primary: true }],
+      });
+
+      // 高级录入：数字步进框 / 自动完成
+      const quantity = new W.ICEInputNumber({
+        id: 'quantity',
+        left: 1060,
+        top: 1256,
+        width: 140,
+        value: 3,
+        min: 1,
+        max: 10,
+        step: 1,
+      });
+      const cityAuto = new W.ICEAutoComplete({
+        id: 'city-auto',
+        left: 1060,
+        top: 1310,
+        width: 220,
+        placeholder: '输入城市名…',
+        options: ['杭州', '上海', '深圳', '北京', '广州', '成都'],
+      });
+
+      const treeSelectHint = new W.ICELabel({
+        left: 1300,
+        top: 1232,
+        text: '未选择',
+        style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+      });
+      const dataTreeSelect = new W.ICETreeSelect({
+        id: 'tree-select',
+        left: 1060,
+        top: 1364,
+        width: 220,
+        placeholder: '选择数据源…',
+        defaultExpandAll: true,
+        nodes: [
+          {
+            key: 'db',
+            label: '数据库',
+            children: [
+              { key: 'mysql', label: 'MySQL' },
+              { key: 'pg', label: 'PostgreSQL' },
+            ],
+          },
+          { key: 'cache', label: '缓存' },
+        ],
+        onChange: (key, node) => treeSelectHint.setText('已选：' + node.label),
+      });
+
+      const datePickerHint = new W.ICELabel({
+        left: 1250,
+        top: 1412,
+        text: '未选择日期',
+        style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+      });
+      const datePicker = new W.ICEDatePicker({
+        id: 'date-picker',
+        left: 1060,
+        top: 1406,
+        width: 180,
+        placeholder: '选择日期…',
+        value: '2026-09-12',
+        onChange: (value) => datePickerHint.setText('已选：' + value),
+      });
+
+      const timeHint = new W.ICELabel({
+        left: 1240,
+        top: 1462,
+        text: '未选择时间',
+        style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+      });
+      const timePicker = new W.ICETimePicker({
+        id: 'time-picker',
+        left: 1060,
+        top: 1454,
+        width: 160,
+        placeholder: '选择时间…',
+        value: '09:30:00',
+        onChange: (value) => timeHint.setText('已选：' + value),
+      });
+
+      const cascader = new W.ICECascader({
+        id: 'cascader',
+        left: 1060,
+        top: 1502,
+        width: 220,
+        placeholder: '选择地区…',
+        value: 'xh',
+        separator: ' / ',
+        options: [
+          {
+            value: 'zj',
+            label: '浙江',
+            children: [
+              {
+                value: 'hz',
+                label: '杭州',
+                children: [
+                  { value: 'xh', label: '西湖' },
+                  { value: 'yh', label: '余杭' },
+                ],
+              },
+              { value: 'nb', label: '宁波' },
+            ],
+          },
+          {
+            value: 'js',
+            label: '江苏',
+            children: [
+              { value: 'nj', label: '南京' },
+              { value: 'sz', label: '苏州' },
+            ],
+          },
+          { value: 'other', label: '其它（禁用）', disabled: true },
+        ],
+        onChange: (value, path) => console.log('cascader ->', value, path.map((n) => n.label).join('/')),
+      });
+
+      // 穿梭框：勾选后用中间按钮在「待选 / 已选」之间搬运
+      const transfer = new W.ICETransfer({
+        id: 'transfer',
+        left: 880,
+        top: 140,
+        width: 420,
+        height: 240,
+        dataSource: [
+          { key: 'apple', title: '苹果' },
+          { key: 'banana', title: '香蕉' },
+          { key: 'cherry', title: '樱桃' },
+          { key: 'durian', title: '榴莲', disabled: true },
+          { key: 'elder', title: '接骨木' },
+        ],
+        targetKeys: ['banana'],
+        titles: ['待选', '已选'],
+        onChange: (keys, direction, moveKeys) =>
+          console.log('transfer ->', direction, moveKeys.join(','), '=>', keys.join(',')),
+      });
+
+      // 轮播：裁剪视口 + 横向轨道 + 箭头/圆点（切换带补间过渡）
+      const makeSlide = (text, bg) => {
+        const slide = new W.ICEWidget({
+          width: 320,
+          height: 180,
+          radius: theme.radius.md,
+          fill: true,
+          stroke: false,
+          style: { fillStyle: bg },
+        });
+        slide.addChild(
+          new W.ICELabel({
+            interactive: false,
+            left: 0,
+            top: 0,
+            width: 320,
+            height: 180,
+            align: 'center',
+            verticalAlign: 'middle',
+            text,
+            style: { fontSize: 18, fontWeight: '600', fillStyle: '#ffffff' },
+          }),
+          false,
+        );
+        return slide;
+      };
+      const carousel = new W.ICECarousel({
+        id: 'carousel',
+        left: 360,
+        top: 900,
+        width: 320,
+        height: 180,
+        slides: [
+          makeSlide('1 / 3', theme.colors.primary),
+          makeSlide('2 / 3', theme.colors.success),
+          makeSlide('3 / 3', theme.colors.warning),
+        ],
+        onChange: (index) => console.log('carousel ->', index),
+      });
+
+      // Ant 补全：头像组（重叠 + 折叠 +N）与可关闭提示条
+      const avatarGroup = new W.ICEAvatarGroup({
+        id: 'avatar-group',
+        left: 360,
+        top: 262,
+        size: 32,
+        max: 4,
+        overlap: 10,
+        avatars: [
+          { text: 'A' },
+          { text: 'B', backgroundColor: theme.colors.success },
+          { text: 'C', backgroundColor: theme.colors.warning },
+          { text: 'D', backgroundColor: theme.colors.error },
+          { text: 'E', backgroundColor: theme.colors.info },
+          { text: 'F' },
+        ],
+      });
+      const closableAlert = new W.ICEAlert({
+        id: 'closable-alert',
+        left: 360,
+        top: 1150,
+        width: 420,
+        height: 56,
+        type: 'success',
+        title: '发布成功',
+        message: '右侧 ✕ 可关闭这条提示。',
+        closable: true,
+        onClose: () => console.log('alert closed'),
+      });
+
+      // 环形进度：底环 + 进度弧 + 居中百分比（66% 主色 / 100% 成功色）
+      const progressCircle = new W.ICEProgressBar({
+        id: 'progress-circle',
+        type: 'circle',
+        left: 1080,
+        top: 1560,
+        size: 88,
+        strokeWidth: 8,
+        value: 66,
+      });
+      const progressCircleDone = new W.ICEProgressBar({
+        id: 'progress-circle-done',
+        type: 'circle',
+        left: 1190,
+        top: 1560,
+        size: 88,
+        strokeWidth: 8,
+        value: 100,
+        status: 'success',
+      });
+
+      // 上传：点击虚线区唤起系统文件框（accept/maxSize/maxCount 校验 + 文件列表）
+      const upload = new W.ICEUpload({
+        id: 'upload',
+        left: 1000,
+        top: 400,
+        width: 320,
+        accept: '.png,.jpg,.pdf',
+        maxSize: 2 * 1024 * 1024,
+        maxCount: 4,
+        onChange: (files) => console.log('upload ->', files.map((f) => f.name).join(',')),
+      });
+      upload.addFile({ name: 'design.png', size: 348 * 1024 });
+
+      // 评论区（含嵌套回复与操作）
+      const comment = new W.ICEComment({
+        id: 'comment',
+        left: 32,
+        top: 1730,
+        width: 460,
+        author: '张三',
+        avatarText: '张',
+        time: '2 小时前',
+        content: '这条评论用于验证嵌套回复与操作按钮。',
+        actions: [
+          { key: 'reply', text: '回复' },
+          { key: 'like', text: '点赞' },
+        ],
+        replies: [{ author: '李四', content: '同意，我也这么觉得。', time: '1 小时前' }],
+      });
+
+      // 颜色选择器：色板网格 + 选中环（表单控件语义）
+      const colorHint = new W.ICELabel({
+        left: 542,
+        top: 1856,
+        text: '已选：' + theme.colors.primary,
+        style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+      });
+      // 不传 colors → 用 ICEColorPicker 的默认色板（Bootstrap 主题色）
+      const colorPicker = new W.ICEColorPicker({
+        id: 'color-picker',
+        left: 540,
+        top: 1740,
+        width: 300,
+        columns: 6,
+        value: theme.colors.primary,
+        onChange: (color) => colorHint.setText('已选：' + color),
+      });
+
+      // 图片：fill / contain / cover 三种适配（240x120 源图放进 120x90 盒子）
+      const demoImageSrc =
+        'data:image/svg+xml;utf8,' +
+        encodeURIComponent(
+          "<svg xmlns='http://www.w3.org/2000/svg' width='240' height='120'>" +
+            "<rect width='240' height='120' fill='#cfe2ff'/>" +
+            "<circle cx='48' cy='60' r='34' fill='#0d6efd'/>" +
+            "<rect x='110' y='18' width='112' height='84' rx='12' fill='#198754'/>" +
+            "<text x='132' y='68' font-size='18' fill='#ffffff'>240x120</text>" +
+            '</svg>',
+        );
+      const imageFill = new W.ICEImageView({
+        id: 'image-fill',
+        left: 0,
+        top: 0,
+        width: 120,
+        height: 90,
+        fit: 'fill',
+        src: demoImageSrc,
+      });
+      const imageContain = new W.ICEImageView({
+        id: 'image-contain',
+        left: 0,
+        top: 0,
+        width: 120,
+        height: 90,
+        fit: 'contain',
+        src: demoImageSrc,
+      });
+      const imageCover = new W.ICEImageView({
+        id: 'image-cover',
+        left: 0,
+        top: 0,
+        width: 120,
+        height: 90,
+        fit: 'cover',
+        src: demoImageSrc,
+      });
+
+      // 导航 / 指标 / 分组 / 分栏 / 水印（本轮新增的组件）
+      const breadcrumb = new W.ICEBreadcrumb({
+        id: 'breadcrumb',
+        left: 0,
+        top: 0,
+        items: [{ label: '首页' }, { label: '订单管理' }, { label: '订单详情' }],
+      });
+      const breadcrumbCollapsed = new W.ICEBreadcrumb({
+        id: 'breadcrumb-collapsed',
+        left: 0,
+        top: 0,
+        maxItems: 3,
+        items: [
+          { label: '首页' },
+          { label: '销售' },
+          { label: '订单' },
+          { label: '发货' },
+          { label: '详情' },
+        ],
+      });
+      const statistic = new W.ICEStatistic({
+        id: 'statistic',
+        left: 0,
+        top: 0,
+        width: 200,
+        title: '本月成交额',
+        value: 1234567.891,
+        precision: 2,
+        groupSeparator: true,
+        prefix: '¥',
+        status: 'primary',
+      });
+      const countdown = new W.ICEStatistic({
+        id: 'statistic-countdown',
+        left: 0,
+        top: 0,
+        width: 200,
+        title: '距活动结束',
+        countdown: 3 * 86400000 + 3661000,
+        suffix: '',
+      });
+      const radioGroup = new W.ICERadioGroup({
+        id: 'radio-group',
+        left: 0,
+        top: 0,
+        width: 360,
+        value: 'pro',
+        options: [
+          { value: 'standard', label: '标准版' },
+          { value: 'pro', label: '专业版' },
+          { value: 'flag', label: '旗舰版（未开放）', disabled: true },
+        ],
+      });
+      const checkboxGroup = new W.ICECheckboxGroup({
+        id: 'checkbox-group',
+        left: 0,
+        top: 0,
+        width: 360,
+        value: ['mail'],
+        options: [
+          { value: 'mail', label: '邮件' },
+          { value: 'sms', label: '短信' },
+          { value: 'im', label: '站内信' },
+        ],
+      });
+      const splitterLeft = new W.ICEPanel({ id: 'splitter-left', left: 0, top: 0, width: 180, height: 160 });
+      splitterLeft.addChild(
+        new W.ICELabel({ left: 12, top: 12, width: 150, height: 20, text: '左侧栏（可拖）', style: { fontSize: 12 } }),
+        false,
+      );
+      const splitterRight = new W.ICEPanel({ id: 'splitter-right', left: 0, top: 0, width: 230, height: 160 });
+      splitterRight.addChild(
+        new W.ICELabel({ left: 12, top: 12, width: 200, height: 20, text: '右侧栏', style: { fontSize: 12 } }),
+        false,
+      );
+      const splitter = new W.ICESplitter({
+        id: 'splitter',
+        left: 0,
+        top: 0,
+        width: 420,
+        height: 160,
+        size: 180,
+        min: 60,
+        first: splitterLeft,
+        second: splitterRight,
+      });
+      const watermark = new W.ICEWatermark({
+        id: 'watermark',
+        left: 0,
+        top: 0,
+        width: 320,
+        height: 160,
+        text: 'ICE 内部资料',
+        gapX: 160,
+        gapY: 80,
+        color: 'rgba(13, 110, 253, 0.16)',
+      });
+
+      // 排版 / 锚点 / 回到顶部
+      const typographyTitle = new W.ICETypography({
+        id: 'type-title',
+        left: 0,
+        top: 0,
+        width: 320,
+        text: '订单中心',
+        variant: 'title',
+        level: 1,
+      });
+      const typographyParagraph = new W.ICETypography({
+        id: 'type-paragraph',
+        left: 0,
+        top: 0,
+        width: 320,
+        rows: 2,
+        ellipsis: true,
+        variant: 'paragraph',
+        text: '这里是订单中心的说明文字，内容比较长，用来演示画布里的自动折行与省略号：超过宽度的部分会被截断并在末尾补省略号，不会再压出色块。',
+      });
+      const typographyLink = new W.ICETypography({
+        id: 'type-link',
+        left: 0,
+        top: 0,
+        width: 320,
+        text: '查看全部订单 →',
+        variant: 'link',
+      });
+      const anchorContent = new W.ICEWidget({
+        id: 'anchor-content',
+        left: 0,
+        top: 0,
+        width: 260,
+        height: 700,
+        fill: false,
+        stroke: false,
+      });
+      [
+        ['基本信息', 16],
+        ['订单记录', 266],
+        ['操作日志', 516],
+      ].forEach(([title, top]) => {
+        anchorContent.addChild(
+          new W.ICETypography({
+            left: 12,
+            top,
+            width: 220,
+            text: title,
+            variant: 'title',
+            level: 4,
+          }),
+          false,
+        );
+      });
+      const anchorPane = new W.ICEScrollPane({ id: 'anchor-pane', left: 0, top: 0, width: 260, height: 180 });
+      anchorPane.setContent(anchorContent);
+      anchorPane.setContentSize(260, 700);
+      const anchor = new W.ICEAnchor({
+        id: 'anchor',
+        left: 274,
+        top: 0,
+        width: 110,
+        target: anchorPane,
+        items: [
+          { key: 'basic', label: '基本信息', top: 0 },
+          { key: 'orders', label: '订单记录', top: 250 },
+          { key: 'logs', label: '操作日志', top: 500 },
+        ],
+      });
+      const backTop = new W.ICEBackTop({
+        id: 'back-top',
+        left: 274,
+        top: 120,
+        target: anchorPane,
+        visibilityHeight: 80,
+      });
+
+      // 日历 / 图片预览 / 漫游引导
+      const calendar = new W.ICECalendar({
+        id: 'calendar',
+        left: 0,
+        top: 0,
+        width: 300,
+        month: '2026-09',
+        value: '2026-09-12',
+        today: '2026-09-12',
+      });
+      const imagePreview = new W.ICEImagePreview(ice, {
+        images: [demoImageSrc, demoImageSrc, demoImageSrc],
+        index: 0,
+      });
+      const previewTarget = new W.ICEButton({
+        id: 'preview-target',
+        left: 0,
+        top: 0,
+        width: 120,
+        text: '预览图片',
+      });
+      previewTarget.on('click', () => {
+        imagePreview.open();
+        // 示例页的画布比窗口高得多：预览框按画布居中，这里把它滚进视口
+        // （真实应用里画布本身就是视口，通常不需要这一步）
+        const frame = imagePreview.getFrame();
+        const canvasEl = document.getElementById('canvas');
+        if (frame && canvasEl) {
+          const rect = canvasEl.getBoundingClientRect();
+          window.scrollTo(0, Math.max(0, window.scrollY + rect.top + Number(frame.state.top) - 120));
+        }
+      });
+      const tour = new W.ICETour(ice, {
+        steps: [
+          { target: previewTarget, title: '先看图片预览', description: '点这里可以放大、旋转、翻页查看图片。' },
+          { target: statistic, title: '再看看指标', description: '统计数值支持精度、千分位与倒计时。' },
+          { target: calendar, title: '最后挑个日期', description: '选日期、翻月份，支持键盘操作。' },
+        ],
+      });
+      const tourTarget = new W.ICEButton({
+        id: 'tour-target',
+        left: 136,
+        top: 0,
+        width: 120,
+        text: '开始引导',
+      });
+      tourTarget.on('click', () => tour.open());
+
+      // 布局骨架（Space / Grid）+ 悬浮按钮 + 分页表格
+      const layoutSpace = new W.ICESpace({ id: 'layout-space', left: 0, top: 0, direction: 'horizontal', size: 8 });
+      layoutSpace.addItem(new W.ICEButton({ left: 0, top: 0, width: 72, height: 32, text: '保存', variant: 'primary' }));
+      layoutSpace.addItem(new W.ICEButton({ left: 0, top: 0, width: 72, height: 32, text: '取消' }));
+      layoutSpace.addItem(
+        new W.ICETag({ left: 0, top: 0, width: 64, height: 32, text: '草稿', status: 'warning', variant: 'soft' }),
+      );
+      const layoutGrid = new W.ICEGrid({ id: 'layout-grid', left: 0, top: 0, width: 360, gutter: 12 });
+      const gridCell = (label, height) => {
+        const panel = new W.ICEPanel({ left: 0, top: 0, width: 10, height });
+        panel.addChild(
+          new W.ICELabel({
+            left: 12,
+            top: 0,
+            width: 120,
+            height,
+            text: label,
+            verticalAlign: 'middle',
+            style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+          }),
+          false,
+        );
+        return panel;
+      };
+      layoutGrid.addCol(new W.ICEGridCol({ span: 12, content: gridCell('span 12', 56) }));
+      layoutGrid.addCol(new W.ICEGridCol({ span: 12, content: gridCell('span 12', 56) }));
+      layoutGrid.addCol(new W.ICEGridCol({ span: 24, content: gridCell('span 24', 32) }));
+      const fabSpacer = new W.ICEWidget({
+        left: 0,
+        top: 0,
+        width: 0,
+        height: 160,
+        fill: false,
+        stroke: false,
+        interactive: false,
+      });
+      let fabPicked = null;
+      const fab = new W.ICEFloatButton({
+        id: 'float-button',
+        left: 0,
+        top: 116,
+        type: 'primary',
+        items: [
+          { key: 'edit', icon: '✎' },
+          { key: 'share', icon: '↗' },
+        ],
+        onItemClick: (key) => {
+          fabPicked = key;
+        },
+      });
+      window.__fabPicked = () => fabPicked;
+      const pagedTable = new W.ICETable({
+        id: 'paged-table',
+        left: 0,
+        top: 0,
+        width: 420,
+        rowHeight: 34,
+        columns: [
+          { key: 'name', title: '客户' },
+          { key: 'city', title: '城市' },
+          { key: 'amount', title: '金额', align: 'right', sorter: true },
+        ],
+        // 表头边界可拖拽缩列（最小 70px，拖过头会夹住）
+        resizable: true,
+        minColumnWidth: 70,
+        // 行可拖拽排序（按住行上下拖，松手落位）
+        rowDraggable: true,
+        data: [
+          { name: 'Ava', city: '杭州', amount: 1240 },
+          { name: 'Bob', city: '上海', amount: 860 },
+          { name: 'Cara', city: '北京', amount: 2310 },
+          { name: 'Dan', city: '深圳', amount: 540 },
+          { name: 'Ella', city: '成都', amount: 1780 },
+          { name: 'Finn', city: '广州', amount: 990 },
+          { name: 'Gina', city: '武汉', amount: 320 },
+          { name: 'Hugo', city: '西安', amount: 1450 },
+        ],
+        pagination: { pageSize: 3, showTotal: true },
+      });
+
+      // 跨字段依赖：确认密码（改密码 → 确认框立刻重算）
+      const crossForm = new W.ICEForm({ id: 'cross-form', left: 0, top: 0, width: 300, gap: 12 });
+      const passwordInput = new W.ICEPasswordField({ width: 220, height: 32, placeholder: '密码（≥6 位）' });
+      const confirmInput = new W.ICEPasswordField({ width: 220, height: 32, placeholder: '再输一次' });
+      crossForm.addItems([
+        new W.ICEFormItem({
+          name: 'password',
+          label: '密码',
+          control: passwordInput,
+          rules: [{ required: true, minLength: 6 }],
+        }),
+        new W.ICEFormItem({
+          name: 'confirm',
+          label: '确认密码',
+          control: confirmInput,
+          dependencies: ['password'],
+          rules: [
+            { required: true },
+            {
+              validator: (value, values) => (value === values.password ? null : '两次输入的密码不一致'),
+            },
+          ],
+        }),
+      ]);
+
+      // 演示清单：每个 item 要么是单个组件，要么是一组「必须贴在一起」的组件（数组）。
+      // 组件自带的 left/top 只是簇内局部坐标，实际位置由 flowSections 统一排。
+      /** 虚拟列表句柄（QA 用它验证「一万行只渲染可视区」） */
+      let virtualList = null;
+      /** 宽表句柄（QA 用它验证虚拟行 / 固定列 / 横向滚动） */
+      let bigTable = null;
+      /** 看板句柄（QA 用它验证跨列拖卡片） */
+      let kanban = null;
+      const sections = [
+        {
+          title: 'Kanban（卡片跨列拖拽）',
+          items: [
+            (() => {
+              kanban = new W.ICEKanban({
+                id: 'kanban',
+                left: 0,
+                top: 0,
+                width: 560,
+                height: 220,
+                columnWidth: 172,
+                cardHeight: 48,
+                draggable: true,
+                columns: [
+                  { key: 'todo', title: '待办', cards: [{ key: 'c1', title: '修复登录抖动' }, { key: 'c2', title: '补充埋点文档' }] },
+                  { key: 'doing', title: '进行中', cards: [{ key: 'c3', title: '审核组件 API' }] },
+                  { key: 'done', title: '已完成', cards: [] },
+                ],
+              });
+              return kanban;
+            })(),
+          ],
+        },
+        {
+          title: 'Big table（一万行 × 20 列：虚拟行 + 固定列 + 拖拽缩列）',
+          items: [
+            (() => {
+              const bigColumns = Array.from({ length: 20 }, (_, i) => ({
+                key: 'c' + i,
+                title: '列' + (i + 1),
+                width: i < 2 ? 100 : undefined,
+                fixed: i < 2,
+                align: i % 3 === 0 ? 'right' : 'left',
+              }));
+              const bigRows = Array.from({ length: 10000 }, (_, i) => {
+                const row = {};
+                bigColumns.forEach((column, index) => {
+                  row[column.key] = index === 0 ? '行 ' + (i + 1) : String(((i + 1) * (index + 3)) % 9973);
+                });
+                return row;
+              });
+              bigTable = new W.ICETable({
+                id: 'big-table',
+                left: 0,
+                top: 0,
+                width: 420,
+                height: 300,
+                headerHeight: 34,
+                rowHeight: 32,
+                virtual: true,
+                resizable: true,
+                minColumnWidth: 70,
+                columns: bigColumns,
+                data: bigRows,
+              });
+              return bigTable;
+            })(),
+          ],
+        },
+        {
+          title: 'Virtual list（一万行也只渲染可视区）',
+          items: [
+            (() => {
+              const rows = Array.from({ length: 10000 }, (_, i) => ({
+                id: i + 1,
+                name: '订单 ' + String(i + 1).padStart(5, '0'),
+                amount: '¥' + (((i * 37) % 900) + 10),
+              }));
+              const list = new W.ICEVirtualList({
+                id: 'virtual-list',
+                left: 0,
+                top: 0,
+                width: 360,
+                height: 260,
+                itemHeight: 28,
+                buffer: 2,
+                items: rows,
+                renderItem: (index, item, node) => {
+                  const zebra = index % 2 === 0 ? theme.colors.surface : theme.colors.background;
+                  node.addChild(
+                    new W.ICEWidget({
+                      left: 0,
+                      top: 0,
+                      width: 344,
+                      height: 26,
+                      radius: 3,
+                      fill: true,
+                      stroke: false,
+                      interactive: false,
+                      style: { fillStyle: zebra },
+                    }),
+                    false,
+                  );
+                  node.addChild(
+                    new W.ICELabel({
+                      interactive: false,
+                      left: 10,
+                      top: 0,
+                      width: 200,
+                      height: 26,
+                      text: item.name,
+                      verticalAlign: 'middle',
+                      style: { fontSize: 13 },
+                    }),
+                    false,
+                  );
+                  node.addChild(
+                    new W.ICELabel({
+                      interactive: false,
+                      left: 210,
+                      top: 0,
+                      width: 124,
+                      height: 26,
+                      text: item.amount,
+                      align: 'right',
+                      verticalAlign: 'middle',
+                      style: { fontSize: 13, fillStyle: theme.colors.textSecondary },
+                    }),
+                    false,
+                  );
+                },
+              });
+              virtualList = list;
+              return list;
+            })(),
+          ],
+        },
+        {
+          title: 'Buttons',
+          items: [
+            new W.ICEButton({ id: 'btn-primary', left: 0, top: 0, text: 'Primary', width: 96 }),
+            new W.ICEButton({ id: 'btn-default', left: 0, top: 0, text: 'Default', width: 96, variant: 'default' }),
+            new W.ICEButton({ id: 'btn-text', left: 0, top: 0, text: 'Text', width: 72, variant: 'text' }),
+            new W.ICEButton({ id: 'btn-link', left: 0, top: 0, text: 'Link', width: 72, variant: 'link' }),
+            new W.ICEButton({ id: 'btn-danger', left: 0, top: 0, text: 'Danger', width: 96, danger: true }),
+            new W.ICEButton({ id: 'btn-small', left: 0, top: 0, text: 'Small', width: 84, size: 'small' }),
+            new W.ICEButton({ id: 'btn-large', left: 0, top: 0, text: 'Large', width: 104, size: 'large' }),
+          ],
+        },
+        {
+          title: 'Badges & tags',
+          items: [
+            new W.ICEBadge({ id: 'badge-primary', left: 0, top: 0, text: '9', width: 32, height: 24 }),
+            new W.ICEBadge({ id: 'badge-success', left: 0, top: 0, text: 'OK', width: 40, height: 24, status: 'success' }),
+            new W.ICEBadge({ id: 'badge-warning', left: 0, top: 0, text: 'W', width: 32, height: 24, status: 'warning' }),
+            new W.ICEBadge({ id: 'badge-error', left: 0, top: 0, text: '5', width: 32, height: 24, status: 'error' }),
+            new W.ICEBadge({ id: 'badge-dot', left: 0, top: 0, dot: true, dotSize: 10 }),
+            new W.ICEBadge({ id: 'badge-count', left: 0, top: 0, width: 46, height: 24, count: 128 }),
+            new W.ICETag({ id: 'tag-default', left: 0, top: 0, text: 'Default', width: 82, height: 24 }),
+            new W.ICETag({ id: 'tag-success', left: 0, top: 0, text: 'Success', width: 88, height: 24, status: 'success' }),
+            new W.ICETag({ id: 'tag-warning', left: 0, top: 0, text: 'Warning', width: 86, height: 24, status: 'warning' }),
+            new W.ICETag({ id: 'tag-error', left: 0, top: 0, text: 'Error', width: 76, height: 24, status: 'error' }),
+            // soft 变体（Bootstrap subtle 浅底 + 强调文字）与实底对照
+            new W.ICETag({ id: 'tag-soft', left: 0, top: 0, text: 'Soft', width: 76, height: 24, status: 'success', variant: 'soft' }),
+          ],
+        },
+        {
+          title: 'Avatars & icons',
+          items: [
+            [
+              new W.ICEAvatar({ id: 'avatar-a', left: 0, top: 28, text: 'A', size: 36 }),
+              new W.ICEAvatar({ id: 'avatar-b', left: 50, top: 24, text: 'B', size: 44 }),
+              new W.ICEAvatar({ id: 'avatar-c', left: 108, top: 18, text: 'C', size: 56, backgroundColor: theme.colors.success }),
+            ],
+            [
+              new W.ICEIcon({ id: 'icon-star', left: 0, top: 32, icon: '★', size: 24, color: theme.colors.warning }),
+              new W.ICEIcon({ id: 'icon-check', left: 38, top: 32, icon: '✓', size: 24, color: theme.colors.success }),
+              new W.ICEIcon({ id: 'icon-info', left: 76, top: 32, icon: 'ℹ', size: 24, color: theme.colors.info }),
+            ],
+            avatarGroup,
+          ],
+        },
+        {
+          title: 'Selection & progress',
+          items: [
+            new W.ICECheckBox({ id: 'check', left: 0, top: 0, width: 24, height: 24, selected: true }),
+            new W.ICERadioButton({ id: 'radio', left: 0, top: 0, width: 24, height: 24, selected: true }),
+            new W.ICESwitch({ id: 'switch', left: 0, top: 0, width: 52, height: 26, selected: true }),
+            new W.ICEProgressBar({ id: 'progress', left: 0, top: 0, value: 55, width: 220, height: 10 }),
+            new W.ICESlider({ id: 'slider', left: 0, top: 0, value: 40, width: 220, height: 18 }),
+            new W.ICESlider({
+              id: 'slider-range',
+              left: 0,
+              top: 0,
+              width: 220,
+              height: 18,
+              range: true,
+              min: 0,
+              max: 100,
+              step: 5,
+              value: [25, 70],
+            }),
+          ],
+        },
+        {
+          title: 'Containers',
+          items: [
+            new W.ICECard({
+              id: 'card',
+              left: 0,
+              top: 0,
+              title: 'Project summary',
+              width: 300,
+              height: 160,
+              // extra 传工厂：节点在卡片之后创建，zIndex 天然在上层
+              extra: () =>
+                new W.ICELabel({
+                  left: 0,
+                  top: 0,
+                  width: 40,
+                  height: 18,
+                  text: 'More',
+                  style: { fontSize: 12, fillStyle: theme.colors.primary },
+                }),
+            }),
+            new W.ICETabs({ id: 'tabs', left: 0, top: 0, tabs: ['Overview', 'Activity', 'Settings'], width: 380, height: 40 }),
+            scrollPane,
+            new W.ICESeparator({ id: 'separator-h', left: 0, top: 0, width: 220, height: 1 }),
+            new W.ICESeparator({ id: 'separator-v', left: 0, top: 0, width: 1, height: 64 }),
+          ],
+        },
+        {
+          title: 'Form',
+          items: [[form, submitButton, submitHint]],
+        },
+        {
+          title: 'Feedback',
+          items: [
+            tipTarget,
+            popoverTarget,
+            [deleteTarget, deleteHint],
+            [modalTarget, modalHint],
+            messageTarget,
+            notifyTarget,
+            drawerTarget,
+            [pageHint, pagination],
+            [cityHint, citySelect],
+            [listHint, cityList],
+            [treeHint, tree],
+            closableAlert,
+          ],
+        },
+        {
+          title: 'More inputs & states',
+          items: [bioArea, passwordField, rangeSegmented, emptyState, skeleton],
+        },
+        {
+          title: 'Data display',
+          items: [collapsePanel, descriptions, timeline],
+        },
+        {
+          title: 'Inputs',
+          items: [
+            quantity,
+            cityAuto,
+            [treeSelectHint, dataTreeSelect],
+            [datePickerHint, datePicker],
+            [timeHint, timePicker],
+            cascader,
+          ],
+        },
+        {
+          title: 'Feedback & status',
+          items: [spin, rate, steps, result, progressCircle, progressCircleDone],
+        },
+        {
+          // 录入类收尾：色板 / 穿梭框 / 上传，宽度接近，放一节里能并排
+          title: 'More form controls',
+          items: [[colorPicker, colorHint], transfer, upload],
+        },
+        {
+          // 展示类收尾：评论 / 轮播 / 图片（图片带图注，各自成列）
+          title: 'Display',
+          items: [
+            comment,
+            carousel,
+            [imageFill, caption('fill', 0, 96)],
+            [imageContain, caption('contain', 0, 96)],
+            [imageCover, caption('cover', 0, 96)],
+          ],
+        },
+        {
+          title: 'Navigation & metrics',
+          items: [breadcrumb, breadcrumbCollapsed, statistic, countdown],
+        },
+        {
+          title: 'Choice groups',
+          items: [radioGroup, checkboxGroup],
+        },
+        {
+          title: 'Splitter & watermark',
+          items: [splitter, watermark],
+        },
+        {
+          title: 'Typography & anchor',
+          items: [typographyTitle, typographyParagraph, typographyLink, [anchorPane, anchor, backTop]],
+        },
+        {
+          title: 'Calendar & overlays',
+          items: [calendar, [previewTarget, tourTarget]],
+        },
+        {
+          title: 'Layout & float',
+          items: [layoutSpace, layoutGrid, [fabSpacer, fab]],
+        },
+        {
+          title: 'Table with pagination',
+          items: [pagedTable],
+        },
+        {
+          title: 'Cross-field validation',
+          items: [crossForm],
+        },
+      ];
+
+      // 画布随内容长高：改元素尺寸 + 同步 ice.canvasWidth/Height（渲染器每帧都读它）
+      const syncCanvasToContent = (height) => {
+        panel.setState({ height });
+        const canvasEl = document.getElementById('canvas');
+        const nextWidth = Math.round(Number(panel.state.width) + 48);
+        const nextHeight = Math.round(height + 48);
+        if (canvasEl.width !== nextWidth || canvasEl.height !== nextHeight) {
+          canvasEl.width = nextWidth;
+          canvasEl.height = nextHeight;
+          canvasEl.style.width = nextWidth + 'px';
+          canvasEl.style.height = nextHeight + 'px';
+        }
+        ice.canvasWidth = nextWidth;
+        ice.canvasHeight = nextHeight;
+        ice.updateCanvasBoundingRect();
+        ice.dirty = true;
+      };
+      syncCanvasToContent(flowSections(panel, sections));
+
+      // 下拉菜单演示：点 Default 弹菜单，选中后触发按钮文字更新
+      const defaultButton = panel.childNodes.find((node) => node.state && node.state.id === 'btn-default');
+      const dropdown = W.attachDropdown(ice, defaultButton, {
+        items: [
+          { key: 'day', label: '按天' },
+          { key: 'week', label: '按周' },
+          { key: 'month', label: '按月' },
+          { key: 'year', label: '按年', disabled: true },
+        ],
+        selectedKey: 'week',
+        onSelect: (item) => defaultButton.setText(item.label),
+      });
+
+
+      // 浮层演示：点 Primary 弹出 popover（弹层底座 + 入场缩放/出场淡出）
+      const primaryButton = panel.childNodes.find((node) => node.state && node.state.id === 'btn-primary');
+      const makePopover = () => {
+        const popover = new W.ICEPanel({ width: 208, height: 84, radius: 8 });
+        popover.addChild(
+          new W.ICELabel({ left: 12, top: 10, text: 'Popover', style: { fontSize: 13, fontWeight: '600' } }),
+        );
+        popover.addChild(
+          new W.ICELabel({
+            left: 12,
+            top: 32,
+            text: 'Anchored + animated',
+            style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+          }),
+        );
+        popover.addChild(
+          new W.ICELabel({
+            left: 12,
+            top: 54,
+            text: 'Click outside to close',
+            style: { fontSize: 12, fillStyle: theme.colors.textTertiary },
+          }),
+        );
+        return popover;
+      };
+      primaryButton.on('click', () => {
+        const overlays = W.getICEOverlayManager(ice);
+        if (overlays.isOpen()) {
+          overlays.closeAll();
+          return;
+        }
+        overlays.open({
+          anchor: primaryButton,
+          content: makePopover(),
+          placement: 'bottomLeft',
+          enterAnimation: 'scale',
+          exitAnimation: 'fade',
+        });
+      });
+
+      ice.addChild(panel);
+
+      // 首帧渲染后，个别组件（时间轴 / 描述列表）才算出真实高度 —— 再跑一次流式布局抹平误差
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => syncCanvasToContent(flowSections(panel, sections))),
+      );
+
+      // 无障碍镜像层：把 canvas 里「有哪些控件、叫什么名字、在什么位置」暴露成隐藏 DOM，
+      // 屏幕阅读器/键盘用户才够得着（canvas 本身对辅助技术是完全不可见的）。
+      const a11yMirror = W.mountICEAccessibilityMirror(ice, { id: 'gallery-a11y-mirror' });
+
+      window.__result = { ice, panel, form, a11yMirror, nameInput, agreeBox, submitButton, submitHint, scrollPane, tipTarget, popoverTarget, deleteTarget, deleteHint, modalTarget, modalHint, modal, pagination, pageHint, dropdown, citySelect, cityHint, drawerTarget, drawer, cityList, listHint, tree, treeHint, bioArea, passwordField, rangeSegmented, emptyState, skeleton, collapsePanel, descriptions, timeline, spin, rate, steps, result, quantity, cityAuto, dataTreeSelect, treeSelectHint, datePicker, datePickerHint, timePicker, timeHint, cascader, transfer, upload, carousel, avatarGroup, closableAlert, progressCircle, progressCircleDone, comment, colorPicker, colorHint, imageFill, imageContain, imageCover, breadcrumb, breadcrumbCollapsed, statistic, countdown, radioGroup, checkboxGroup, splitter, watermark, typographyTitle, typographyParagraph, typographyLink, anchorPane, anchor, backTop, calendar, imagePreview, previewTarget, tour, tourTarget, layoutSpace, layoutGrid, fab, pagedTable, crossForm, virtualList, bigTable, kanban };
+    </script>
+  </body>
+</html>

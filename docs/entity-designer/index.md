@@ -2,7 +2,7 @@
 sidebar_position: 1
 ---
 
-# Entity Designer · ER 图设计器
+# Entity Designer · ER 图设计器（当前 v0.0.40）
 
 **Entity Designer 是基于 ice-render 内核构建的 ER（实体-关系）建模设计器**——它不重复实现底层图元，只在 `ICEGroup`、连线族与事件总线之上，收敛出数据库建模最常用的交互：实体表、字段、主外键约束、关系连线、对齐参考线、自动布局、TypeORM Schema 实时序列化。
 
