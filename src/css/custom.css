@@ -6,27 +6,28 @@
 
 /* You can override the default Infima variables here. */
 :root {
-  /* 品牌主色贴近 ice-render logo 绿 #3ECC5F */
-  --ifm-color-primary: #3ecc5f;
-  --ifm-color-primary-dark: #35ad51;
-  --ifm-color-primary-darker: #2b8f43;
-  --ifm-color-primary-darkest: #227034;
-  --ifm-color-primary-light: #45e46a;
-  --ifm-color-primary-lighter: #4eff77;
-  --ifm-color-primary-lightest: #57ff85;
+  /* 品牌主色 = ICE 家族蓝（ice-web-components 默认主题 ICETheme.ts 的 primary
+     #0d6efd，即 Bootstrap 5 primary），色阶沿用 Bootstrap 蓝的 hover/active/tint */
+  --ifm-color-primary: #0d6efd;
+  --ifm-color-primary-dark: #0b5ed7;
+  --ifm-color-primary-darker: #0a58ca;
+  --ifm-color-primary-darkest: #084298;
+  --ifm-color-primary-light: #3d8bfd;
+  --ifm-color-primary-lighter: #6ea8fe;
+  --ifm-color-primary-lightest: #9ec5fe;
   --ifm-code-font-size: 95%;
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  /* 暗色模式用 logo 高亮绿 #44D860，在深底上更跳 */
-  --ifm-color-primary: #44d860;
-  --ifm-color-primary-dark: #3ab852;
-  --ifm-color-primary-darker: #309743;
-  --ifm-color-primary-darkest: #257735;
-  --ifm-color-primary-light: #4cf26c;
-  --ifm-color-primary-lighter: #55ff78;
-  --ifm-color-primary-lightest: #5fff86;
+  /* 暗色模式用更亮的冰蓝，在深底上更跳（仍属 Bootstrap 蓝色系） */
+  --ifm-color-primary: #3d9bfd;
+  --ifm-color-primary-dark: #2f8def;
+  --ifm-color-primary-darker: #2a7fd8;
+  --ifm-color-primary-darkest: #2569b8;
+  --ifm-color-primary-light: #5aa9fe;
+  --ifm-color-primary-lighter: #79bafe;
+  --ifm-color-primary-lightest: #9ec5fe;
 }
 
 .docusaurus-highlight-code-line {
