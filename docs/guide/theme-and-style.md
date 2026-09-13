@@ -47,7 +47,11 @@ new ICEText({
 });
 ```
 
-> 注意：`measureText` 只覆盖「用户没显式传」的 `width` / `height`（默认 `10` 作哨兵值）。若传了 `width`，居中逻辑依赖它计算 `localOrigin`，不会被 div 量测值覆盖。
+> 注意：`ICEText` 的尺寸分两种语义 —— **显式传了 `width` / `height` 就按你给的尺寸**（量测只补 `textHeight`，不会覆盖它）；
+> **没传才按量测自适应**（首帧拿不到量测时先停在默认 `10×10`，拿到真实量测后修正）。默认值 `10` **不再兼作「未设置」哨兵**，
+> 所以 `new ICEText({ width: 10, height: 10 })` 就是一个真的 10×10 文本框。构造之后再 `setState({ width })`
+> （含布局管理器分配的尺寸）同样按显式尺寸处理。`textAlign: 'center'` 等居中逻辑依赖 `state.width` 计算 `localOrigin`，
+> 显式尺寸不会被量测值覆盖。
 
 ### 阴影简写
 
