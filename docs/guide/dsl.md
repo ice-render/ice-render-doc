@@ -85,7 +85,7 @@ ice-render 家族提供两套互补的 DSL，按场景选择：
 
 两者都遵守同一套「JSON-first、零命令式 API」原则：Agent 只写数据，引擎负责渲染。
 
-### 1. ice-render-dsl（通用图）
+### ice-render-dsl（通用图）
 
 节点类型：`rect` / `circle` / `ellipse` / `text` / `polyline` / `image` / `isogon` / `star` / `rose` / `group`（可递归嵌套 `children`）。边类型：`polyline` / `bezier` / `visio`，支持端口（T/R/B/L/C）、箭头、路由。
 
@@ -105,7 +105,7 @@ ice-render 家族提供两套互补的 DSL，按场景选择：
 }
 ```
 
-### 2. ice-entity-designer-dsl（领域建模：ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力）
+### ice-entity-designer-dsl（领域建模：ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力）
 
 七种文档共用一个入口：`kind` 缺省时按 ER 处理，其余取值 `'flowchart'` / `'bpmn'` / `'uml'` /
 `'statechart'` / `'gantt'` / `'power'`。坐标大多可省略，由编译器按记法自动布局。

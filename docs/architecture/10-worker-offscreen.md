@@ -1,16 +1,16 @@
-# 10 · Worker / OffscreenCanvas 渲染（设计文档，Web-only）
+# · Worker / OffscreenCanvas 渲染（设计文档，Web-only）
 
 > 状态：**设计 + 最小可行性原型**。本轮不把引擎正式移植到 worker；本文给出边界、依赖清单、
 > 架构分层与验证结论，供后续立项。引擎核心渲染逻辑仍以主线程为目标，不破坏小程序多运行时约束。
 
-## 1. 目标与边界
+## 目标与边界
 
 - **目标**：把「CanvasRenderer + 图元 doRender + 真实光栅化」搬到 Web Worker（`OffscreenCanvas`），
   释放主线程帧预算，让交互（命中检测、DOM 事件、面板）与渲染并行。
 - **边界（明确不做）**：不做小程序 worker 移植（见 §6）；不在 worker 内做文本 IME/字体/图片解码；
   不迁移完整组件树双端同步（v0 原型直接 worker 内建静态场景）。
 
-## 2. 现引擎中依赖 DOM/主线程的 API 清单（worker 化需要桥接或禁用）
+## 现引擎中依赖 DOM/主线程的 API 清单（worker 化需要桥接或禁用）
 
 | 依赖点 | 位置 | worker 化方案 |
 |---|---|---|
@@ -22,7 +22,7 @@
 | 命中/坐标换算用 `getBoundingClientRect` | `DOMEventDispatcher` | 命中在主线程算（保持命中检测铁律） |
 | `global`/`window` 探测 | `cross-platform/root.ts` | worker 启动时显式注入 `globalThis.global = self`（UMD 兼容） |
 
-## 3. 架构分层
+## 架构分层
 
 ```
 主线程 RendererHost                          Worker WorkerRenderer
@@ -35,7 +35,7 @@
   主线程 ImageBitmapRenderingContext 展示
 ```
 
-## 4. 双 buffer 方案对比
+## 双 buffer 方案对比
 
 | 方案 | 说明 | 结论 |
 |---|---|---|
@@ -49,21 +49,21 @@
 worker  → 主线程: { type:'bitmap', bitmap, stats:{renderMs} } | { type:'stats', ... }
 ```
 
-## 5. 一致性要点
+## 一致性要点
 
 - 命中检测与状态同步留在主线程 → 不破坏现有「命中检测铁律」与事件语义。
 - 动画时钟单一化：worker 收到主线程 `frame` 命令的时间戳做补间，避免双时钟漂移。
 - 渲染路径直接复用 M1 的 `doRenderFull/doRenderDirtyRect` 分派（渲染器已可插拔），
   将来把 `dirtyIds/快照` 经消息通道传给 worker，worker 内同样受益于脏矩形局部重绘。
 
-## 6. 小程序不适用原因与开关策略
+## 小程序不适用原因与开关策略
 
 - 小程序 Canvas 2D 不在 Worker 运行；`wx.createOffscreenCanvas` 能力与线程模型与 Web 不同，
   worker 化收益不成立且破坏跨端一致。→ **web-only**：`root.workerSupported` 探测 +
   `ICE.init(..., { renderInWorker?: boolean })`（默认关）。探测项：`OffscreenCanvas`、
   `Worker`、`ImageBitmapRenderingContext`。
 
-## 7. 最小可行性原型（本轮交付）
+## 最小可行性原型（本轮交付）
 
 - `examples/performance/worker-main.html` + `worker-min.js`：
   - worker 内 `importScripts` UMD dist（先注入 `globalThis.window/global`），在 `OffscreenCanvas`
@@ -78,7 +78,7 @@ worker  → 主线程: { type:'bitmap', bitmap, stats:{renderMs} } | { type:'sta
 - **注意**：`renderInWorker` 作为引擎级开关仍是**未来设计**（见 §1/§6），本轮未进引擎核心；
   以上兼容处理发生在宿主页/集成层，引擎本身仍以主线程为目标、跨端安全。
 
-## 8. 验收指标与不做清单（M2 范围）
+## 验收指标与不做清单（M2 范围）
 
 - 指标：worker 内单帧渲染 p50（static/anim 对照主线程同场景数值）、帧位图传输可用、`__workerBenchResult` 可达。
 - 不做：树/事件双端同步、文本/图片/字体/控制面板在 worker 内、小程序正式移植。

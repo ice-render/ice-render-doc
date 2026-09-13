@@ -2,7 +2,7 @@
 
 本篇从零开始：创建画布 → 画矩形 → 加文本 → 支持拖拽 → 响应事件 → 序列化。完整可运行代码基于 UMD 格式，npm/ESM 用法完全相同（仅导入方式不同）。
 
-## 1. 准备画布并初始化引擎
+## 准备画布并初始化引擎
 
 ```html
 <!DOCTYPE html>
@@ -19,7 +19,7 @@
 </html>
 ```
 
-## 2. 添加一个矩形
+## 添加一个矩形
 
 ```js
 const rect = new ICE.ICERect({
@@ -35,7 +35,7 @@ ice.addChild(rect);
 
 `ICERect` 默认 `draggable: true`——刷新页面后你已经可以直接用鼠标拖动它。
 
-## 3. 添加文本
+## 添加文本
 
 ```js
 const label = new ICE.ICEText({
@@ -48,7 +48,7 @@ const label = new ICE.ICEText({
 ice.addChild(label);
 ```
 
-## 4. 分组与嵌套
+## 分组与嵌套
 
 `ICEGroup` 是容器组件，子组件使用**相对于分组**的坐标：
 
@@ -61,7 +61,7 @@ ice.addChild(group);
 
 拖动分组时两个子组件一起移动——这就是[嵌套坐标系](../guide/coordinate-system.md)的直观效果。
 
-## 5. 响应事件
+## 响应事件
 
 组件上的事件 API 遵循 W3C 模型：
 
@@ -73,7 +73,7 @@ rect.on('click', (evt) => {
 
 引擎还内置了大量生命周期事件（`BEFORE_MOVE` / `AFTER_RESIZE` / `AFTER_ROTATE` 等），详见[事件系统](../guide/events.md)。
 
-## 6. 序列化与还原
+## 序列化与还原
 
 ```js
 // 导出
@@ -84,7 +84,7 @@ ice.clearAll();
 ice.fromJSONString(json);
 ```
 
-## 7. 开启主题（可选）
+## 开启主题（可选）
 
 ```js
 ice.setTheme('dark'); // 内置 light/dark 语义主题，可热切换

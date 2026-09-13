@@ -1,4 +1,4 @@
-# 12 · 对齐吸附（AlignmentGuideManager）
+# · 对齐吸附（AlignmentGuideManager）
 
 ## 目标与边界
 

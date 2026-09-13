@@ -1,4 +1,4 @@
-# 11 · 视口缩放（view zoom / pan）
+# · 视口缩放（view zoom / pan）
 
 ## 目标与边界
 

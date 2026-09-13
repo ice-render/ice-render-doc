@@ -17,7 +17,7 @@ import TabItem from '@theme/TabItem';
 
 ## 一、零依赖：把代码块写“优雅”
 
-### 1. 标题 + 行号
+### 标题 + 行号
 
 围栏信息串加 `title="..."` 与 `showLineNumbers`，右上角出现文件名，左侧出现行号：
 
@@ -33,7 +33,7 @@ const rect = new ICE.ICERect({ left: 0, top: 0, width: 160, height: 90 });
 ice.addChild(rect);
 ```
 
-### 2. 高亮指定行
+### 高亮指定行
 
 `{行号}` 或 `{起-止}` 高亮关键代码；`{-起-止}` 表示“除这些行外全部高亮”：
 
@@ -51,7 +51,7 @@ const rect = new ICE.ICERect({ left: 0, top: 0, width: 160 });
 ice.addChild(rect);
 ```
 
-### 3. diff 片段
+### diff 片段
 
 语言后加 `diff`，以 `+` / `-` 开头的行自动着色，适合展示“改动前后”：
 
@@ -67,7 +67,7 @@ ice.addChild(rect);
 + const rect = new ICE.ICERect({ left: 0, top: 0, width: 160, height: 90 });
 ```
 
-### 4. 多语言 Tabs
+### 多语言 Tabs
 
 用 `<Tabs>` + `<TabItem>` 给同一段逻辑提供多语言视角（需 `.mdx`）：
 
@@ -102,7 +102,7 @@ import TabItem from '@theme/TabItem';
   </TabItem>
 </Tabs>
 
-### 5. 实时渲染（本仓库特色）
+### 实时渲染（本仓库特色）
 
 普通代码块只展示文本；要“既看代码又看效果”，用本仓库封装的 `<IceCanvas>`（见[核心概念 · 第一个实时示例](/docs/guide/core-concepts) 与[图元](/docs/guide/shapes)）。它本质是一个 `BrowserOnly` 包裹的客户端组件，加载 `static/ice-render.js` 后即可在浏览器里跑真实 ICE 代码。
 

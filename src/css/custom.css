@@ -40,3 +40,44 @@
 [data-theme='dark'] .docusaurus-highlight-code-line {
   background-color: rgba(0, 0, 0, 0.3);
 }
+
+/* ============================================================
+ * 章节自动编号（ISO 2145：1. / 1.1 / 1.1.1 / 1.1.1.1）
+ * 纯 CSS 计数器，不改正文、不改锚点 id；每个文档页从 1 重新计数。
+ * 取代此前散落在各文档里的手工「## 1. / ### 4.1」前缀（已统一清除），
+ * 以后新增文档自动获得层级序号，无需手动维护。
+ * ============================================================ */
+.theme-doc-markdown {
+  counter-reset: h2;
+}
+.theme-doc-markdown h2 {
+  counter-reset: h3;
+  counter-increment: h2;
+}
+.theme-doc-markdown h3 {
+  counter-reset: h4;
+  counter-increment: h3;
+}
+.theme-doc-markdown h4 {
+  counter-reset: h5;
+  counter-increment: h4;
+}
+.theme-doc-markdown h5 {
+  counter-increment: h5;
+}
+.theme-doc-markdown h2::before {
+  content: counter(h2) ". ";
+  font-variant-numeric: tabular-nums;
+}
+.theme-doc-markdown h3::before {
+  content: counter(h2) "." counter(h3) " ";
+  font-variant-numeric: tabular-nums;
+}
+.theme-doc-markdown h4::before {
+  content: counter(h2) "." counter(h3) "." counter(h4) " ";
+  font-variant-numeric: tabular-nums;
+}
+.theme-doc-markdown h5::before {
+  content: counter(h2) "." counter(h3) "." counter(h4) "." counter(h5) " ";
+  font-variant-numeric: tabular-nums;
+}
