@@ -135,8 +135,13 @@ const diagnostics = ice.validateTheme();
 5. **DSL 里能不能写 `"$token"` 取决于「谁在画」**：引擎绘制的图元能解析（设计器的节点 / 连线样式、
    标签），**应用自绘的颜色**（图表系列是图表自己 `ctx.strokeStyle = color`）解析不了、只能用字面量 ——
    那类应用换主题走它自己的主题字段（如 `option.theme`），再由它的桥转给引擎。
-6. **品牌基线（设计语言）是产品决策，别靠合并 token 词汇解决**。家族里三套设计语言并存是事实
+6. **品牌基线（设计语言）是产品决策，别靠合并 token 词汇解决**。选型前家族里三套设计语言并存
    （引擎默认偏 Tailwind 色、chart 与 web-components 用 Bootstrap、设计器 DOM 是 antd）。
+   **2026-09-14 已决策：方案① Bootstrap 5 基线** —— 引擎默认语义色对齐 Bootstrap 5
+   （`DEFAULT_THEME.semantic.primary = #0D6EFD`），数据系列配色抽成唯一来源 `FAMILY_PALETTE`
+   由引擎与 chart 共用，设计器画布外壳改为从引擎主题派生。**这只是"改值"**：三套词汇 / 三条桥的
+   结构照旧（上面 1–5 点不变），各产品自有的身份主题（XP / arcade / 高对比）也照旧保留。
+   决策记录见 [09 · 路线图](roadmap) 的「家族品牌基线」。
 
 ## 关键不变量
 
