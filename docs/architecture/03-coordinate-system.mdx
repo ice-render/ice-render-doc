@@ -1,3 +1,5 @@
+import LiveExample from '@site/src/components/LiveExample';
+
 # · 坐标系与矩阵组合
 
 > 这是整个引擎**最核心、也最容易出错**的部分。嵌套坐标系下的矩阵运算曾导致一个重大 bug（坐标在多层嵌套 + 线性变换时经常算错），其根因与修复方式都在本章说明。
@@ -87,8 +89,12 @@ this.setPosition(this.state.left + point[0], this.state.top + point[1]);
   因此「面板/插槽定位用的盒子」与「上屏快照盒」**必然一致**。几何不遵守默认约定的组件
   （如 `ICEPolyLine`：原点固定在起点、点集可含负坐标）必须覆盖本方法。
   只让其中一条路径覆盖、另一条自行推导会造成二者不一致（历史上折线 `width ≈ 0` →
-  快照盒退化 → 脏矩形局部重绘漏画折线，详见 [13](13-gap-analysis.md) §4.4）。
+  快照盒退化 → 脏矩形局部重绘漏画折线，详见 [13](gap-analysis) §4.4）。
 - `getMinBoundingBox()`：随组件一起旋转/错切的最小包围盒（4 角用 `composedMatrix` 变换）。
 - `getMaxBoundingBox()`：保持水平竖直的 AABB（4 边在全局 X/Y 轴上的投影范围）。
 - `__paintWorldBox(out)`：渲染器专用的零分配快照盒（手动 4 角变换），与 `getMinBoundingBox()` 同源。
 - 二者用于碰撞检测（连接线插槽）与选择高亮。旋转 90° 时 AABB 宽高会互换，回归用例见 `tests/graphic/transform-edge.test.ts`。
+
+## Live Demo
+
+<LiveExample html="/ice-render/examples/coordinate.html" height={420} note="移动父组，观察子组件 composedMatrix 平移分量如何随嵌套坐标变化（局部 left/top 不变）" />

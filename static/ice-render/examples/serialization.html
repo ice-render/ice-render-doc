@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>序列化 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>序列化 / 反序列化：Serializer + Deserializer</h1>
+    <p class="lead">
+      <code>Serializer</code> 递归把组件树写成 JSON（排除 <code>composedMatrix</code> 等运行时缓存，
+      用 <code>typeId</code> 反查稳定类型名，避免打包改名破坏数据）；<code>Deserializer</code> 原路重建。
+      下方左侧场景可序列化，右侧按钮清空后从同一份 JSON 反序列化重建，验证往返一致性。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="320"></canvas>
+        <div class="toolbar">
+          <button class="primary" id="serialize">序列化 → JSON</button>
+          <button id="reset">清空场景</button>
+          <button id="deser">从 JSON 反序列化</button>
+        </div>
+      </div>
+      <div class="card"><pre id="json">// 点击「序列化」生成 JSON</pre></div>
+    </div>
+    <script src="../ice-render.js"></script>
+    <script>
+      const { ICE, ICERect, ICECircle, ICEText } = window.ICE;
+      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const jsonBox = document.getElementById('json');
+      let snapshot = null;
+
+      function build() {
+        ice.clearAll();
+        ice.addChild(new ICERect({ left: 40, top: 40, width: 140, height: 100, radius: 12,
+          style: { fillStyle: '#3B82F6' } }));
+        ice.addChild(new ICECircle({ left: 280, top: 60, radius: 60,
+          style: { fillStyle: '#F59E0B' } }));
+        ice.addChild(new ICEText({ left: 60, top: 250, text: '可序列化场景',
+          style: { fontSize: 20, fillStyle: '#374151' } }));
+      }
+      build();
+
+      document.getElementById('serialize').onclick = () => {
+        snapshot = ice.serializer.toJSONString();
+        jsonBox.textContent = snapshot.length > 1400 ? snapshot.slice(0, 1400) + '\n…(已截断)' : snapshot;
+      };
+      document.getElementById('reset').onclick = () => { ice.clearAll(); jsonBox.textContent = '// 场景已清空'; };
+      document.getElementById('deser').onclick = () => {
+        if (!snapshot) { jsonBox.textContent = '// 请先序列化'; return; }
+        ice.clearAll();
+        ice.deserializer.fromJSONObject(JSON.parse(snapshot));
+        jsonBox.textContent = '// 已从 JSON 重建 ' + ice.childNodes.length + ' 个顶层节点';
+      };
+    </script>
+  </body>
+</html>

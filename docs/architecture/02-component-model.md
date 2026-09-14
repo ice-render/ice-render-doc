@@ -10,7 +10,7 @@ ICERender 的组件模型概念上对齐 React：
 | `state` | `cloneDeep(props)` 得到的运行时状态，动画/交互修改它 | **可变** |
 
 - `setState(newState)` 只改 `state`，并把 `this.dirty = true`（需要重绘）、`this.paramsDirty = true`（自身派生参数需要重算）以及 `ice.dirty = true` 置位，**不会立即重绘**，等下一帧由 `FrameManager` 调度。两者的区别见下文「`dirty` 与 `paramsDirty`」。
-- 序列化时默认序列化的是 `state`（见 [06 序列化](06-serialization.md)）。
+- 序列化时默认序列化的是 `state`（见 [06 序列化](serialization)）。
 
 每个组件的默认 `props` 包含一套完整配置，其中与架构相关的关键项：
 
@@ -58,7 +58,7 @@ graph TD
 
 分层说明：
 
-- **`ICEEventTarget`** —— 最顶层，只提供事件能力（`on/off/trigger/once/...`），见 [05 事件系统](05-event-system.md)。`EventBus`、`CanvasRenderer` 也直接继承它（不只组件）。
+- **`ICEEventTarget`** —— 最顶层，只提供事件能力（`on/off/trigger/once/...`），见 [05 事件系统](event-system)。`EventBus`、`CanvasRenderer` 也直接继承它（不只组件）。
 - **`ICEComponent`（abstract）** —— 所有可见组件的基类，实现 `render()` 模板方法、矩阵组合、边界盒、全局位移/旋转等。**不能直接实例化**。
 - **`ICEPath`（abstract）** —— 引入 `Path2D`，把"路径构建"抽象成 `createPathObject()`。
 - **`ICEDotPath`（abstract）** —— 基于点集（`dots`）的路径，星形/多边形/玫瑰线/折线据此复用 `calcDots`。
@@ -128,7 +128,7 @@ render() {
 ## 容器与 `zIndex`
 
 - 普通组件直接 `ICE.addChild()` 加到 canvas；容器组件用 `ICEGroup.addChild()` 形成树。
-- **渲染顺序由 `zIndex` 决定**：每帧 `flattenTree` 把组件树展平成数组，再按 `state.zIndex` 升序排序（见 [04 渲染](04-rendering-performance.md)）。
+- **渲染顺序由 `zIndex` 决定**：每帧 `flattenTree` 把组件树展平成数组，再按 `state.zIndex` 升序排序（见 [04 渲染](rendering-performance)）。
 - `zIndex` 默认取 `instanceCounter++`（构造顺序），因此后加入的组件默认画在上面；可通过 `setState({ zIndex })` 手动调整层级。
 
 ## 组件的生命周期

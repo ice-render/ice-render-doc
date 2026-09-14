@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>控制面板机制 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>控制面板机制：ICEControlPanelManager</h1>
+    <p class="lead">
+      <code>ICEControlPanelManager</code> 在 <code>mousedown</code> 时统一选中入口、同步插件工具，并按组件类型
+      挂载变换手柄（<code>TransformControlPanel</code>，旋转 / 缩放 / 拖动）或连线端点面板（线条型）。
+      手柄本身也是工具节点，跟随选中组件移动。点击图形即选中，拖动可见手柄。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="360"></canvas>
+        <div class="toolbar">
+          <button class="primary" id="selectAll">全选</button>
+          <button id="clear">取消选中</button>
+        </div>
+        <div class="kpi" id="kpi">已选中：0 个</div>
+      </div>
+      <div class="card"><pre id="tip">// 内置面板默认禁用，选中才 enable
+// selectionList 即当前选中组件数组</pre></div>
+    </div>
+    <script src="../ice-render.js"></script>
+    <script>
+      const { ICE, ICERect, ICECircle, ICEText } = window.ICE;
+      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const kpi = document.getElementById('kpi');
+
+      const a = new ICERect({ left: 40, top: 60, width: 130, height: 100, radius: 12,
+        state: { transformable: true, draggable: true },
+        style: { fillStyle: '#3B82F6', strokeStyle: '#1D4ED8', lineWidth: 2 } });
+      const b = new ICECircle({ left: 300, top: 70, radius: 60,
+        state: { transformable: true, draggable: true },
+        style: { fillStyle: '#10B981', strokeStyle: '#047857', lineWidth: 2 } });
+      const c = new ICEText({ left: 80, top: 250, text: '选中我 → 出现手柄', style: { fontSize: 20, fillStyle: '#374151' } });
+      ice.addChild(a); ice.addChild(b); ice.addChild(c);
+
+      function refresh() { kpi.innerHTML = '已选中：<b>' + (ice.selectionList ? ice.selectionList.length : 0) + '</b> 个'; }
+      ice.evtBus.on('AFTER_RENDER', refresh);
+
+      document.getElementById('selectAll').onclick = () => { ice.setSelection([a, b, c]); refresh(); };
+      document.getElementById('clear').onclick = () => { ice.setSelection([]); refresh(); };
+      refresh();
+    </script>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 # · 应用驱动的引擎评估（admin + Windows XP 复盘）
 
-> **这份文档的视角与 [13 · 能力缺口分析](13-gap-analysis.md) 不同**：
+> **这份文档的视角与 [13 · 能力缺口分析](gap-analysis) 不同**：
 > 13 是「对标主流引擎，哪些该做而没做」；本文是「两个真实应用跑下来，引擎在哪些地方**真的**
 > 扛住了、在哪些地方**真的**把人卡住了」。前者靠对比清单，后者靠实践证据。
 >
@@ -45,7 +45,7 @@
 |---|---|---|
 | `ICEText.startEditing()`：挂透明 `<input>`、**支持 `compositionend`（IME）**、光标与选区 | 组件库的 `ICETextField` 自己手写 `keydown` 单字符追加 | **中文输入法打不进去**（只能 `setValue`），是「能不能当产品用」的硬伤 |
 | `createLinearGradient` / `createRadialGradient` / `createConicGradient`（可序列化的渐变对象） | XP 标题栏用 8–24 条色带拼渐变；壁纸绕道离屏 canvas 生成 PNG 再喂 `ICEImage` | 代码更绕、色带在缩放时有轻微 banding；暴露出的是**能力发现**问题 |
-| `getAccessibilityTree()` / `setFocusedComponent()` 契约（[14](14-accessibility.md)） | 两个案例一行都没接 | canvas UI 的键盘/读屏故事仍是半截 |
+| `getAccessibilityTree()` / `setFocusedComponent()` 契约（[14](accessibility)） | 两个案例一行都没接 | canvas UI 的键盘/读屏故事仍是半截 |
 
 **结论**：需要一层「组件库该用引擎哪些能力」的对照清单（或示例），否则能力存在也不会被用。
 `ice-web-components` 已在 `docs/guides/` 里补了主题、表单、浮层、布局等专题，但**文本编辑态与渐变
@@ -198,6 +198,6 @@
 
 - **有新案例/新版本就补一节**：每条结论都要求「现象 + 证据（哪个案例的哪个文件/哪次修复）+ 归属」，
   不接受无证据的判断；
-- **与 [13](13-gap-analysis.md) 的分工**：13 负责「对标清单 + P0/P1/P2 进度」，本文负责「实践反推 + 归属」；
+- **与 [13](gap-analysis) 的分工**：13 负责「对标清单 + P0/P1/P2 进度」，本文负责「实践反推 + 归属」；
   两条结论冲突时，以本文的实践证据为准，并回写 13 的对应行（13 的 §1 已经是双列对照表，支持滚动更新）；
 - **修完之后**：把该条从 §3 移到本文顶部的「已关闭」小节（本节先留空，等第一条被关闭时启用）。

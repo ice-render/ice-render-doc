@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Link 机制 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>Link 机制：插槽（ICELinkSlot）+ 连线（ICEPolyLine）</h1>
+    <p class="lead">
+      可连接组件（<code>state.linkable:true</code>）在运行时会由 <code>ICELinkSlotManager</code> 动态挂上
+      4 边中点 + 中心的 <code>ICELinkSlot</code>。拖动连线端点手柄（<code>linkEditable</code>）可改连接关系，
+      连线本身按 <code>links</code> 数据模型绑定目标组件，目标移动时自动跟随。下方两个框可拖动，连线跟随。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="360"></canvas></div>
+      <div class="card">
+        <div class="toolbar">
+          <button class="primary" id="connect">连接 / 断开</button>
+          <button id="curve">切直线·曲线</button>
+        </div>
+        <div class="kpi" id="kpi">连线：已连接（box1.R → box2.L）</div>
+        <pre id="cfg">// 连线数据模型
+links: {
+  R: { id:'box1', position:'L' }  // 自身 R 槽 → box1 的 L 槽
+}</pre>
+      </div>
+    </div>
+    <script src="../ice-render.js"></script>
+    <script>
+      const { ICE, ICERect, ICEPolyLine, ICEText } = window.ICE;
+      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const kpi = document.getElementById('kpi');
+
+      const box1 = new ICERect({
+        id: 'box1', left: 40, top: 60, width: 120, height: 90, radius: 10,
+        state: { linkable: true, draggable: true },
+        style: { fillStyle: '#DBEAFE', strokeStyle: '#2563EB', lineWidth: 2 },
+      });
+      const box2 = new ICERect({
+        id: 'box2', left: 340, top: 180, width: 120, height: 90, radius: 10,
+        state: { linkable: true, draggable: true },
+        style: { fillStyle: '#D1FAE5', strokeStyle: '#059669', lineWidth: 2 },
+      });
+      const line = new ICEPolyLine({
+        points: [[160, 105], [340, 225]],
+        links: { R: { id: 'box1', position: 'L' } },
+        curveType: 'straight',
+        style: { strokeStyle: '#DC2626', lineWidth: 2 },
+      });
+      const hint = new ICEText({ left: 40, top: 300, text: '拖动两个框，连线自动跟随', style: { fontSize: 16, fillStyle: '#6B7280' } });
+      ice.addChild(box1); ice.addChild(box2); ice.addChild(line); ice.addChild(hint);
+
+      let connected = true;
+      document.getElementById('connect').onclick = () => {
+        connected = !connected;
+        if (connected) { line.setState({ links: { R: { id: 'box1', position: 'L' } } }); kpi.textContent = '连线：已连接（box1.R → box2.L）'; }
+        else { line.setState({ links: {} }); kpi.textContent = '连线：已断开'; }
+      };
+      const curveBtn = document.getElementById('curve');
+      let curved = false;
+      curveBtn.onclick = () => {
+        curved = !curved;
+        line.setState({ curveType: curved ? 'quadratic' : 'straight' });
+        curveBtn.textContent = curved ? '切回直线' : '切直线·曲线';
+      };
+    </script>
+  </body>
+</html>

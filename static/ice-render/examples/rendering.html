@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>渲染机制 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>渲染机制：脏矩形局部重绘（dirty-rect）</h1>
+    <p class="lead">
+      默认 <code>renderMode:'dirty-rect'</code>：只有脏组件的包围盒被收集、聚合成若干裁剪区做局部 clear+重绘，
+      其余区域零成本；脏占比超阈值（&gt;20% 组件数 / &gt;35% 面积）或含半透明落墨时回退全量。
+      下面 300 个静态点 + 1 个动画点，切到 <code>full</code> 后每帧重绘全部，FPS 明显下降。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="360"></canvas>
+        <div class="toolbar">
+          <button class="primary" id="mode">当前：dirty-rect</button>
+        </div>
+        <div class="kpi" id="fps">FPS：—</div>
+        <div class="kpi" id="cull">本帧跳过的组件：—</div>
+      </div>
+      <div class="card"><pre id="note">// 观察：切到 full 后 FPS 掉、cull=0
+// 切回 dirty-rect：只有动画点所在区域重绘</pre></div>
+    </div>
+    <script src="../ice-render.js"></script>
+    <script>
+      const { ICE, ICERect, ICECircle } = window.ICE;
+      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const fpsEl = document.getElementById('fps');
+      const cullEl = document.getElementById('cull');
+      const modeBtn = document.getElementById('mode');
+
+      // 300 个静态点
+      for (let i = 0; i < 300; i++) {
+        const x = 20 + (i % 20) * 24, y = 20 + Math.floor(i / 20) * 18;
+        ice.addChild(new ICECircle({ left: x, top: y, radius: 5,
+          style: { fillStyle: '#cbd5e1' } }));
+      }
+      // 1 个动画点（唯一会置脏的组件）
+      const mover = new ICECircle({ left: 60, top: 300, radius: 14,
+        style: { fillStyle: '#DC2626' },
+        animations: { left: { from: 60, to: 460, duration: 1000, loop: true, alternate: true } } });
+      ice.addChild(mover); ice.animationManager.add(mover);
+
+      // 连续帧：让两种模式都能稳定测 FPS（否则 idle 停帧后无对比）
+      if (typeof ice.setContinuousFrames === 'function') ice.setContinuousFrames(true);
+
+      let frames = 0, last = performance.now();
+      function tick() {
+        frames++;
+        const now = performance.now();
+        if (now - last >= 500) {
+          fpsEl.innerHTML = 'FPS：<b>' + Math.round((frames * 1000) / (now - last)) + '</b>';
+          frames = 0; last = now;
+          const c = ice.renderer && ice.renderer.__lastFrameCulled;
+          cullEl.innerHTML = '本帧跳过的组件：<b>' + (typeof c === 'number' ? c : 'n/a') + '</b>';
+        }
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      modeBtn.onclick = () => {
+        const cur = ice.renderer.getRenderMode();
+        const next = cur === 'dirty-rect' ? 'full' : 'dirty-rect';
+        ice.renderer.setRenderMode(next);
+        modeBtn.textContent = '当前：' + next;
+      };
+    </script>
+  </body>
+</html>

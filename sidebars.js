@@ -85,6 +85,12 @@ const sidebars = {
             { type: 'doc', id: 'architecture/link-port-evaluation', label: '1.4.16 连线端点（插槽）扩展评估' },
             { type: 'doc', id: 'architecture/i18n-boundary', label: '1.4.17 i18n 边界（引擎 / 组件库 / 应用）' },
             { type: 'doc', id: 'architecture/animation-architecture', label: '1.4.18 动画机制（目标架构与约束）' },
+            { type: 'doc', id: 'architecture/theme', label: '1.4.19 主题机制' },
+            { type: 'doc', id: 'architecture/link', label: '1.4.20 连线机制' },
+            { type: 'doc', id: 'architecture/control-panel', label: '1.4.21 控制面板' },
+            { type: 'doc', id: 'architecture/plugin', label: '1.4.22 插件机制' },
+            { type: 'doc', id: 'architecture/layout', label: '1.4.23 布局机制' },
+            { type: 'doc', id: 'architecture/export', label: '1.4.24 导出（SVG）' },
           ],
         },
         {

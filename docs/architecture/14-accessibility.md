@@ -21,7 +21,7 @@
 |---|---|
 | DOM 结构（平铺 / 嵌套 / 是否带分组标题） | 取决于产品的信息架构与屏幕阅读器播报路径 |
 | `role` 粒度（一个图元一个元素？还是一个容器一个元素？） | 取决于图元语义：表格卡片该播报为 `button` 还是 `group` |
-| 文案（`aria-label` / `aria-description` / 状态播报） | 取决于业务语言与 i18n（引擎只提供文本通道，不做词条 —— 见 [17 · i18n 边界](17-i18n-boundary.md)） |
+| 文案（`aria-label` / `aria-description` / 状态播报） | 取决于业务语言与 i18n（引擎只提供文本通道，不做词条 —— 见 [17 · i18n 边界](i18n-boundary)） |
 
 同时，引擎还受「多运行时」约束：小程序没有 DOM，内建镜像层在那里毫无意义。
 
@@ -58,7 +58,7 @@ const nodes = ice.getAccessibilityTree(options);
 - **只含已上屏的组件**：没有有效变换矩阵（从未渲染）的组件不会出现在快照里——它们本来也没显示。
 - **不发散、不修改任何组件 state**：内部读缓存的 `composedMatrix`（`__paintWorldBox`），
   **不会**调用 `composeMatrix()`。这一点是刻意的：`composeMatrix()` 对点集路径会就地平移
-  `state.dots`，反复调用会累积漂移（见 [13 · 能力缺口分析](13-gap-analysis.md) §4.6）。
+  `state.dots`，反复调用会累积漂移（见 [13 · 能力缺口分析](gap-analysis) §4.6）。
 - 应用层拿到的是**快照**，不是活动视图：需要刷新时重新调用即可（示例中挂在 `ROUND_FINISH` 后同步）。
 
 ### 键盘焦点
@@ -103,4 +103,4 @@ ice.getFocusedComponent();
 
 - MDN `<canvas>`：[https://developer.mozilla.org/en-US/docs/Web/HTML/Element/canvas](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/canvas)
 - W3C Canvas 无障碍用例：[https://www.w3.org/WAI/PF/HTML/wiki/Canvas_Accessibility_Use_Cases](https://www.w3.org/WAI/PF/HTML/wiki/Canvas_Accessibility_Use_Cases)
-- [13 · 能力缺口分析](13-gap-analysis.md) §3 P1-4 a11y
+- [13 · 能力缺口分析](gap-analysis) §3 P1-4 a11y

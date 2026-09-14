@@ -1,3 +1,5 @@
+import LiveExample from '@site/src/components/LiveExample';
+
 # · 渲染与性能
 
 ## 渲染策略：脏标记 + 脏矩形局部重绘（默认），条件回退全量
@@ -38,7 +40,7 @@ graph TD
 | 上述 risky 组件**刚变脏**、但**只是位置变化**（`paramsDirty === false`，即祖先变换导致的平移）且**非文本** | 不阻塞 | 脏组件的 old∪new 盒（含 paint pad）本来就会被并进脏区，所以 clip 切不到它的墨迹 —— 墨迹形状不变、只是整体平移，逐像素必然一致 |
 | 上述 risky 组件**刚变脏、只是位置变化**、且**是文本** | 命中离屏缓存则放行，否则全量 | 文本字形墨迹可能超出几何盒，只有走离屏缓存（主画布只是 `drawImage` 平移复用位图、clip 只作用于整像素采样）才能保证逐像素一致 |
 | 上述 risky 组件**干净**、且已离屏缓存 | 不阻塞局部重绘 | 主画布只是 `drawImage` 一张不透明位图，clip 只作用位图的整像素采样，不改变字形内部 AA |
-| 场景含折线（`isLine`）且其带宽盒较大 | 富场景下会**稳定回退全量** | 折线包围盒修复为真实值后属「clip 会切断描边抗锯齿」的风险类别。这是**正确的保守行为** —— 此前「能走局部重绘」恰恰是因为盒子退化、漏画了折线（见 [13](13-gap-analysis.md) §4.4） |
+| 场景含折线（`isLine`）且其带宽盒较大 | 富场景下会**稳定回退全量** | 折线包围盒修复为真实值后属「clip 会切断描边抗锯齿」的风险类别。这是**正确的保守行为** —— 此前「能走局部重绘」恰恰是因为盒子退化、漏画了折线（见 [13](gap-analysis) §4.4） |
 | 新/旧包围盒含 NaN；ctx 无 clip/save/restore（老小程序 canvas） | 全量 | 安全兜底 |
 
 **不再回退的两类（2026-09-11 落地）**：以前「视口非单位变换」与「dpr ≠ 1」都直接回退全量 ——
@@ -97,7 +99,7 @@ graph TD
   - 未 dirty 且已有 cache → 直接贴图；
   - dirty → 先 `refreshParams()` **按需**刷新派生状态（只有自身派生参数变脏时才重算点集 / 文本量测；
     祖先移动导致的「只需重绘」不重算），再 `composeMatrix()` 后比较 `contentKey` 与 `linearKey`（a,b,c,d）；
-    （`composeMatrix()` 对 dots 的平移已改为幂等，不再要求每次 compose 前都重算 dots，见 [02](02-component-model.md)）
+    （`composeMatrix()` 对 dots 的平移已改为幂等，不再要求每次 compose 前都重算 dots，见 [02](component-model)）
   - 内容或线性变化 → 重建位图（`renderTo` 到离屏）；
   - 仅平移变化 → 复用位图，刷新贴图位置。
 
@@ -135,7 +137,7 @@ graph TD
 两点关键约定：
 
 1. **这些缓冲是普通数组**（非 `mat2d.create()` 返回的 `Float32Array`），以保持矩阵为 `Array` 类型，兼容 `Array.isArray` 与序列化。
-2. **优化不得破坏语义**：`calcAbsoluteLinearMatrix` 仍要实时重算祖先（见 [03](03-coordinate-system.md)），零分配只是复用存储、不是复用缓存值。
+2. **优化不得破坏语义**：`calcAbsoluteLinearMatrix` 仍要实时重算祖先（见 [03](coordinate-system)），零分配只是复用存储、不是复用缓存值。
 
 `applyStyleToCtx` 同样做了零分配：用 `for...in` 直接遍历 `props.style`/`state.style` 写 `ctx`，**不用** `Object.keys`（会分配 key 数组、加重 GC）也不做对象展开合并。
 
@@ -246,7 +248,7 @@ node bench/render.cjs 5000
 
 另外两条门同样要记住：脏区**面积**占比 > `FULL_FALLBACK_AREA_RATIO = 0.35` → 全量；
 脏区最多聚合 `MAX_DIRTY_REGIONS = 6` 块（脏块数超过 `MAX_COALESCE_REGIONS = 32` 时不再精挑细选，
-直接塌缩成并集盒 → 交给面积阈值回退全量，见 [18 §3.3](18-animation-architecture.md)）。
+直接塌缩成并集盒 → 交给面积阈值回退全量，见 [18 §3.3](animation-architecture)）。
 
 ### ④ 文本动画是重灾区
 
@@ -285,7 +287,7 @@ Canvas 2D 没有合成器通路：CSS/WAAPI 的 `transform` / `opacity` 可以�
    平移、缩放、淡入淡出、翻页这类"**场景级**动画"都该这么做；
 2. **分层与位图复用**：静态背景预渲染成位图，只重绘动画层；纯平移时位图 `drawImage` 复用
    （`ObjectCache` 已支持，但需要动画写值不置 `paramsDirty`，见 ⑤）；
-3. **OffscreenCanvas / Worker**：把光栅化搬离主线程（成本最高，见 [10](10-worker-offscreen.md)）。
+3. **OffscreenCanvas / Worker**：把光栅化搬离主线程（成本最高，见 [10](worker-offscreen)）。
 
 ### 动画性能预算（做动画功能前先看这张表）
 
@@ -321,18 +323,23 @@ Canvas 2D 没有合成器通路：CSS/WAAPI 的 `transform` / `opacity` 可以�
 | 同上、关掉量化（`snapToDevicePixel = false`） | — | 34.7 ms/帧（回到每帧重建） |
 | 1,000 个矩形（对照） | 1.4 ms/帧 | 1.4 ms/帧（不受影响） |
 
-### 优化方向（**尚未实现**，别当成已有能力）
+### 优化方向（逐条状态；**标 ❌ 的别当成已有能力**）
 
 1. ~~**把「计数门」换成「面积门」**（或对"纯平移 + 已缓存"直接放行）~~ ——
    **2026-09-13 实测后否决**（结论与数据见
-   [18 · 动画机制 §3.3](18-animation-architecture.md)）：脏区一散开，并集盒必然撞 0.35 的面积阈值，
+   [18 · 动画机制 §3.3](animation-architecture)）：脏区一散开，并集盒必然撞 0.35 的面积阈值，
    面积门并不能把 ③ 的断崖补回来，反而让"注定回退全量"的帧白花 ~30% 做收集与聚合；
    成片脏区的交叉点在 20~30% 且低于测量噪声。**该场景的正解是分层渲染**（见 18 §3.1 与本文末）。
    评估中撞出并修掉了 `coalesceRegions` 的 O(k³) 卡帧缺陷（聚合预算 `MAX_COALESCE_REGIONS = 32`，
    1000 脏块 111s → 1ms，单测钉住）；
-2. **帧率分级 + 空闲停帧**：次要动画按 30fps 推进；没有动画且无脏帧时停 rAF
-   （当前 `FrameManager` 每帧无条件续帧，纯耗电）；
-3. **OffscreenCanvas / Worker**（见 ⑥）。
+2. ~~**帧率分级 + 空闲停帧**~~ —— **✅ 已落地（2026-09-13，详见
+   [18 §3.4](animation-architecture)）**：`FrameManager` 改成按需续帧（宿主用 `needsFrame()` 回答
+   "这一帧还要吗"），次要动画可写 `fps: 30` 降频，`prefers-reduced-motion` 下直接落终态。
+   真实浏览器实测：静止页面 500ms 内 **0 次帧回调**（改造前约 30 次）。回归
+   `tests/FrameManager.idle.test.ts`、`tests/animation/animation-scheduling.test.ts`、
+   `e2e/visual/animation-scheduling.spec.ts`。
+3. ❌ **OffscreenCanvas / Worker**（见 [10](worker-offscreen)：目前只有设计 + 最小可行性原型，
+   引擎尚未正式移植到 worker）。
 
 ### 已落地：分层渲染（静态层 + 动画层，2026-09-13）
 
@@ -347,9 +354,13 @@ Canvas 2D 没有合成器通路：CSS/WAAPI 的 `transform` / `opacity` 可以�
 与全量不一致 → 门控还会回退）；分层把静态层位图整层复用，动画帧只画动画层。
 引擎只提供原语（视口同步 `ICE.linkViewport`、输入穿透 `setInputPassthrough`、多实例事件归属过滤），
 **分层由应用按配方组织**（层数 ≤2~3、上层默认穿透、静态层只在内容变化时置 dirty）——
-完整配方与约束见 [18 · 动画机制 §3.1](18-animation-architecture.md#31-分层渲染静态层--动画层)。
+完整配方与约束见 [18 · 动画机制 §3.1](animation-architecture#31-分层渲染静态层--动画层)。
 
-> 这几条的**目标架构、约束与验收指标**已整理成 [18 · 动画机制](18-animation-architecture.md)
+> 这几条的**目标架构、约束与验收指标**已整理成 [18 · 动画机制](animation-architecture)
 > （含"不用 CSS 变换做图元动画""不做每动画一个定时器"等决策记录）；本节只保留实测数据。
 >
 > 写值通道与量化已固化进门槛：`npm run bench:anim`（`--check` 会按宽松阈值判定，已接进 `verify:full`）。
+
+## Live Demo
+
+<LiveExample html="/ice-render/examples/rendering.html" height={460} note="300 静态点 + 1 动画点；切换 full / dirty-rect，观察 FPS 与「本帧跳过组件数」差异" />

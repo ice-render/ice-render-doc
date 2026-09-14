@@ -25,7 +25,7 @@
 ## 结论速览
 
 > 换个视角的证据：两个真实应用（`ice-web-components` 的六页后台与全屏 Windows XP 桌面）跑下来的
-> 复盘在 [15 · 应用驱动的引擎评估](15-app-driven-review.md) —— 那里记的是「哪里真的被卡住、归属是谁」，
+> 复盘在 [15 · 应用驱动的引擎评估](app-driven-review) —— 那里记的是「哪里真的被卡住、归属是谁」，
 > 与本文的「对标清单」互补。
 
 > **这是一张会随进展更新的表**：左三列是 2026-09-10 评估时的判断，最后一列是 2026-09-11 的复核结果。
@@ -42,8 +42,8 @@
 | 6 | 文本无自动换行 / 省略，超宽时横向压缩字形 | P1 | 完全没做 | ✅ **已做**（`wrap` / `maxLines` / `ellipsis` / grapheme 分段，默认关闭；`letterSpacing` / `lineHeight` / `textDecoration` / RTL / CJK 避头尾 / 无空格脚本断行均已落地）。仍缺**富文本**（同行混排粗体 / 颜色 / 字号） |
 | 7 | 文本含 HTML 注入；非 DOM 环境量不出尺寸 | P1 | 缺陷 | ✅ **已修**：改用 `textContent`；量测改为 canvas 优先 + DOM 降级 |
 | 8 | 无 SVG / PDF 导出，无 SVG 导入 | P1 | 部分 | ✅ **SVG 导出 + 无头出图已做**（`ice.toSvg()` / `exportSvg()` 与画布共用命令流；`ICE.headless()` 让 Node 建树出图不依赖 DOM / rAF；`examples/node/export.mjs` 落盘 SVG、可选转 PNG）。**仍未做**：PDF 导出、SVG 导入、剪贴板 / 打印（见 §6 与 §8） |
-| 9 | 无障碍零实现（无 ARIA / DOM 镜像 / 键盘焦点） | P1 | 完全没做 | ✅ **已给原语**：`getAccessibilityTree()` / `setFocusedComponent()`（方案 B：DOM 镜像交应用层，见 [14](14-accessibility.md)） |
-| 10 | 无插件 / 扩展点（仅 `registerType`） | P1 | 完全没做 | ✅ **已做**：`ICE.use()` 三层注册点。仍缺「自定义命中判定」注册协议（见 [09 路线图](09-roadmap.md)） |
+| 9 | 无障碍零实现（无 ARIA / DOM 镜像 / 键盘焦点） | P1 | 完全没做 | ✅ **已给原语**：`getAccessibilityTree()` / `setFocusedComponent()`（方案 B：DOM 镜像交应用层，见 [14](accessibility)） |
+| 10 | 无插件 / 扩展点（仅 `registerType`） | P1 | 完全没做 | ✅ **已做**：`ICE.use()` 三层注册点。仍缺「自定义命中判定」注册协议（见 [09 路线图](roadmap)） |
 | 11 | 序列化以 `constructor.name` 为类型键；映射漏项 | P1 | 隐患 | ✅ **已修**：`getTypeId()` 反查 + 补 `ICERose` + 反序列化容错 + 迁移表；**2026-09-13 进一步**把 typeId 统一为 `namespace:Type`、冲突明确抛错、且只认 canonical 一种形式。⚠️ 该缺陷**随后在下游应用层复现过一次**（引擎修了、应用层漏改），见 §8 末条 |
 | 12 | 发行契约缺失；CI 不跑可视化回归 | P1 | 部分 | ✅ **已做**：`exports` / `sideEffects` / CHANGELOG / `publint`+`attw` / 覆盖率门槛 / CI 接可视化回归。**2026-09-12 复核**：GitHub Actions 上的 `ci.yml` 是真在跑的（累计 121 次运行，dev / master 最近全绿），镜像也已是同步状态；⚠️ **下游两仓（ice-entity-designer / ice-entity-designer-dsl）尚无 CI**，各自的门禁目前只靠本地 `npm run` 系列 |
 | 13 | 动画无 delay / 序列 / spring，且 `Math.floor` 掉精度 | P2 | 部分 | ✅ **已做**（另加关键帧时间轴、数组字段补间，结束判定改按时间） |
@@ -131,7 +131,7 @@
 - 编辑态不换行（`caretIndex` 按原始文本计，换行会错位）
 - 仍缺：`wordSpacing`、富文本（同行混排粗体 / 颜色 / 字号）
 
-> **状态（2026-09-13）**：RTL / `ctx.direction`、CJK 断行规则（标点避头尾）与无空格脚本（泰 / 老挝 / 高棉 / 缅甸）词典分词断行**已落地**（见 [17 · i18n 边界](17-i18n-boundary.md)）；`letterSpacing` / `lineHeight` / `textDecoration` 已按「正式配置」落地（量测 / 换行 / 渲染 / SVG 导出同口径）；无 DOM 运行时的编辑 / 光标 / 选区已改为 grapheme 感知并支持多行。
+> **状态（2026-09-13）**：RTL / `ctx.direction`、CJK 断行规则（标点避头尾）与无空格脚本（泰 / 老挝 / 高棉 / 缅甸）词典分词断行**已落地**（见 [17 · i18n 边界](i18n-boundary)）；`letterSpacing` / `lineHeight` / `textDecoration` 已按「正式配置」落地（量测 / 换行 / 渲染 / SVG 导出同口径）；无 DOM 运行时的编辑 / 光标 / 选区已改为 grapheme 感知并支持多行。
 
 **grapheme 问题**：`caretIndex` 按 UTF-16 码元计数（`ICEText.ts:242-273`），`ICEPolyLine.ts:787` 降级宽度估算用 `label.length * fontSize`——中文/emoji/ZWJ 序列下**光标定位与估算均不正确**。对标：主流引擎的新版本已引入 grapheme 感知布局；标准解法是 `Intl.Segmenter`（Baseline 2024）。
 
@@ -163,7 +163,7 @@
 **对标**：MDN 明确 `<canvas>` 只是位图、不向辅助技术暴露绘制对象，仅提供 fallback 文本；W3C 把 canvas 的命中测试、放大、动态焦点列为**未解决用例**。业界已有引擎用「隐藏 DOM 覆盖层 + accessible 标题/提示/类型/tabIndex 语义标注」的方案解决，可直接借鉴。
 
 **进展（2026-09-10，方案 B：引擎只给原语）**：新增 `ICE.getAccessibilityTree()` 与 `ICE.setFocusedComponent()`，
-**不自建 DOM 镜像层**——理由与方案 A 需要解决的问题见 [14 · 无障碍原语](14-accessibility.md)：
+**不自建 DOM 镜像层**——理由与方案 A 需要解决的问题见 [14 · 无障碍原语](accessibility)：
 - `getAccessibilityTree(options)`：产出可访问节点快照（id / 角色建议 / 可读名称 / **屏幕坐标盒（CSS 像素，含视口换算）**
   / 层级 / 父 id / tab 顺序 / 选中态 / 可聚焦性）。只含已上屏组件；**不修改任何组件 state**
   （用缓存的 `composedMatrix`，不调 `composeMatrix()`，避免点集路径 `dots` 漂移）
@@ -219,7 +219,7 @@
 第三方小写包名），并把注册表收敛成一套可解释的契约：同 typeId 注册不同构造函数、同构造函数
 注册第二个 typeId 都**明确抛错**；类型名**只有 canonical 一种形式**——家族仍在发布初期，
 因此不为旧的无 namespace 类名维护别名（旧数据里的节点按未注册类型处理）；注册表本身改用
-无原型对象，`getType('constructor')` 不会命中 `Object.prototype`。详见 [06 · 序列化](06-serialization.md)。
+无原型对象，`getType('constructor')` 不会命中 `Object.prototype`。详见 [06 · 序列化](serialization)。
 
 ### P1-7 发行契约与质量门禁
 
@@ -306,7 +306,7 @@
   - **副作用（需知）**：折线连上后包围盒变真实、且在大场景里往往很大，而折线属于「clip 会切断描边
     抗锯齿」的风险类别 → 富场景会**稳定回退全量**（`dirty-rect-pixel:rich` 的 `局部执行=0`）。
     这是**正确的保守行为**：此前「能走局部重绘」恰恰是因为盒子退化漏画了折线。要恢复局部重绘，
-    需要先解决折线描边的 clip-AA 一致性（与 [04](04-rendering-performance.md) 里 v2 的门控细化是同一件事）。
+    需要先解决折线描边的 clip-AA 一致性（与 [04](rendering-performance) 里 v2 的门控细化是同一件事）。
 - 连接插槽为**全局共享的 5 个固定实例**（T/R/B/L/C，`graphic/link/ICELinkSlotManager.ts:204-288`），无法为多组件同时展示端口，也不支持自定义锚点。
 - `ICELinkSlot.updatePosition` 在 `AFTER_RENDER` 内 `setState`（`graphic/link/ICELinkSlot.ts:91,97`）→ 置脏 → 下帧再渲染 → 再 setState：**只要有 linkable 组件，画面永不空闲**。
 
@@ -497,9 +497,9 @@
 | 2026-09-11 | 顺带修掉两个同源缺口：隐藏「分组」不失效后代可见性缓存 / 分组改尺寸不请求父容器重排 | ✅ 已做（抽 `setState` 前/后置钩子 `__beforeStateMerge`/`__afterStateMerge`，自身与 `ICEGroup` 都成对调用）。后者是上一轮「布局响应式」遗留漏洞 |
 | 2026-09-11 | **基准脚本与文档数字的可复现性**：`npm run bench` 因产物改名长期跑不起来、README 的「5000 图元 0.8ms」实测 2.2ms | ✅ 已做：修路径 + `tests/tooling/bench-smoke.test.ts` 门禁（反证：改回坏路径即转红）+ CI 加 bench 步骤 + 文档改为「用 `npm run bench 5000` 复现并标注机器/日期」+ 新增 `npm run verify` 一条命令跑全部门禁 |
 | 2026-09-11 | 富场景局部重绘：放开「仅位置变化」的变脏 risky 组件 | ✅ 已做（内容变了仍一律回退；非文本平移放行；文本平移需命中离屏缓存）。回归：门控契约单测 9 例 + 像素场景 11 个全部 10/10 一致 + 新增 `?opaque=1&grouptext=1` 断言 `perStep[3] > 0`。**仍未解**：干净不可缓存的连线（见下条） |
-| 2026-09-11 | 应用层实测钉出局部重绘的真实瓶颈：**干净、不可缓存的 `ICEPolyLine`（关系连线）与脏区相交** | ⏳ **待产品决策**（`ice-entity-designer` 里仍 100% 回退）：① 缓存连线位图；② 接受 clip 边缘 AA 接缝（放弃「full/partial 逐像素一致」不变量）。已排除的猜测：文本缓存命中率 100%、工具层不阻塞。详见 [04](04-rendering-performance.md) 与 [09 路线图](09-roadmap.md) 的「仍未做」 |
+| 2026-09-11 | 应用层实测钉出局部重绘的真实瓶颈：**干净、不可缓存的 `ICEPolyLine`（关系连线）与脏区相交** | ⏳ **待产品决策**（`ice-entity-designer` 里仍 100% 回退）：① 缓存连线位图；② 接受 clip 边缘 AA 接缝（放弃「full/partial 逐像素一致」不变量）。已排除的猜测：文本缓存命中率 100%、工具层不阻塞。详见 [04](rendering-performance) 与 [09 路线图](roadmap) 的「仍未做」 |
 
 > **说明**：上表只记录「决定要做的项」的进展。因此**表内全绿 ≠ 报告里的缺口全部清零** ——
 > 仍未建的项（空间索引、SVG/PDF 导出与互操作、动画帧对 risky 图元的局部重绘）见 §1 速览与
-> [09 路线图](09-roadmap.md) 的「仍未做」表；明确划归应用层的项（框选交互、多指手势）见 §5 边界。
+> [09 路线图](roadmap) 的「仍未做」表；明确划归应用层的项（框选交互、多指手势）见 §5 边界。
 > `§1 结论速览` 是**滚动更新**的双列表（左三列是评估当天判断，最后一列是当前状态），不再当快照用。

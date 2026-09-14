@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>主题机制 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>主题机制：三层 design token + 命名主题</h1>
+    <p class="lead">
+      主题 = <code>base</code>（原始值）→ <code>semantic</code>（用途：primary / danger / palette / motion）
+      → <code>component</code> 预设（STYLE_PRESETS）。优先级链：用户 props &gt; 组件 preset &gt; 语义 theme &gt;
+      基础 default。<code>ice.setTheme('dark')</code> 实例级切换，互不污染。下方色块取自
+      <code>ice.theme.semantic.palette</code>，切换主题实时重着色。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="320"></canvas>
+        <div class="toolbar">
+          <button class="primary" id="light">default</button>
+          <button id="dark">dark</button>
+          <button id="brand">自定义品牌</button>
+        </div>
+      </div>
+      <div class="card"><pre id="meta">// 当前主题元信息</pre></div>
+    </div>
+    <script src="../ice-render.js"></script>
+    <script>
+      const { ICE, ICERect, ICEText } = window.ICE;
+      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const meta = document.getElementById('meta');
+
+      const blocks = [];
+      for (let i = 0; i < 6; i++) {
+        const b = new ICERect({ left: 30 + i * 78, top: 40, width: 64, height: 64, radius: 10,
+          style: { fillStyle: '#999' } });
+        blocks.push(b); ice.addChild(b);
+      }
+      const title = new ICEText({ left: 30, top: 150, text: '语义色板 palette', style: { fontSize: 20, fillStyle: '#374151' } });
+      const sub = new ICEText({ left: 30, top: 200, text: '背景 background', style: { fontSize: 16, fillStyle: '#6B7280' } });
+      ice.addChild(title); ice.addChild(sub);
+
+      function applyTheme() {
+        const t = ice.theme.semantic;
+        blocks.forEach((b, i) => b.setState({ style: { fillStyle: t.palette[i % t.palette.length] } }));
+        title.setState({ style: { ...title.state.style, fillStyle: t.text } });
+        sub.setState({ style: { ...sub.state.style, fillStyle: t.muted } });
+        meta.textContent =
+`theme.semantic = {
+  primary:  ${t.primary}
+  danger:   ${t.danger}
+  background:${t.background}
+  text:     ${t.text}
+  palette:  [${t.palette.slice(0,3).join(', ')} …]
+}`;
+      }
+      applyTheme();
+
+      document.getElementById('light').onclick = () => { ice.setTheme('default'); applyTheme(); };
+      document.getElementById('dark').onclick = () => { ice.setTheme('dark'); applyTheme(); };
+      document.getElementById('brand').onclick = () => {
+        ice.setTheme({ primary: '#7C3AED', danger: '#DB2777',
+          palette: ['#7C3AED','#DB2777','#0D9488','#F59E0B','#2563EB','#059669'] });
+        applyTheme();
+      };
+    </script>
+  </body>
+</html>

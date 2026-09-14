@@ -35,13 +35,13 @@ ice-entity-designer（应用）= 用原语「拼装」编辑器 UX
 | 领域 | 落地内容 |
 |---|---|
 | 输入层 | `pointer*` / `touch*` / `wheel` 三通道，按运行时能力自动选择（无 `PointerEvent` 时回退 `mouse* + touch*`）；拖拽不再依赖 `evt.movementX` |
-| 视口 | `setViewport()`、锚点缩放 `zoomAt(screenX, screenY, factor)`；**视图缩放**与**图元缩放**严格分离（见 [11](11-viewport-zoom.md)） |
+| 视口 | `setViewport()`、锚点缩放 `zoomAt(screenX, screenY, factor)`；**视图缩放**与**图元缩放**严格分离（见 [11](viewport-zoom)） |
 | HiDPI | `ICE.init(el, { dpr })`，backing store = 内容盒尺寸 × dpr；坐标换算与命中同步改走内容盒语义 |
-| 对齐吸附 | 边缘 / 中心 / 等间距 + 提示线，默认禁用、按需 `alignmentGuide.enable()`，未启用零开销（见 [12](12-alignment-guide.md)） |
+| 对齐吸附 | 边缘 / 中心 / 等间距 + 提示线，默认禁用、按需 `alignmentGuide.enable()`，未启用零开销（见 [12](alignment-guide)） |
 | 命中检测精度 | 全局→本地变换后调 `containsLocalPoint()`：圆/椭圆走椭圆方程、点集类（星形/正N边形/玫瑰）走射线法、折线走点-线段距离（`ICEEllipse` / `ICEDotPath` / `ICEPolyLine`） |
 | 命中检测性能 | 视口裁剪 + 包围盒 O(1) 预筛（实测 N=6000、屏外 50%：**1.89x**） |
 | 渲染 | 脏矩形局部重绘门控由「整场景」细化为「相交级」；本地盒收敛到唯一来源 `__localBox()`（`getMinBoundingBox()` 与上屏快照盒必然一致） |
-| 渲染（坐标与裁剪） | **脏区「世界坐标收集 → 渲染坐标裁剪」**（`mapBoxToRender()`，一次乘 `dpr · viewport`、向外取整防接缝）：**缩放/平移与 `dpr>1` 不再回退全量**；**多块裁剪区**（`coalesceRegions()`，分散脏区不再被并成一个大盒）——见 [04](04-rendering-performance.md) |
+| 渲染（坐标与裁剪） | **脏区「世界坐标收集 → 渲染坐标裁剪」**（`mapBoxToRender()`，一次乘 `dpr · viewport`、向外取整防接缝）：**缩放/平移与 `dpr>1` 不再回退全量**；**多块裁剪区**（`coalesceRegions()`，分散脏区不再被并成一个大盒）——见 [04](rendering-performance) |
 | 渐变 | 声明式 `style.fillGradient` / `strokeGradient`（`linear`/`radial`/`conic`，**可序列化**、可写进主题 preset，按描述引用缓存）；手搓 `CanvasGradient` 仍可用 |
 | 可见性 | `display:false` 是**整棵子树**语义（`isEffectivelyVisible()` 沿父链判断，渲染/命中/a11y/离屏缓存统一消费） |
 | 布局 | 除 `addChild`/`removeChild` 立即重排外，**子项改 `width/height` 会在下一帧触发重排**（一帧内合并一次，布局期间不自激）；`ICEGroup.getPreferredSize()` 转发布局策略 |
@@ -58,7 +58,7 @@ ice-entity-designer（应用）= 用原语「拼装」编辑器 UX
 | 连接线 | 正交路由 `routeType: 'orthogonal'`、连线标签 `label + labelStyle`、5 个共享插槽吸附；端点箭头默认实心（`arrowStyle: 'filled' \| 'hollow'`）、连线形态可切（`linkShape: 'visio' \| 'bezier'`，贝塞尔为插槽法线方向的三次曲线采样）；`findComponent` 递归查找（因此**连线可连嵌套子组件**） |
 | 序列化 | 类型标识统一为 **`namespace:Type`**（`ice-render:*` / `ice-entity-designer:*` / `ice-chart:*` / 第三方包名），`ICE.getTypeId(ctor)` 反查（与类的 JS 名解耦，压缩改名不破坏已存数据）；重复注册（同 typeId 不同构造函数 / 同构造函数第二个 typeId）**明确抛错**；不做旧无 namespace 名的兼容；`version` 字段 + `SERIALIZATION_MIGRATIONS` 迁移表；未注册类型跳过并记入 `deserializer.unknownTypes`（序列化侧记入 `Serializer.unregisteredTypes`） |
 | 插件 | `ICE.use(plugin)` / `unuse(name)` 三层注册点（组件类型 / 每帧渲染 / 交互工具）+ `setup` / `teardown` 生命周期 |
-| 无障碍 | `getAccessibilityTree()` 可访问节点快照 + `setFocusedComponent()` 键盘焦点回传。**引擎不自建 DOM 镜像层**（见 [14](14-accessibility.md)） |
+| 无障碍 | `getAccessibilityTree()` 可访问节点快照 + `setFocusedComponent()` 键盘焦点回传。**引擎不自建 DOM 镜像层**（见 [14](accessibility)） |
 | 多运行时 | `root.createPath2D()`（原生 `Path2D` / `PolyfillPath2D` 降级）、离屏 canvas、图片、像素比全部有平台适配；`requestFrame` 无 rAF 时定时器兜底（Node / headless / 小程序低版本也能启动） |
 | 脏矩形 | 局部重绘支持缩放/平移/`dpr>1`/多块裁剪；门控按「相交」判定；**离屏缓存与直接落墨逐像素一致**（位图栅格对齐设备像素，零重采样）；连线可缓存；脏盒合并带「划算护栏」，细长盒不会被串成整屏大盒。应用层实测：拖动实体时局部重绘 0 → 20 次、渲染 −31%/帧、局部 ≡ 全量 0 差异 |
 | 导出与无头 | **SVG 矢量导出**：`ice.toSvg()` / `exportSvg()` 与画布**共用同一套绘制命令流**，渐变、虚线、阴影、子树透明度、裁剪、连线标签、实心端点箭头都进产物（路径命令流底座见 `src/graphic/path`）；**无头实例** `ICE.headless()` 让 Node / 服务端建树出图不依赖 DOM 与 rAF（导出时先刷新派生几何）；`examples/node/export.mjs` 演示落盘 SVG、装了 `@resvg/resvg-js` 时再转 2× PNG |

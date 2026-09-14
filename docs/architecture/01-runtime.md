@@ -35,7 +35,7 @@ graph TD
 
 - **`FrameManager` 是全局单例**。同一个 `window`/`global` 里只有一个实例，它维护一个 `evtBuses` 数组，逐条触发 `ICE_FRAME_EVENT`。因此一个页面上可以同时存在多幅图，共享同一个 rAF 循环。
 - **`CanvasRenderer` 只在 `ice.dirty` 为真时渲染**。脏标记是"惰性渲染"的开关：`setState`/结构变更会置 `dirty=true`，下一帧才真正重绘，最小延迟约一帧（`1/60 ≈ 16.7ms`）。
-- **渲染分派**：默认 `dirty-rect` 只重绘脏区域（旧∪新世界盒），不满足局部条件（结构变更/快照未就绪/脏占比或面积过大/场景含文本·点集路径·半透明落墨等）时自动回退 `doRenderFull()` 全量重绘。组件 render 末尾会归位泄漏的 ctx 属性，保证两条路径逐像素一致。详见 [04](04-rendering-performance.md) 与 AGENTS「脏矩形局部重绘铁律」。
+- **渲染分派**：默认 `dirty-rect` 只重绘脏区域（旧∪新世界盒），不满足局部条件（结构变更/快照未就绪/脏占比或面积过大/场景含文本·点集路径·半透明落墨等）时自动回退 `doRenderFull()` 全量重绘。组件 render 末尾会归位泄漏的 ctx 属性，保证两条路径逐像素一致。详见 [04](rendering-performance) 与 AGENTS「脏矩形局部重绘铁律」。
 
 ## `ICE.init()` 的启动顺序（有严格依赖）
 

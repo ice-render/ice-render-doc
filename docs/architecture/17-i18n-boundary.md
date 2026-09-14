@@ -74,7 +74,7 @@ new ICEText({
 ### A. 引擎对文本保持中立
 
 - 不做 Unicode 规范化、不做大小写折叠（会破坏应用层词条比对）；
-- 不做任何 locale 相关的默认格式化（时间戳统一 ISO 8601 UTC，见 [06 · 序列化](06-serialization.md)）；
+- 不做任何 locale 相关的默认格式化（时间戳统一 ISO 8601 UTC，见 [06 · 序列化](serialization)）；
 - 序列化**逐字节保留**用户文本（`state.text` 原样往返；派生量 `lines` 不进快照）。
 
 ### B. 引擎错误带稳定错误码

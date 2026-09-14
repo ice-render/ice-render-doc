@@ -1,3 +1,5 @@
+import LiveExample from '@site/src/components/LiveExample';
+
 # · 序列化
 
 ## 目标
@@ -126,3 +128,7 @@ ice.registerType('my-app:Badge', Badge);
   不参与序列化。
 
 回归用例见 `tests/persistence/serialization.test.ts`。
+
+## Live Demo
+
+<LiveExample html="/ice-render/examples/serialization.html" height={460} note="序列化生成 JSON；清空后从同一份 JSON 反序列化重建，验证往返一致性" />

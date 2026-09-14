@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>插件机制 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>插件机制：PluginHost 三层注册点</h1>
+    <p class="lead">
+      <code>PluginHost</code> 提供「组件 / 渲染 / 交互工具」三层注册点：<code>components</code> 声明自定义图元
+      （自动 <code>registerType</code>，获得序列化 typeId 反查）；<code>render</code> 每帧在世界坐标下叠加绘制；
+      <code>tools</code> 按 <code>match(component)</code> 挂交互工具。<code>ice.use(plugin)</code> 幂等，
+      <code>unuse</code> 撤销渲染/工具（类型注册保留）。下方网格插件可开关。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="320"></canvas>
+        <div class="toolbar">
+          <button class="primary" id="toggle">卸载网格插件</button>
+        </div>
+        <div class="kpi" id="kpi">插件：grid 已挂载</div>
+      </div>
+      <div class="card"><pre id="code">const grid = {
+  name: 'grid',
+  render({ ctx, width, height }) {
+    ctx.save();
+    ctx.strokeStyle = '#e5e7eb';
+    for (let x=0; x<width; x+=24) { /* 竖线 */ }
+    for (let y=0; y<height; y+=24) { /* 横线 */ }
+    ctx.restore();
+  }
+};
+ice.use(grid);</pre></div>
+    </div>
+    <script src="../ice-render.js"></script>
+    <script>
+      const { ICE, ICERect } = window.ICE;
+      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const kpi = document.getElementById('kpi');
+      const btn = document.getElementById('toggle');
+
+      ice.addChild(new ICERect({ left: 180, top: 110, width: 160, height: 100, radius: 14,
+        style: { fillStyle: '#6366F1', strokeStyle: '#4338CA', lineWidth: 2 } }));
+
+      const gridPlugin = {
+        name: 'grid',
+        render({ ctx, width, height }) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(99,102,241,0.18)';
+          ctx.lineWidth = 1;
+          for (let x = 0; x <= width; x += 24) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+          for (let y = 0; y <= height; y += 24) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+          ctx.restore();
+        },
+      };
+      ice.use(gridPlugin);
+
+      let on = true;
+      btn.onclick = () => {
+        on = !on;
+        if (on) { ice.use(gridPlugin); btn.textContent = '卸载网格插件'; kpi.textContent = '插件：grid 已挂载'; }
+        else { ice.unuse('grid'); btn.textContent = '挂载网格插件'; kpi.textContent = '插件：grid 已卸载'; }
+      };
+    </script>
+  </body>
+</html>

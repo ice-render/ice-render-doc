@@ -1,3 +1,5 @@
+import LiveExample from '@site/src/components/LiveExample';
+
 # · 事件系统
 
 ## 设计目标
@@ -48,7 +50,7 @@ graph TD
 `EventBus` 是 `ICEEventTarget` 的**实现类**（无额外逻辑），每 ICE 实例一条。它是引擎内部 Manager 之间的协作通道：
 
 - `FrameManager` 通过它广播 `ICE_FRAME_EVENT`；
-- 各 Manager 通过 `on/off` 订阅感兴趣的事件（见 [01 运行时](01-runtime.md)）。
+- 各 Manager 通过 `on/off` 订阅感兴趣的事件（见 [01 运行时](runtime)）。
 
 ## DOM 事件桥接
 
@@ -76,3 +78,7 @@ graph LR
 - 连线钩子：`HOOK_MOUSEDOWN` / `HOOK_MOUSEMOVE` / `HOOK_MOUSEUP`
 
 回归用例见 `tests/event/EventBus.test.ts`。
+
+## Live Demo
+
+<LiveExample html="/ice-render/examples/event.html" height={460} note="点击 / 悬停图形，日志实时打印 ICEEventTarget 派发过程；可挂起 click 验证 suspend 语义" />

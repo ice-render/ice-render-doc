@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>坐标系 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>坐标系：嵌套 + composedMatrix 组合</h1>
+    <p class="lead">
+      每个组件有自己的局部坐标；父组件的变换经 <code>composedMatrix</code>（gl-matrix mat2d）组合进子组件，
+      形成嵌套世界坐标。子组件的 <code>left/top</code> 是相对父容器的局部偏移，永远不变；移动父容器时，
+      子的世界坐标（composedMatrix 的平移分量）随之变化。下方按钮移动父组，观察子矩阵。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="320"></canvas>
+        <div class="toolbar">
+          <button class="primary" id="move">父组 +60,0</button>
+          <button id="reset">复位</button>
+        </div>
+      </div>
+      <div class="card"><pre id="m">// 子组件 composedMatrix</pre></div>
+    </div>
+    <script src="../ice-render.js"></script>
+    <script>
+      const { ICE, ICEGroup, ICERect } = window.ICE;
+      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const mBox = document.getElementById('m');
+
+      const group = new ICEGroup({ left: 40, top: 40, width: 240, height: 200, radius: 8,
+        style: { fillStyle: 'rgba(59,130,246,0.08)', strokeStyle: '#93C5FD', lineWidth: 2 } });
+      const child = new ICERect({ left: 30, top: 30, width: 70, height: 50, radius: 8,
+        style: { fillStyle: '#F59E0B' } });
+      group.addChild(child);          // 子组件局部坐标 (30,30) 相对 group
+      ice.addChild(group);
+
+      function show() {
+        const m = child.state.composedMatrix || [];
+        mBox.textContent =
+`group.left=${group.state.left}  group.top=${group.state.top}
+child.left=${child.state.left}  child.top=${child.state.top}
+
+child.composedMatrix = [
+  ${m.slice(0,6).map(n=>n.toFixed(2)).join(', ')}
+]
+// 平移分量 [4]=${m[4]?.toFixed(1)} [5]=${m[5]?.toFixed(1)}
+// = group.(left/top) + child.(left/top)`;
+      }
+      show();
+      document.getElementById('move').onclick = () => { group.setState({ left: group.state.left + 60 }); show(); };
+      document.getElementById('reset').onclick = () => { group.setState({ left: 40 }); show(); };
+    </script>
+  </body>
+</html>

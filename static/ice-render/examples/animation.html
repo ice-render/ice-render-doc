@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>动画机制 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>动画机制：AnimationManager 写值通道</h1>
+    <p class="lead">
+      动画不是"每帧 setState 全量重算"，而是 <code>AnimationManager</code> 在 <code>ICE_FRAME_EVENT</code>
+      里按时间进度把值写回 <code>state</code>，且只对"动画安全键"（纯绘制 / 变换）跳过派生参数重算。
+      下方卡片做单段补间 + 循环，圆做关键帧颜色时间轴。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="360"></canvas></div>
+      <div class="card">
+        <div class="toolbar">
+          <button class="primary" id="play">播放 / 重播</button>
+          <button id="pause">暂停</button>
+          <button id="resume">恢复</button>
+        </div>
+        <div class="kpi" id="kpi">动画状态：idle</div>
+        <pre id="cfg">// 动画配置见源码面板</pre>
+      </div>
+    </div>
+    <script src="../ice-render.js"></script>
+    <script>
+      const { ICE, ICERect, ICECircle } = window.ICE;
+      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const kpi = document.getElementById('kpi');
+
+      const card = new ICERect({
+        left: 40, top: 80, width: 120, height: 120, radius: 14,
+        style: { fillStyle: '#6366F1', strokeStyle: '#4338CA', lineWidth: 2 },
+        animations: {
+          left: { from: 40, to: 340, duration: 1200, easing: 'easeInOutCubic', loop: true, alternate: true },
+          top:  { from: 80, to: 160, duration: 1200, easing: 'easeInOutCubic', loop: true, alternate: true },
+        },
+      });
+      const dot = new ICECircle({
+        left: 230, top: 250, radius: 40,
+        style: { fillStyle: '#10B981', strokeStyle: '#047857', lineWidth: 2 },
+        animations: {
+          style: {
+            keyframes: [
+              { offset: 0,   value: { fillStyle: '#10B981' } },
+              { offset: 0.5, value: { fillStyle: '#F59E0B' } },
+              { offset: 1,   value: { fillStyle: '#10B981' } },
+            ],
+            duration: 1600, loop: true,
+          },
+        },
+      });
+      ice.addChild(card);
+      ice.addChild(dot);
+      // 带 animations 的组件在 addChild 时已自动纳入 AnimationManager；手动 add 也行
+      ice.animationManager.add(card);
+      ice.animationManager.add(dot);
+
+      const refresh = () => {
+        const a = ice.animationManager.hasActiveAnimations();
+        kpi.innerHTML = '动画状态：<b>' + (a ? 'playing' : 'idle') + '</b> · 暂停=' + ice.animationManager.isPaused();
+      };
+      setInterval(refresh, 200);
+
+      document.getElementById('play').onclick = () => { ice.animationManager.replay(card); ice.animationManager.replay(dot); };
+      document.getElementById('pause').onclick = () => ice.animationManager.pause();
+      document.getElementById('resume').onclick = () => ice.animationManager.resume();
+      document.getElementById('cfg').textContent =
+`card.animations = {
+  left: { from:40, to:340, duration:1200,
+          easing:'easeInOutCubic', loop:true, alternate:true },
+  top:  { ... },
+}
+dot.animations = {
+  style: { keyframes:[{fillStyle:'#10B981'},
+                      {fillStyle:'#F59E0B'},
+                      {fillStyle:'#10B981'}],
+           duration:1600, loop:true }
+}`;
+    </script>
+  </body>
+</html>
