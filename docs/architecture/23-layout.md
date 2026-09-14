@@ -4,44 +4,63 @@
 
 容器组件（`ICEGroup` 及其子类）可以持有一个**布局策略**（`ICELayoutManager`），把子组件按某种规则自动排布，而非硬编码坐标。采用 **策略模式**（Swing 风格）：`setLayout(manager)` 持有策略，`doLayout()` 重排。
 
-## 8 种布局
+## 内置布局：抽象基类 + 7 种具体实现
 
-| 布局 | 文件 | 语义 |
-|---|---|---|
-| `ICELayoutManager` | `ICELayoutManager.ts` | 抽象基类，`doLayout()` / `requestLayout()` |
-| `ICEBorderLayout` | `ICEBorderLayout.ts` | 上 / 下 / 左 / 右 / 中 五区 |
-| `ICEBoxLayout` | `ICEBoxLayout.ts` | 水平 / 垂直盒，类似 Flexbox |
-| `ICEFlowLayout` | `ICEFlowLayout.ts` | 流式（换行），`gap` / `align` |
-| `ICEFlowLayout` → | | |
-| `ICEGridLayout` | `ICEGridLayout.ts` | 网格（行 × 列） |
-| `ICEOverlayLayout` | `ICEOverlayLayout.ts` | 绝对叠加（层） |
-| `ICELayeredLayout` | `ICELayeredLayout.ts` | 分层（z 序驱动） |
-| `ICECardLayout` | `ICECardLayout.ts` | 卡片（标题 + 内容区） |
+| 类 | 文件 | 语义 | 构造参数（默认值） |
+|---|---|---|---|
+| `ICELayoutManager` | `ICELayoutManager.ts` | **抽象基类**：只定义 `layoutContainer(container)` 与 `getPreferredSize(container)`；“什么时候重排”由容器（`ICEGroup`）负责，不在基类里 | — |
+| `ICEFlowLayout` | `ICEFlowLayout.ts` | 流式：从左到右排列，超出容器宽度则换行 | `gap=10`、`align='left' \| 'center' \| 'right'` |
+| `ICEGridLayout` | `ICEGridLayout.ts` | 网格：按 `cols` 行优先填入，每行高度取该行最高子项 | `cols=2`、`gapX=10`、`gapY=10` |
+| `ICEBorderLayout` | `ICEBorderLayout.ts` | 五区：上 / 下 / 左 / 右 / 中；子项用 `state.layoutConstraint` 指定区域（默认 `center`） | `gap=5` |
+| `ICEBoxLayout` | `ICEBoxLayout.ts` | 单轴依次排列（不换行） | `axis='x' \| 'y'`、`gap=5` |
+| `ICECardLayout` | `ICECardLayout.ts` | **一次只显示一个子项**（其余置 `display:false`），用 `show(i)` / `next()` / `previous()` 切换 | `currentIndex=0` |
+| `ICEOverlayLayout` | `ICEOverlayLayout.ts` | 所有子项叠在同一位置（容器左上角） | — |
+| `ICELayeredLayout` | `ICELayeredLayout.ts` | **图布局**：读容器里的节点与 `ICEPolyLine` 的连线，按「拓扑分层（最长路径法）→ 层内排序（重心法，减少边交叉）→ 落坐标」排布；面向流程图 / ER 图这类“图”，不是容器流式排版 | `gapX=80`、`gapY=40` |
+
+> `ICECardLayout` 是「同一时刻只显示一个子项」的**容器布局**，与桌面组件里的 Card（标题 + 内容区）不是一回事。
+> `ICELayeredLayout` 也是**图布局**，与 z 序无关 —— 它把节点按依赖关系分层摆放。
 
 ## 与组件模型的关系
 
 ```mermaid
 graph TD
-    G[ICEGroup 容器] -->|setLayout| LM[ICELayoutManager 策略]
+    G[ICEGroup 容器] -->|setLayout| LM[ICELayoutManager 策略<br/>layoutContainer / getPreferredSize]
     G -->|addChild| CH[子组件]
     LM -->|doLayout 计算每个子 left/top| CH
-    G -->|requestLayout| LM
+    CH -->|改 width/height 触发 requestLayout<br/>只标记，下一帧排一次| G
     CH -. 布局接管时 .-> OFF[子组件 transformable/draggable=false]
 ```
 
-- 容器一旦设定 `layoutManager`，新加入的子组件会被**禁止手动变换 / 拖动**（`__disableTransformRecursively`），由布局全权负责位置。
-- 旧实现只在 `setLayout()` / `addChild()` 时排一次，子项尺寸变化不触发重排；新实现提供 `requestLayout()`，子项尺寸变化可主动触发重排（[13 · 能力缺口](gap-analysis) 相关项）。
+- 容器一旦设定 `layoutManager`，其后代会被**递归禁止手动变换 / 拖动**，位置由布局全权负责。
+- `setLayout()` 会把布局**传播给「未显式设置布局」的容器型子组件**（子容器默认继承父层布局），否则它内部的子项不会被排布。
+
+## 什么时候会重排
+
+| 时机 | 行为 |
+|---|---|
+| `setLayout(manager)` | **立即**排一次 |
+| `addChild` / `removeChild` | **立即**重排（新加的要占位、删掉的要补空位）；`addChildren` / `removeChildren` 批量操作只在结束后排一次 |
+| 子项改 `width` / `height` | `setState` 的后置钩子检测到尺寸变化 → `parent.requestLayout()` → **只标记**，在本容器**下一帧 `doRender()` 之前**消费（一帧内多次请求合并成一次，避免逐项 `setState` 退化成 O(n²)） |
+| `doLayout()` 内部 | **先对每个子项 `measure()` 再布局** —— 否则首次布局读到的是 0 / 哨兵值（文本还要等字形量测） |
 
 ## 关键 API
 
 ```ts
 const group = new ICE.ICEGroup({ ... });
 group.setLayout(new ICE.ICEFlowLayout({ gap: 12, align: 'left' }));
-group.addChild(a); group.addChild(b);   // 自动按流式布局排布
-group.doLayout();                        // 立即重排（或等 requestLayout）
+group.addChild(a); group.addChild(b);   // 加完即排（见上表）
+group.doLayout();                        // 也可以手动立即重排一次
+group.getPreferredSize();                // 转发给策略：容器内容的首选尺寸（未设布局时为 [0,0]）
 ```
 
-> 布局产物是子组件的 `left/top`，最终仍走同一套 [03 · 坐标系](coordinate-system) 与 [04 · 渲染](rendering-performance) 管线，因此布局与动画 / 序列化天然兼容（布局结果可被序列化）。
+**布局产物是子组件的 `left/top`**，最终仍走同一套 [03 · 坐标系](coordinate-system) 与
+[04 · 渲染](rendering-performance) 管线，所以它和动画能共存。
+
+但**布局与序列化只有一半是通的**，别搞混：
+
+- ✅ **结果**进快照：反序列化后子组件就停在算好的坐标上；
+- ❌ **策略**不进快照：`layoutManager` 不在序列化范围内。所以「存盘再读回」之后容器**不再自动排布**，
+  要自己重新 `setLayout()` —— 否则之后增删子项不会重排（表现为“新加的子项堆在 0,0”）。
 
 ## 现状与边界
 

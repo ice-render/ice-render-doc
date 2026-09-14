@@ -33,7 +33,7 @@ ICERender 是一款 **Canvas 2D 交互图形渲染引擎**（MIT 协议，作者
 | **主题机制** | `ICETheme` · `STYLE_PRESETS` · `resolveTheme` | [19 · 主题机制](theme) | [themetheme.html |
 | 控制面板机制 | `ICEControlPanelManager` · `TransformControlPanel` · `LineControlPanel` | [21 · 控制面板](control-panel) | [control-panelcontrol-panel.html |
 | 插件机制 | `PluginHost`（组件/渲染/工具三层） | [22 · 插件机制](plugin) | [pluginplugin.html |
-| 布局机制 | `ICELayoutManager` · 8 种布局 | [23 · 布局机制](layout) | — |
+| 布局机制 | `ICELayoutManager` 策略 + **7 种具体布局**（流式 / 网格 / 五区 / 单轴 / 卡片 / 叠加 / 图分层） | [23 · 布局机制](layout) | — |
 | 视口缩放 | `getRenderViewport` · 视口矩阵 | [11 · 视口缩放](viewport-zoom) | — |
 | 对齐吸附 | `AlignmentGuideManager` | [12 · 对齐吸附](alignment-guide) | — |
 | 无障碍原语 | `a11y/accessibility` | [14 · 无障碍原语](accessibility) | — |
