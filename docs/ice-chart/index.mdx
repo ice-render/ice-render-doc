@@ -4,9 +4,9 @@ sidebar_position: 1
 
 import LiveExample from '@site/src/components/LiveExample';
 
-# ice-chart · 交互式图表库（当前 v0.20.0）
+# ice-chart · 交互式图表库（当前 v0.22.0）
 
-:::info 🧩 应用层 · 基于 ice-render 引擎 v2.3.0 封装（当前 v0.20.0）
+:::info 🧩 应用层 · 基于 ice-render 引擎 v2.5.1 封装（当前 v0.22.0）
 本页属于 ice-render 家族的**应用层**产品：图表层只声明「数据 → 像素 → 语义事件」，命中测试与事件派发全部交给引擎内核。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
 :::
 
@@ -40,7 +40,7 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 | --- | --- |
 | 图表类型 | 折线 / 面积 / 柱状 / 堆叠柱 / 饼 / 玫瑰 / 雷达 / 仪表盘 / 漏斗 / 水位球 / 散点 / 气泡 / 箱线 / 桑基 / 关系图 / 树图 / 热力 / K 线 / 时序等，均基于 ice-render 图元 |
 | 内建交互 | 悬停高亮 + 压暗其它系列、点击下钻、框选缩放、滚轮缩放、拖拽平移、图例联动、跨图联动、键盘导航——命中由引擎承担，0 插件成本 |
-| 设计语言 | 直接采用 Bootstrap 5 调色板与令牌（`--bs-border-radius`、`--bs-body-font-family` 等），换肤只需覆盖 `theme.colorPalette` 或派生 `BOOTSTRAP_TOKENS` |
+| 设计语言 | 直接采用 Bootstrap 5 调色板与令牌（`--bs-border-radius`、`--bs-body-font-family` 等）；**数据系列配色与引擎共用一份**（`CHART_PALETTE` 直接 import 引擎的 `FAMILY_PALETTE`），换肤只需覆盖 `theme.colorPalette` 或派生 `BOOTSTRAP_TOKENS` |
 | 大屏脚手架 | `dash-kit` 1~12 列栅格 + 一套空间利用率审计（墨迹横向占宽 / 图形直径占分配直径门禁），避免「右侧浪费太多」 |
 | 像素契约 | `rebuildPixels()` 重算一次点集，`render()` 与 `hitTestIndex()` 消费同一份缓存——「看得见的点」与「点得到的点」不可能漂移 |
 | 标注图层 | `option.annotation`：目标线 / 阈值线、异常点、目标区间。声明式、纯数据可序列化，定位走坐标轴比例尺（随缩放 / 平移 / 联动走），默认不吃命中；越界不画但给结构化诊断 |

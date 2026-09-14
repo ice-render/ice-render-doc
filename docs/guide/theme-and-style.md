@@ -195,17 +195,22 @@ new ICERect({ radius: 12, style: { fillStyle: '#fff' } });
 | 层 | 含义 | 例子 |
 |---|---|---|
 | **base（基础）** | 原始值，无语义：色 ramp / spacing / radius / font | `baseTokens.color.blue[600]`、`baseTokens.radius.lg` |
-| **semantic（语义）** | 用途：primary / danger / text / border / palette / motion | `primary: blue[600]`、`palette: [blue600, green600, ...]` |
+| **semantic（语义）** | 用途：primary / danger / text / border / palette / motion | `primary: '#0D6EFD'`、`palette: [FAMILY_PALETTE...]` |
 | **component（组件）** | 变体：card / button / title … | `STYLE_PRESETS.card` |
 
 ```js
 import { baseTokens, DEFAULT_THEME, DARK_THEME } from 'ice-render';
 
-baseTokens.color.blue[600];          // '#185FA5'
-DEFAULT_THEME.semantic.primary;      // '#185FA5'（引用 base）
-DEFAULT_THEME.semantic.palette;      // 8 色数据系列配色
+baseTokens.color.blue[600];          // '#2563EB'（原始色料，global token）
+DEFAULT_THEME.semantic.primary;      // '#0D6EFD'（家族品牌基线 Bootstrap 5，alias token）
+DEFAULT_THEME.semantic.palette;      // 8 色数据系列配色（= FAMILY_PALETTE，与 ice-chart 共用）
 DEFAULT_THEME.semantic.motion;       // { duration, easing }
 ```
+
+> **base 与 semantic 的分工**：`base.color` 只放"原始色料"（Tailwind 风格 ramp），
+> **品牌决策落在 semantic（alias token）上** —— 2026-09-14 起家族基线是 Bootstrap 5，
+> 但 `base.color.blue[600]` 仍是它原来的 Tailwind 值，两者不是同一条引用链，
+> 也不要靠"把两家 token 合并成一种词汇"来替代品牌决策。
 
 ### 组件预设（preset）
 
@@ -251,7 +256,10 @@ ice.getTheme().semantic.primary;      // 当前主题主色
 ice.getTheme().semantic.palette[0];   // 数据系列配色
 ```
 
-热切换：`setTheme` 后，已渲染的、用了 `preset` 的组件会**重新 resolve**（用户显式传的样式优先）。内置 `DEFAULT_THEME`（亮色）与 `DARK_THEME`（暗色，彩色用 400 level 更亮、文字/边/背景反转）。
+热切换：`setTheme` 后，已渲染的、用了 `preset` 的组件会**重新 resolve**（用户显式传的样式优先；
+带 `'$token'` 引用的样式在**绘制那一刻**解析，所以自定义组件也跟着变）。
+内置 `DEFAULT_THEME`（亮色，语义色 = Bootstrap 5 基线）与 `DARK_THEME`
+（Bootstrap 5.3 深色变体：`#212529` 底 + `#dee2e6` 正文，彩色用亮一档的变体，数据系列用 `FAMILY_PALETTE_DARK`）。
 
 ### motion token 与动画打通
 
