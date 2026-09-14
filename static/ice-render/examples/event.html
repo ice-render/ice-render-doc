@@ -10,8 +10,10 @@
     <p class="lead">
       Canvas 内部没有 DOM 事件，引擎用 <code>ICEEventTarget</code>（模仿 W3C EventTarget，别名
       <code>addEventListener/on/off</code>）给每个组件挂事件，原生 DOM 事件经
-      <code>DOMEventDispatcher</code> 转发成 <code>ICEEvent</code> 后派发到对应组件。下面三个图形都可点击 /
-      悬停，日志实时打印派发过程。
+      <code>DOMEventDispatcher</code> 转发成 <code>ICEEvent</code> 后派发到对应组件。<code>click</code> /
+      <code>mousedown</code> / <code>mouseup</code> 是一等公民组件事件；但引擎<strong>不派发</strong>
+      <code>mouseenter</code>/<code>mouseleave</code>——下面悬停高亮演示的是引擎原生做法：监听总线
+      <code>mousemove</code> + <code>ice.hitTest()</code> 自己判定命中组件。
     </p>
     <div class="row">
       <div class="card"><canvas id="canvas" width="520" height="360"></canvas></div>
@@ -32,32 +34,36 @@
 
       const rect = new ICERect({
         left: 40, top: 60, width: 150, height: 150, radius: 12,
-        style: { fillStyle: '#3B82F6', strokeStyle: '#1D4ED8', lineWidth: 2 },
+        style: { fillStyle: '#3B82F6', strokeStyle: '#1D4ED8', lineWidth: 2, shadow: 'none' },
       });
       const circle = new ICECircle({
         left: 300, top: 60, radius: 75,
-        style: { fillStyle: '#10B981', strokeStyle: '#047857', lineWidth: 2 },
+        style: { fillStyle: '#10B981', strokeStyle: '#047857', lineWidth: 2, shadow: 'none' },
       });
       const label = new ICEText({
         left: 150, top: 250, text: '悬停 / 点击我',
-        style: { fontSize: 22, fillStyle: '#374151' },
+        style: { fontSize: 22, fillStyle: '#374151', shadow: 'none' },
       });
       ice.addChild(rect); ice.addChild(circle); ice.addChild(label);
 
-      // 组件级事件：原生 DOM 事件名（click / mouseenter / mouseleave / mousedown）直接 on
+      // 组件级事件：原生 DOM 事件名（click / mousedown / mouseup）直接 on
       rect.on('click', () => push('rect click → ICERect'));
       circle.on('click', () => push('circle click → ICECircle'));
       label.on('click', () => push('label click → ICEText'));
 
-      [rect, circle, label].forEach((c, i) => {
-        c.on('mouseenter', () => {
-          push('mouseenter → 组件#' + i);
-          c.setState({ style: { ...c.state.style, shadow: 'md' } });
-        });
-        c.on('mouseleave', () => {
-          push('mouseleave → 组件#' + i);
-          c.setState({ style: { ...c.state.style, shadow: 'none' } });
-        });
+      // 悬停高亮：引擎不派发 mouseenter/mouseleave，这里用总线 mousemove + ice.hitTest 自己实现。
+      // pointer/touch 设备也会被 DOMEventDispatcher 用 legacy 名重派成 mousemove，因此同一套代码通用。
+      const allComps = [rect, circle, label];
+      let hovered = null;
+      ice.evtBus.on('mousemove', (evt) => {
+        const target = ice.hitTest(evt.offsetX, evt.offsetY);
+        if (target === hovered) return; // 仍在同一个组件上，避免高频 setState
+        if (hovered) hovered.setState({ style: { ...hovered.state.style, shadow: 'none' } });
+        hovered = target;
+        if (hovered) {
+          hovered.setState({ style: { ...hovered.state.style, shadow: 'md' } });
+          push('hover → ' + hovered.constructor.name);
+        }
       });
 
       // 总线级事件：所有 ICE 实例共享的 EventBus 也能监听（这里监听渲染完成）
