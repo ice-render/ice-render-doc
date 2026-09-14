@@ -8,10 +8,10 @@ module.exports = {
   iceRender: '2.4.0',
   // 应用层产品
   entityDesigner: '0.2.6',
-  iceChart: '0.20.1',
-  iceWebComponents: '1.6.0',
+  iceChart: '0.21.0',
+  iceWebComponents: '1.7.0',
   // DSL 兄弟包（ice-chart / ice-entity-designer 落地页与生态表引用）
-  iceChartDsl: '0.2.1',
+  iceChartDsl: '0.2.2',
   entityDesignerDsl: '0.0.19',
-  iceRenderDsl: '0.0.8',
+  iceRenderDsl: '0.1.0',
 };
