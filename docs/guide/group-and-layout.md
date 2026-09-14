@@ -4,7 +4,8 @@ sidebar_position: 5
 
 # 分组与布局
 
-`ICEGroup` 是容器组件，配合 **Swing 风格的布局管理器**（策略模式）可以像写 Java Swing 一样组织图元。
+`ICEGroup` 是容器组件，配合**布局管理器**（设计思想来自 Java Swing 的 `LayoutManager`，策略模式）
+可以像写 Java Swing 一样组织图元：容器持有策略、策略只算位置。
 
 ## ICEGroup
 

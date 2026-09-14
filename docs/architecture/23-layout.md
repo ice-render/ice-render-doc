@@ -2,7 +2,12 @@
 
 ## 设计目标
 
-容器组件（`ICEGroup` 及其子类）可以持有一个**布局策略**（`ICELayoutManager`），把子组件按某种规则自动排布，而非硬编码坐标。采用 **策略模式**（Swing 风格）：`setLayout(manager)` 持有策略，`doLayout()` 重排。
+容器组件（`ICEGroup` 及其子类）可以持有一个**布局策略**（`ICELayoutManager`），把子组件按某种规则自动排布，而非硬编码坐标。
+
+**设计思想来自 Java Swing 的 `LayoutManager`**：容器持有策略（`setLayout(manager)`）、
+策略只管算位置（`layoutContainer(container)`）、可选地报告内容首选尺寸（`getPreferredSize(container)`）
+—— 连方法名都是 Swing 的原名。六个容器布局也逐条对齐 Swing 的对应实现：
+`FlowLayout` / `GridLayout` / `BorderLayout` / `BoxLayout` / `CardLayout` / `OverlayLayout`。
 
 ## 内置布局：抽象基类 + 7 种具体实现
 
