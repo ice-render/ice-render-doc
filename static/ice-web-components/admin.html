@@ -180,7 +180,52 @@
         });
         const height = y - gapY + padBottom;
         container.setState({ height });
+        /**
+         * 记下「怎么重排这一次」：页面里的文案是动态的（选中数量 / 金额区间 / 履约进度…），
+         * 文字一变宽度就变，而这是一次性布局 —— 不重排的话兄弟节点还停在
+         * 「按旧文字宽度」算出来的位置上，文字就压过去了（批量操作行就是这么被压住的）。
+         * 重排是幂等的：每次都重新测量簇的包围盒，再把它们摆到该在的位置。
+         */
+        container.__relayout = () => flow(container, sections, options);
+        /**
+         * 组件主动要求重排时（`ICELabel` 发现自己的实测尺寸变了，会调父容器的 `requestLayout()`），
+         * 把这一步接到这一层的重排上。不接的话，一次性布局的容器对 `requestLayout` 只会无动于衷 ——
+         * 包装盒从 418 修成 228 之后，按旧宽度留位的邻居不会跟着回来。
+         */
+        container.requestLayout = () => {
+          container.__relayout();
+          // 页面这一层的高度变了：同步滚动内容尺寸（页面节点 = 直接挂在 pageHost 下）
+          if (container.parentNode === pageHost) {
+            pageHost.setState({ height: container.state.height });
+            contentHost.setContentSize(container.state.width, container.state.height);
+          }
+        };
         return height;
+      };
+
+      /**
+       * 改完动态文案后，从内到外把每一层「一次性布局」重排一遍（卡片 → 页面 → 滚动内容尺寸）。
+       * 没有做流式布局的祖先就跳过，所以对静态文案调用也没有副作用。
+       */
+      const relayoutAncestors = (node) => {
+        let cursor = node && node.parentNode;
+        let page = null;
+        while (cursor) {
+          if (typeof cursor.__relayout === 'function') cursor.__relayout();
+          // 页面节点 = 直接挂在 pageHost 下的那一层；它的高度变了要把滚动内容尺寸同步过去
+          if (cursor.parentNode === pageHost) page = cursor;
+          cursor = cursor.parentNode;
+        }
+        if (page) {
+          pageHost.setState({ height: page.state.height });
+          contentHost.setContentSize(page.state.width, page.state.height);
+        }
+        ice.dirty = true;
+      };
+      /** 改动态文案：改完让所在的那一层重新排一次。 */
+      const setDynamicText = (label, text) => {
+        label.setText(text);
+        relayoutAncestors(label);
       };
 
       /* ---------------------------------- 数据 ---------------------------------- */
@@ -196,7 +241,7 @@
       ];
       const STATUS_MAP = { Paid: 'success', Pending: 'warning', Shipped: 'info', Refunded: 'error' };
       const money = (value) => '$' + value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      const orderState = { status: 'all', keyword: '', region: null, page: 1, pageSize: 6 };
+      const orderState = { status: 'all', keyword: '', region: null, dateRange: null, page: 1, pageSize: 6 };
       const customersOf = (row) => ORDERS.filter((o) => o.customer === row);
       /** 跨页共享的少量运行时句柄（筛选器、当前面板切换器等） */
       const state = {};
@@ -307,7 +352,12 @@
         id: 'breadcrumb',
         left: 56,
         top: 36,
-        width: 420,
+        /**
+         * 宽度按内容给：面包屑只有「首页 › 当前页」两项。
+         * 之前是 420 —— 盒子一直伸到搜索框底下（重叠区 176×12），虽然搜索框 z 更高、点得到，
+         * 但这是一颗地雷：任何 z 顺序调整都会让搜索框左边 176px 点不动。现在两个盒子不再相交。
+         */
+        width: 220,
         fontSize: 11,
         items: [{ label: '首页' }, { label: '仪表盘' }],
         onNavigate: (item, index) => {
@@ -446,8 +496,8 @@
           }),
         });
 
-        const dashboardTable = buildOrderTable({ width: 1160, compact: true });
-        const tableCaption = note('按订单号 / 日期 / 金额排序试试，点表头即可');
+        const dashboardTable = buildOrderTable({ width: 1160, compact: true, filters: true, summary: true });
+        const tableCaption = note('点表头排序、点表头漏斗筛状态、底部看本页合计');
 
         const statusCard = new W.ICECard({ left: 0, top: 0, width: 280, height: 232, title: 'System Status' });
         const meters = [
@@ -564,7 +614,7 @@
             left: 0,
             top: 0,
             width: 268,
-            text: '倒计时归零时会自动提醒一次（Ant Statistic.Countdown）。',
+            text: '倒计时归零时会自动提醒一次。',
             style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
           }),
         );
@@ -587,10 +637,10 @@
 
         const INVENTORY = [
           { sku: 'TS-001', name: '秋季基础 T 恤', stock: 8, safe: 20, channel: '天猫' },
-          { sku: 'TS-002', name: '加绒卫衣', stock: 64, safe: 30, channel: '京东' },
+          { sku: 'TS-002', name: '加绒卫衣', stock: 64, safe: 30, channel: '自营商城' },
           { sku: 'PT-101', name: '直筒牛仔裤', stock: 12, safe: 25, channel: '天猫' },
           { sku: 'SH-210', name: '轻跑鞋', stock: 5, safe: 15, channel: '抖音' },
-          { sku: 'BG-330', name: '通勤双肩包', stock: 42, safe: 20, channel: '京东' },
+          { sku: 'BG-330', name: '通勤双肩包', stock: 42, safe: 20, channel: '自营商城' },
           { sku: 'HT-040', name: '针织帽', stock: 0, safe: 10, channel: '天猫' },
           { sku: 'SC-050', name: '撞色围巾', stock: 27, safe: 12, channel: '抖音' },
           { sku: 'JK-060', name: '防风外套', stock: 3, safe: 18, channel: '官网' },
@@ -682,20 +732,33 @@
                 style: { fontSize: 14, fillStyle: theme.colors.text },
               }),
           },
-          {
-            key: 'status',
-            title: '状态',
-            width: 120,
-            renderCell: (value, row, column, meta) =>
-              new W.ICETag({
-                left: 0,
-                top: Math.round((meta.cellHeight - 22) / 2),
-                width: 78,
-                height: 22,
-                text: value,
-                status: STATUS_MAP[value] || 'default',
-              }),
-          },
+          (() => {
+            const column = {
+              key: 'status',
+              title: '状态',
+              width: 120,
+              renderCell: (value, row, column, meta) =>
+                new W.ICETag({
+                  left: 0,
+                  top: Math.round((meta.cellHeight - 22) / 2),
+                  width: 78,
+                  height: 22,
+                  text: value,
+                  status: STATUS_MAP[value] || 'default',
+                }),
+            };
+            // 表头筛选（分析半边）：只有「最近订单」这类由表格自己管数据的场景才开，
+            // 订单页的状态筛选由页面级 segmented 负责，开两份会互相打架
+            if (options.filters) {
+              column.filters = [
+                { text: '已支付', value: 'Paid' },
+                { text: '待处理', value: 'Pending' },
+                { text: '已发货', value: 'Shipped' },
+                { text: '退款', value: 'Refunded' },
+              ];
+            }
+            return column;
+          })(),
         ];
         if (!options.compact) {
           columns.push({
@@ -738,11 +801,58 @@
           rowHeight: 40,
           columns,
           data: ORDERS.slice(0, 6),
+          // 展开状态按订单号记（翻页/换数据后仍然指得准，不依赖行下标）
+          rowKey: options.expandable ? 'order' : undefined,
           // 多选列（批量操作靠它）；单选场景不传 rowSelection 即可
           rowSelection: options.rowSelection,
           onSelectionChange: options.onSelectionChange,
           // 页面可以覆盖选中行为（订单页要保持「选中提示」同步）
           onSelect: options.onSelect || ((row) => row && openOrderDrawer(row)),
+          // 汇总行：算的是表格当前持有的行（这里口径写清楚，避免被当成全量合计）
+          summary: options.summary
+            ? (rows) => ({
+                order: `本页合计 ${rows.length} 笔`,
+                amount: money(rows.reduce((sum, row) => sum + Number(row.amount || 0), 0)),
+              })
+            : undefined,
+          // 行展开：展开区是行下面的一块内容（后面的行真的被推下去，不是浮层）
+          expandable: options.expandable
+              ? {
+                  expandedRowHeight: 84,
+                  render: (row, ctx) => {
+                  const wrap = box(ctx.width - 24, 74);
+                  const label = (top, text) =>
+                    new W.ICELabel({
+                      left: 0,
+                      top,
+                      height: 18,
+                      verticalAlign: 'middle',
+                      text,
+                      style: { fontSize: 12, fillStyle: theme.colors.textSecondary },
+                    });
+                  const detail = new W.ICEButton({
+                    left: ctx.width - 140,
+                    top: 22,
+                    width: 96,
+                    height: 28,
+                    text: '查看详情',
+                    size: 'small',
+                    variant: 'default',
+                  });
+                  detail.on('click', () => openOrderDrawer(row));
+                  wrap.addChildren(
+                    [
+                      label(8, `客户：${row.customer} · 配送区域：${row.region}`),
+                      label(32, `下单日期：${row.date} · 金额 ${money(Number(row.amount))}`),
+                      label(56, `状态：${row.status} · 订单号 ${row.order}`),
+                      detail,
+                    ],
+                    { align: 'top' },
+                  );
+                  return wrap;
+                },
+              }
+            : undefined,
         });
         return table;
       };
@@ -754,6 +864,12 @@
         return ORDERS.filter((row) => {
           if (orderState.status !== 'all' && row.status.toLowerCase() !== orderState.status) return false;
           if (orderState.region && row.region !== orderState.region) return false;
+          // 下单日期区间：ISO 字符串可以直接比大小；只选了一头时那一头不参与过滤
+          if (orderState.dateRange) {
+            const [from, to] = orderState.dateRange;
+            if (from && row.date < from) return false;
+            if (to && row.date > to) return false;
+          }
           if (regions.length && regions.indexOf(row.region) === -1) return false;
           if (range && (row.amount < range[0] || row.amount > range[1])) return false;
           if (orderState.onlyAbnormal && row.status !== 'Refunded' && row.status !== 'Pending') return false;
@@ -783,11 +899,11 @@
             applyFilter();
           },
         });
-        const keywordField = new W.ICETextField({ id: 'order-keyword', left: 0, top: 0, width: 200, placeholder: '订单号 / 客户…' });
+        const keywordField = new W.ICETextField({ id: 'order-keyword', left: 0, top: 0, width: 170, placeholder: '订单号 / 客户…' });
         const regionSelect = new W.ICECascader({
           left: 0,
           top: 0,
-          width: 180,
+          width: 160,
           placeholder: '配送区域',
           options: [
             { value: '华东', label: '华东' },
@@ -800,13 +916,20 @@
             applyFilter();
           },
         });
-        const dateRange = new W.ICEDatePicker({
+        const dateRange = new W.ICEDateRangePicker({
+          id: 'order-date-range',
           left: 0,
           top: 0,
-          width: 160,
-          placeholder: '下单日期',
-          value: '2026-09-07',
-          onChange: (value) => toast('按日期筛选：' + value, 'info'),
+          width: 220,
+          // 演示页固定「今天」，快捷项与高亮才是可复现的（不随打开时间漂）
+          today: '2026-09-12',
+          now: () => new Date(2026, 8, 12, 10, 0),
+          value: ['2026-09-07', '2026-09-12'],
+          onChange: (value) => {
+            orderState.dateRange = value;
+            orderState.page = 1;
+            applyFilter();
+          },
         });
         const searchButton = new W.ICEButton({ left: 0, top: 0, width: 76, height: 32, text: '查询' });
         const resetButton = new W.ICEButton({ left: 0, top: 0, width: 76, height: 32, text: '重置', variant: 'default' });
@@ -876,7 +999,7 @@
         });
         const clearAdvanced = () => {
           amountRange.setRangeValue([0, 4000]);
-          amountLabel.setText('金额：$0 – $4,000');
+          setDynamicText(amountLabel, '金额：$0 – $4,000');
           regionGroup.setValue([]);
           onlyAbnormal.setSelected(false);
           orderState.amountRange = null;
@@ -890,13 +1013,14 @@
         advancedReset.on('click', clearAdvanced);
         amountRange.on('change', () => {
           const range = amountRange.getRangeValue() || [0, 4000];
-          amountLabel.setText(`金额：${money(range[0])} – ${money(range[1])}`);
+          setDynamicText(amountLabel, `金额：${money(range[0])} – ${money(range[1])}`);
         });
 
         const refreshSelectedHint = () => {
           const rows = table.getSelectedRows();
           const total = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-          selectedHint.setText(
+          setDynamicText(
+            selectedHint,
             rows.length
               ? `已选中 ${rows.length} 笔 · 合计 ${money(total)}`
               : '未选中任何订单（勾选左侧复选框可多选）',
@@ -904,6 +1028,8 @@
         };
         const table = buildOrderTable({
           id: 'orders-full',
+          // 行展开：展开区里放这一单的摘要 + 进详情抽屉的入口
+          expandable: true,
           // 多选：勾复选框批量操作；点「详情」仍然打开抽屉
           rowSelection: 'multiple',
           onSelectionChange: () => refreshSelectedHint(),
@@ -941,7 +1067,7 @@
           pagination.setTotal(rows.length);
           pagination.setPageSize(orderState.pageSize, { silent: true });
           pagination.setCurrent(orderState.page, { silent: true });
-          total.setText(`共 ${rows.length} 条 · 第 ${orderState.page} 页 / 每页 ${orderState.pageSize} 条`);
+          setDynamicText(total, `共 ${rows.length} 条 · 第 ${orderState.page} 页 / 每页 ${orderState.pageSize} 条`);
           emptyState.setState({ display: rows.length === 0 });
           table.setState({ display: rows.length > 0 });
           refreshSelectedHint();
@@ -1035,11 +1161,13 @@
           segmented.setValue('all');
           keywordField.setValue('');
           regionSelect.setValue(undefined);
+          orderState.dateRange = null;
+          dateRange.clear();
           orderState.amountRange = null;
           orderState.regions = [];
           orderState.onlyAbnormal = false;
           amountRange.setRangeValue([0, 4000]);
-          amountLabel.setText('金额：$0 – $4,000');
+          setDynamicText(amountLabel, '金额：$0 – $4,000');
           regionGroup.setValue([]);
           onlyAbnormal.setSelected(false);
           applyFilter();
@@ -1061,10 +1189,9 @@
                 segmented,
                 keywordField,
                 regionSelect,
-                dateRange,
-                searchButton,
-                resetButton,
-                createButton,
+                // 日期区间与三个动作按钮编成**一个**簇（row() 返回数组 = 一个 cluster）：
+                // 放不下时整簇换行，不会出现「查询/重置/新建」被拆散到两行的情况
+                row(16, dateRange, searchButton, resetButton, createButton),
               ),
             ],
           },
@@ -1319,7 +1446,7 @@
           columns: 6,
           value: theme.colors.primary,
           onChange: (color) => {
-            state.productColor && state.productColor.setText('主题色：' + color);
+            state.productColor && setDynamicText(state.productColor, '主题色：' + color);
           },
         });
         const colorLabel = new W.ICELabel({ left: 0, top: 0, height: 18, verticalAlign: 'middle', text: '主题色：' + theme.colors.primary, style: { fontSize: 12, fillStyle: theme.colors.textSecondary } });
@@ -1435,7 +1562,7 @@
           max: 10,
           step: 0.5,
           value: 8.5,
-          onChange: (value) => discountLabel.setText(`折扣：${Number(value).toFixed(1)} 折`),
+          onChange: (value) => setDynamicText(discountLabel, `折扣：${Number(value).toFixed(1)} 折`),
         });
         const categoryTree = new W.ICETree({
           left: 0,
@@ -1575,10 +1702,10 @@
           items: CUSTOMERS.map((customer) => ({ key: customer.key, label: customer.name })),
           onChange: (keys) => {
             if (!keys.length) {
-              listHint.setText('选择客户查看右侧档案');
+              setDynamicText(listHint, '选择客户查看右侧档案');
               return;
             }
-            listHint.setText(`已选 ${keys.length} 位：${keys.map(nameOf).join('、')}`);
+            setDynamicText(listHint, `已选 ${keys.length} 位：${keys.map(nameOf).join('、')}`);
             selectCustomer(keys[keys.length - 1]);
           },
         });
@@ -1861,7 +1988,7 @@
         quietSwitch.on('change', () => {
           const on = quietSwitch.isSelected();
           quietSlider.setState({ opacity: on ? 1 : 0.4 });
-          quietLabel.setText(on ? '免打扰时段（22:00 - 08:00）' : '免打扰已关闭');
+          setDynamicText(quietLabel, on ? '免打扰时段（22:00 - 08:00）' : '免打扰已关闭');
         });
         const digestSegmented = new W.ICESegmented({
           left: 0,
@@ -1937,7 +2064,7 @@
           max: 100,
           step: 5,
           value: 20,
-          onChange: (value) => stockThresholdLabel.setText(`库存预警阈值：低于 ${value} 件时提醒`),
+          onChange: (value) => setDynamicText(stockThresholdLabel, `库存预警阈值：低于 ${value} 件时提醒`),
         });
         const stockThresholdLabel = note('库存预警阈值：低于 20 件时提醒');
 
@@ -1969,7 +2096,8 @@
           const value = String(newPassword.getFormValue() || '');
           const score = Math.min(100, value.length * 9 + (/[0-9]/.test(value) ? 15 : 0) + (/[^A-Za-z0-9]/.test(value) ? 20 : 0));
           strengthBar.setValue(score);
-          strengthNote.setText(
+          setDynamicText(
+            strengthNote,
             score === 0 ? '密码强度：待输入' : `密码强度：${score >= 80 ? '强' : score >= 50 ? '中' : '弱'}（${score}%）`,
           );
         });
@@ -2110,7 +2238,7 @@
             { label: '预计送达', value: '2026-09-14' },
           ]);
           progress.setValue(row.progress);
-          progressLabel.setText(`履约进度 ${row.progress}%（${row.stage}）`);
+          setDynamicText(progressLabel, `履约进度 ${row.progress}%（${row.stage}）`);
           track.setItems([
             { title: '订单创建', time: '09-12 09:12', description: row.customer + ' 提交订单' },
             { title: '支付完成', time: '09-12 09:15', color: theme.colors.success, description: money(row.amount) },
@@ -2202,6 +2330,8 @@
       function showPage(key, menuKey) {
         const def = PAGE_DEFS[key];
         if (!def) return;
+        // 切页先收浮层：锚点所在的页面一藏，浮层就会孤零零地飘在画布上（表头筛选/日期面板/下拉都是）
+        W.getICEOverlayManager(ice).closeAll();
         if (!builtPages[key]) {
           builtPages[key] = def.build();
           pageHost.addChild(builtPages[key], false);
