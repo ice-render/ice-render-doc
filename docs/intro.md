@@ -62,7 +62,7 @@ sidebar_label: 1.1 介绍
 
 > ⚠️ **应用层迁移（破坏性行为变更）**：若你自己 `evtBus.on('ICE_FRAME_EVENT', …)` 做**逐帧计算**（时钟、令牌仿真、自绘指示器、自定义补间…），必须调 `ice.setContinuousFrames(true)`，否则引擎的空闲停帧会让逐帧逻辑停摆（"挂了监听"不再等于"帧还会来"）。用完记得 `setContinuousFrames(false)` 归还。
 
-深入实现见 [18 · 动画机制](architecture/18-animation-architecture.md)、[16 · 连线端口评估](architecture/16-link-port-evaluation.md)、[04 · 渲染性能](architecture/04-rendering-performance.md)，完整清单见引擎仓库 `CHANGELOG.md`。
+深入实现见 [18 · 动画机制](architecture/18-animation-architecture.mdx)、[16 · 连线端口评估](architecture/16-link-port-evaluation.md)、[04 · 渲染性能](architecture/04-rendering-performance.mdx)，完整清单见引擎仓库 `CHANGELOG.md`。
 
 ## 两层架构与生态
 

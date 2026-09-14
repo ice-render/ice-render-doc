@@ -67,7 +67,7 @@ const ice = new ICE();
 | `getRegisteredTypeIds()` | 当前实例已注册的 canonical typeId 列表 |
 
 内置类型的 typeId 形如 `ice-render:Rect`、`ice-render:Group`。类型名**只有 canonical 一种形式**，
-引擎不兼容无 namespace 的旧类名。冲突规则与未注册类型的处理见 [06 · 序列化](../architecture/06-serialization.md)。
+引擎不兼容无 namespace 的旧类名。冲突规则与未注册类型的处理见 [06 · 序列化](../architecture/06-serialization.mdx)。
 
 格式契约随包导出，下游包可直接复用（不必各处手写正则）：
 

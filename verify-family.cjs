@@ -1,5 +1,8 @@
-// 校验 ice-chart / ice-web-components 文档页的 navbar / sidebar / 内联实时示例
-// 用法：node verify-family.cjs  （需先 npm run serve 在某端口，默认 3100）
+// 校验 ice-chart / ice-web-components 文档页的 navbar / sidebar / 实时示例
+// 用法：先起一个静态服务指向构建产物，再 node verify-family.cjs（默认 3100）：
+//   npx http-server build -p 3100 -s        # 站点在根路径时
+//   npx http-server . -p 3100 -s            # 站点在子路径 /ice-render-doc/ 时（父目录里带同名软链）
+// 注意：不要用 `docusaurus serve` —— 它把 `/ice-chart/xxx.html` 301 到首页，示例页永远加载不到。
 const { chromium } = require('playwright');
 
 const BASE = process.env.BASE || 'http://127.0.0.1:3100';
@@ -18,6 +21,34 @@ const paintOf = async (frame) => frame.evaluate(() => {
   return total;
 });
 
+/**
+ * 页面总落墨 = **主文档 + 全部 iframe**。
+ *
+ * LiveExample 从 2026-09-13 起改成 iframe（见 src/components/LiveExample.jsx：一个文档页里
+ * 多个示例都用 `id="canvas"`，注入同一份 document 会互相抢画布）。所以「文档页里有没有画出来」
+ * 必须连 iframe 一起量 —— 只查父文档会永远是 0 像素，把好好的页面判成失败。
+ */
+const paintOfPage = async (page) => {
+  let total = 0;
+  for (const frame of page.frames()) {
+    total += await paintOf(frame).catch(() => 0);
+  }
+  return total;
+};
+
+/** LiveExample 的 iframe 是 loading="lazy"：不滚过去就不会加载。 */
+async function scrollThrough(page) {
+  const steps = 12;
+  for (let i = 0; i <= steps; i++) {
+    await page.evaluate((n) => {
+      const ratio = n / 12;
+      window.scrollTo(0, document.body.scrollHeight * ratio);
+    }, i);
+    await page.waitForTimeout(220);
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
 async function checkPage(browser, path, { label }) {
   const page = await browser.newPage();
   const errors = [];
@@ -33,27 +64,16 @@ async function checkPage(browser, path, { label }) {
   const sideText = await page.locator('aside').innerText().catch(() => '');
   const sideOk = sideText.includes(label);
 
-  // 页面里的内联实时示例（LiveExample 注入的 [data-live-example] 容器）与画布落墨
+  // 页面里的实时示例（LiveExample 的 [data-live-example] iframe）与画布落墨
   const live = await page.locator('[data-live-example]').count().catch(() => 0);
-  await page
-    .waitForFunction(
-      () => {
-        let total = 0;
-        document.querySelectorAll('[data-live-example] canvas').forEach((c) => {
-          try {
-            const ctx = c.getContext('2d');
-            if (!ctx || !c.width || !c.height) return;
-            const d = ctx.getImageData(0, 0, c.width, c.height).data;
-            for (let i = 3; i < d.length; i += 4) if (d[i] > 10) total += 1;
-          } catch (e) { /* tainted / 未就绪忽略 */ }
-        });
-        return total > 1000;
-      },
-      null,
-      { timeout: 25000 },
-    )
-    .catch(() => {});
-  const paint = await paintOf(page).catch(() => 0);
+  await scrollThrough(page); // 触发 lazy iframe
+  let paint = 0;
+  const deadline = Date.now() + 25000;
+  while (Date.now() < deadline) {
+    paint = await paintOfPage(page);
+    if (paint > 1000) break;
+    await page.waitForTimeout(500);
+  }
   const iframes = await page.locator('iframe').count().catch(() => 0);
   await page.close();
   return { path, label, navOk, sideOk, live, iframes, paint, errors };
@@ -137,7 +157,9 @@ async function checkFunDemos(browser) {
 
   let allOk = true;
   for (const r of results) {
-    const ok = r.navOk && r.sideOk && r.iframes === 0 && r.live > 0 && r.paint > 1000 && r.errors.length === 0;
+    // 判据：导航 / 侧边栏有入口，页面上有实时示例容器，且**连 iframe 一起**量到落墨，零控制台报错。
+    // （不再要求 iframes === 0 —— 示例现在就是靠 iframe 隔离的，见 paintOfPage 的说明。）
+    const ok = r.navOk && r.sideOk && r.live > 0 && r.paint > 1000 && r.errors.length === 0;
     allOk = allOk && ok;
     console.log(`\n[${ok ? 'PASS' : 'FAIL'}] ${r.label}  (${r.path})`);
     console.log(
