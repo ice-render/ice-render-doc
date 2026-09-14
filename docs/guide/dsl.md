@@ -105,6 +105,23 @@ ice-render 家族提供两套互补的 DSL，按场景选择：
 }
 ```
 
+**主题**（引擎 2.4 起）：文档顶层可以直接声明 `theme`，样式里可以用 `"$token"` 引用主题色 ——
+它跟着文档走、可序列化，生成之后 `validateDsl()` 会替你查「命名主题有没有注册、token 拼没拼错」：
+
+```json title="暗色主题 + token 引用"
+{
+  "schemaVersion": 1,
+  "theme": "dark",
+  "nodes": [
+    { "id": "a", "type": "rect", "left": 80, "top": 160, "width": 180, "height": 90,
+      "style": { "fillStyle": "$primary", "strokeStyle": "$border", "lineWidth": 2 } }
+  ]
+}
+```
+
+`theme` 也可以是部分主题：`{ "primary": "#0d6efd" }` 或 `{ "semantic": { "primary": "#0d6efd" } }`。
+两块图形的配色都归这套 token —— 换主题时整张图跟着换，不用逐节点改颜色。
+
 ### ice-entity-designer-dsl（领域建模：ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力）
 
 七种文档共用一个入口：`kind` 缺省时按 ER 处理，其余取值 `'flowchart'` / `'bpmn'` / `'uml'` /
