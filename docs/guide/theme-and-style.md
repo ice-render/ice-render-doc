@@ -53,6 +53,20 @@ new ICEText({
 > （含布局管理器分配的尺寸）同样按显式尺寸处理。`textAlign: 'center'` 等居中逻辑依赖 `state.width` 计算 `localOrigin`，
 > 显式尺寸不会被量测值覆盖。
 
+**放不下就截断，绝不压字形**（`textOverflow`，引擎 2.6 起）：
+
+```js
+new ICEText({ text: '很长的一段中文……', width: 120, height: 24, style: { fontSize: 13 } });
+// 默认 'ellipsis'：按盒子内宽逐 grapheme 回退，末尾补 '…'（可用 ellipsis 换成 '...'）
+
+new ICEText({ text: '很长的一段中文……', width: 120, textOverflow: 'clip', style: { fontSize: 13 } });
+// 'clip'：原样画出去（允许溢出盒子），由调用方自己裁
+```
+
+> 历史坑：以前是把盒子宽度当 `fillText(text, x, y, maxWidth)` 的第四个参数传下去 —— canvas 对 `maxWidth`
+> 的语义是**把字形横向压扁**（不是截断），长中文会被挤成一团。现在这条路径已经去掉；
+> 多行配合 `wrap: true` + `maxLines` 截末行；**编辑态不截断**（光标按原始文本算）。
+
 ### 阴影简写
 
 `shadow: 'sm' | 'md' | 'lg'` 一行展开成 4 个 canvas 属性：
@@ -240,7 +254,7 @@ new ICERect({ preset: 'button', style: { fillStyle: 'red' } }); // red 覆盖 pr
 
 ```js
 // 注册命名主题（运行时注入，如多品牌 / 多租户）
-ice.registerTheme('brand', {
+ice.registerTheme('app:brand', {
   base: baseTokens,
   semantic: { ...DEFAULT_THEME.semantic, primary: '#ff6600' },
 });
@@ -255,6 +269,26 @@ ice.setTheme('default');              // 复位
 ice.getTheme().semantic.primary;      // 当前主题主色
 ice.getTheme().semantic.palette[0];   // 数据系列配色
 ```
+
+命名主题注册的**写法约束**（引擎 2.6 起，与 `registerPreset` / `registerType` 一致）：
+
+- 内置名 `default` / `dark` **不可覆盖**（它们在导出的 `BUILTIN_THEME_NAMES` 里）；
+- 同一个名字**重复注册抛错**，要覆盖须显式 `ice.registerTheme(name, theme, { overwrite: true })`；
+- 应用主题建议带命名空间（`app:brand`）。
+
+**主题变更通知**（引擎 2.6 起）——上层「被动跟随」主题的唯一时机：
+
+```js
+const off = ice.onThemeChange(({ theme, previous, kind }) => {
+  if (kind !== 'theme') return;   // 'chrome' = 只有交互外壳那组 token 变了
+  repaintMyChrome(theme.semantic.primary);
+});
+off();                            // 退订
+```
+
+回调发生在**主题已应用、缓存已失效之后**（读 `ice.getTheme()` 拿到的是新值）；
+订阅者之间互相隔离（某个回调抛错只 `console.warn` 一次，不影响主题应用与其它订阅者）。
+底层是 `ice.evtBus` 上的 `ICE_EVENT_NAME_CONSTS.THEME_CHANGE`（常量已从包入口导出）。
 
 热切换：`setTheme` 后，已渲染的、用了 `preset` 的组件会**重新 resolve**（用户显式传的样式优先；
 带 `'$token'` 引用的样式在**绘制那一刻**解析，所以自定义组件也跟着变）。

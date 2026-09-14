@@ -118,6 +118,30 @@ const diagnostics = ice.validateTheme();
 `text` / `muted` / `hint` 与背景的 **WCAG 对比度**（< 3 报错、< 4.5 警告）。
 这条检查第一次跑就抓到了引擎自己的默认主题（`hint` 在纯白上只有 2.54:1），默认值已调深一档。
 
+引擎 2.6 起，顶层 semantic 键分两类（此前一律报 warning，文案还写成「引擎不会读它」，是错的）：
+
+- **疑似打错内置名** → `warning` + 候选名字（`primry` → "是不是想写 `primary`？"）；
+  判定保守：归一化后同名，或**首字母相同且编辑距离 ≤ 2**；
+- **应用自带词汇** → `info`（`ThemeDiagnostic.severity` 因此多了 `'info'`）——
+  `token('app.highlight')` 这类引用**是能被解析的**（`tokenValue` 按路径取，不限于内置名单），
+  所以它不该被报成问题。
+
+## 主题变更通知（被动跟随）
+
+`setTheme` / `setChrome` 应用完成、缓存失效之后会广播一次变更；订阅用 `ice.onThemeChange(fn)`，
+返回的函数即退订：
+
+```ts
+const off = ice.onThemeChange(({ theme, previous, kind }) => {
+  if (kind !== 'theme') return;             // 'chrome' = 只有交互外壳那组 token 变了
+  repaintChrome(theme.semantic.primary);    // 此刻 ice.getTheme() 已是新主题
+});
+```
+
+订阅者之间**互相隔离**（某个回调抛错只 `console.warn` 一次，不影响主题应用与其它订阅者）；
+底层是 `ice.evtBus` 上的 `ICE_EVENT_NAME_CONSTS.THEME_CHANGE`（常量已从包入口导出）。
+设计器外壳从引擎主题派生、图表 `theme:'auto'` 跟随引擎明暗，都靠它，不必各自发明同步时机。
+
 ## 上层应用怎么接：桥的约定
 
 引擎只提供**机制**，主题的**词汇表归应用层** —— 与 i18n 的边界是同一条原则（引擎不做 i18n，
