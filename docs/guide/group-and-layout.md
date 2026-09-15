@@ -74,6 +74,12 @@ for (let i = 0; i < 9; i++) {
 | 内外距 | 容器 `padding` / 子项 `margin` | `number` 四边等距，或 `{top,right,bottom,left}`；七个布局口径一致 |
 | 布局 + 交互共存 | `group.setLayout(manager, { disableTransform: false })` | 默认布局接管后禁止拖拽；传 `false` 则布局照常摆位、用户仍可拖 |
 | 剩余空间 | 箱式 `grow`、网格 `gridSpan` | 定宽侧栏 + 自适应内容区；表头通栏 / 侧栏跨行 |
+| 手动定位的子项 | 子项 `state.layoutIgnore: true` | 布局跳过它（也不计入首选尺寸）—— CSS `position: absolute` 的对应物 |
+| 最小尺寸 | 子项 `setMinimumSize({ width: 120 })` | 空间不足时只有声明了 `grow` 的子项参与收缩，且不越过下限；**没声明 = 不可压缩**（既有界面行为不变） |
+
+> 2.11 起「交互锁」是**独立的一维策略**：`setLayout(manager, { lockInteraction: false })` 或
+> `group.setInteractionLock(false)` 只排位置、不接管交互（解锁按原值还原）；`group.setLayout(null)`
+> 撤销布局时坐标留在原地、交互锁还原。`disableTransform` 是旧名字，仍然可用。
 
 ```js
 // 定宽侧栏（90）+ 两块按 1:2 瓜分剩余空间的内容区

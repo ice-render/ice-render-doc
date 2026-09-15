@@ -94,6 +94,28 @@ group.addChild(a); group.addChild(b);   // 加完即排（见上表）
 group.doLayout();                        // 也可以手动立即重排一次
 group.getPreferredSize();                // 首选尺寸：声明过 → 声明值；有布局 → 策略算出的内容尺寸；否则自己的盒子
 group.setPreferredSize([320, 200]);      // 显式声明首选尺寸（Swing 同名 API）
+group.getLayout();                       // 当前策略（没设过是 null）
+group.setLayout(null);                   // 撤销布局：坐标留在原地、交互锁还原
+```
+
+## 自由排版 vs 自由拖动（2.11 起）
+
+设计器类界面（ER / 流程图 / 水务工艺图）里的图元**位置就是数据**，用户必须能拖；而 UI 外壳里的
+子项位置该由布局说了算。2.11 把这两件事彻底分开，并补上"位置由布局定、但允许少数子项手动定位"的出口：
+
+| 能力 | 写法 | 语义 |
+|---|---|---|
+| 交互锁（独立一维策略） | `setLayout(manager, { lockInteraction: false })` / `setInteractionLock(false)` | 只排位置、不接管交互。**解锁按原值还原**（记住改过谁、改前是什么），所以不会把"本来就不可拖"的子项解锁成可拖；`getInteractionLock()` 可读 |
+| 手动定位的子项 | 子项 `state.layoutIgnore: true` | 布局**跳过它**（也不计入首选尺寸）—— CSS `position: absolute` 的对应物。"容器负责排布、少数子项位置是数据"由此成立 |
+| 最小尺寸 | 子项 `setMinimumSize({ width: 120 })` | 空间不足时，`ICEBoxLayout` 按"能压多少"收缩声明了 `grow` 的子项，压到下限就停（如实溢出，而不是把内容压没）。**没声明的轴回落到首选尺寸 = 不可压缩**，所以既有界面行为不变 |
+| 整数分配 | 自动 | 等分网格与 `grow` 的剩余空间用「累计取整」切分：每份整数、总和精确（292/3 → 97/98/97），相邻子项之间不会出现半像素缝 |
+
+```ts
+// 例：容器负责排布，但其中一个子项由用户拖动定位
+const strip = new ICEGroup({ width: 400, height: 120, padding: 8 });
+strip.setLayout(new ICEBoxLayout({ axis: 'y', gap: 6 }), { lockInteraction: false });
+strip.addChild(new ICERect({ width: 380, height: 40 }));                 // 布局排
+strip.addChild(new ICECircle({ radius: 12, left: 300, top: 70, layoutIgnore: true })); // 用户拖
 ```
 
 **布局产物是子组件的 `left/top`**，最终仍走同一套 [03 · 坐标系](coordinate-system) 与
@@ -106,6 +128,15 @@ group.setPreferredSize([320, 200]);      // 显式声明首选尺寸（Swing 同
   七种内置布局在 `ICE` 构造时注册（`ice-render:ICEFlowLayout` …），各自 `toJSON()` 只报构造参数；
   自研布局要往返，得先 `ice.registerType('your-ns:MyLayout', MyLayout)` + 实现 `toJSON()`；
   类型没注册时读回**跳过策略、保留坐标**并记入 `deserializer.unknownTypes`（与未注册组件的容错口径一致，不炸整份数据）。
+
+**没注册的布局不会写进快照**（2.11 起，原先是"回退写类名"）：回退写类名看着能读回，但下游打包改名之后
+那份数据就是废的（引擎 AGENTS 记过同类事故）。子项的 `left/top` 照旧在快照里，所以读回来**版式不变**、
+只是不再自动重排；序列化时会告警提示你 `registerType`。旧快照里已经是类名的数据仍按未注册类型兼容读取。
+
+**组件内部策略用 `toJSON() { return null; }` 声明"不进文档"**（既不写、也不告警）：这类策略由组件在构造时
+自己 `setLayout(new XxxLayout())` 重建、参数活在组件的 state 里 —— 组件库的 `ICEMenu` / `ICEWindow` /
+`ICEFormItem` / `ICETabs` / `ICEStatCard` 等 8 个组件就是这么处理的。返回 `{}` 则表示"没有参数，但请在文档里保留策略"；
+仍用基类默认 `toJSON()` 的布局会告警一次（有构造参数的布局会在这里静默丢参）。
 
 ## 现状与边界
 
