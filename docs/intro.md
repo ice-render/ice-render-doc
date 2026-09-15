@@ -3,7 +3,7 @@ sidebar_position: 0
 sidebar_label: 1.1 介绍
 ---
 
-# ICE Render · 雪花渲染器（当前 v2.11.1）
+# ICE Render · 雪花渲染器（当前 v2.11.2）
 
 **ICERender** 是一个用纯 TypeScript 编写的 Canvas 2D 交互图形渲染引擎，面向 ER 图、流程图、拓扑图等图编辑场景。它借鉴了 React 的组件模型与 W3C 的事件模型，提供嵌套坐标系、序列化、动画与 Visio 风格连接线，运行时零依赖（gl-matrix 在构建期内联）。
 
@@ -17,10 +17,12 @@ sidebar_label: 1.1 介绍
 
 ### 极端规模下的内存与构建效率
 
-通过原型继承共享默认 props/state（默认配置不复制）、WeakSet 让挂载 O(1)：
+通过原型继承共享默认 props/state（默认配置不复制，`style` 按主题每实例派生）、WeakSet 让挂载 O(1)：
 
-- 实测 100 万个最小矩形的堆增量约 **0.87GB**（朴素实现约 2.0GB）
-- 构建约 6 秒
+- 实测 100 万个最小矩形的堆增量约 **2.3GB**（每图元 2.4KB；同场景把整份默认表显式复制进每个实例约 7.4GB，3.3×）
+- 构建约 6 秒（2026-09-10 示例页数据，未复测）
+
+内存口径与复现方式见 [04 · 渲染性能](architecture/04-rendering-performance.mdx)；本机跑 `npm run bench:mem` 即可重测。
 
 ### 局部重绘是「可证明的像素契约」
 
@@ -70,7 +72,7 @@ ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应
 
 | 层级 | 项目 | 说明 |
 |---|---|---|
-| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v2.11.1**） |
+| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v2.11.2**） |
 | 引擎（DSL） | [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **引擎级** JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎 |
 | 应用 | [ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) | 基于引擎的交互式图表库（折线 / 饼 / 雷达 / K 线 / 桑基 / 关系图等），命中测试与交互全部由引擎承担 |
 | 应用（DSL） | [ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl) | 图表 DSL：一张表 + `encoding` 编译成 `ChartOption`，带结构化诊断 |
