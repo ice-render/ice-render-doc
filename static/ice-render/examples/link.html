@@ -29,7 +29,7 @@ links: {
     <script src="../../ice-render.js"></script>
     <script>
       const { ICE, ICERect, ICEPolyLine, ICEText } = window.ICE;
-      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const ice = new ICE().init('canvas', { renderMode: 'dirty-rect' });
       const kpi = document.getElementById('kpi');
 
       const box1 = new ICERect({

@@ -1,5 +1,6 @@
 import BrowserOnly from '@docusaurus/BrowserOnly';
 import React, { useEffect, useRef, useState } from 'react';
+import useAssetResolver from '../utils/assetUrl';
 
 /**
  * ERNodePlayground —— 「Entity 领域图元 · 可复制 ER 节点骨架」实时演示。

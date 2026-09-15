@@ -10,9 +10,9 @@ import LiveExample from '@site/src/components/LiveExample';
 
 ```mermaid
 graph TD
-    U[ICE.use(plugin)] --> C[components<br/>namespace:Type → 构造函数<br/>自动 registerType]
+    U["ICE.use(plugin)"] --> C["components<br/>namespace:Type → 构造函数<br/>自动 registerType"]
     U --> R[render<br/>每帧在世界坐标叠加绘制]
-    U --> TO[tools<br/>match(component) → 工具组件]
+    U --> TO["tools<br/>match(component) → 工具组件"]
     C -->|反查 typeId| S[(序列化安全)]
     R -->|clip 之内| CR[CanvasRenderer]
     TO -->|addTool| TN[ice.toolNodes]

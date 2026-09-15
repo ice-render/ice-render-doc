@@ -30,7 +30,7 @@
       const { ICE, ICERect, ICECircle, ICEText } = window.ICE;
       const log = document.getElementById('log');
       const push = (m) => { log.textContent += '\n' + m; log.scrollTop = log.scrollHeight; };
-      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const ice = new ICE().init('canvas', { renderMode: 'dirty-rect' });
 
       const rect = new ICERect({
         left: 40, top: 60, width: 150, height: 150, radius: 12,
