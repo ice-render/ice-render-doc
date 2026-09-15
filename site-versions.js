@@ -7,11 +7,11 @@ module.exports = {
   // 渲染引擎内核（本站核心，也是所有应用层的地基）
   iceRender: '2.11.2',
   // 应用层产品
-  entityDesigner: '0.4.1',
-  iceChart: '0.23.2',
-  iceWebComponents: '1.11.0',
+  entityDesigner: '0.4.2',
+  iceChart: '0.23.3',
+  iceWebComponents: '1.11.1',
   // DSL 兄弟包（ice-chart / ice-entity-designer 落地页与生态表引用）
-  iceChartDsl: '0.2.6',
-  entityDesignerDsl: '0.0.24',
-  iceRenderDsl: '0.1.4',
+  iceChartDsl: '0.2.7',
+  entityDesignerDsl: '0.0.27',
+  iceRenderDsl: '0.1.5',
 };
