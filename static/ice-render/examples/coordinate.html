@@ -24,7 +24,7 @@
     <script src="../../ice-render.js"></script>
     <script>
       const { ICE, ICEGroup, ICERect } = window.ICE;
-      const ice = new ICE.ICE().init('canvas', { renderMode: 'dirty-rect' });
+      const ice = new ICE().init('canvas', { renderMode: 'dirty-rect' });
       const mBox = document.getElementById('m');
 
       const group = new ICEGroup({ left: 40, top: 40, width: 240, height: 200, radius: 8,

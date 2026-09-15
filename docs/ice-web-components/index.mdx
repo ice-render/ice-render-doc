@@ -4,23 +4,23 @@ sidebar_position: 1
 
 import LiveExample from '@site/src/components/LiveExample';
 
-# ice-web-components · Canvas 原生 UI 组件库（当前 v1.8.0）
+# ice-web-components · Canvas 原生 UI 组件库（当前 v1.10.3）
 
-:::info 🧩 应用层 · 基于 ice-render 引擎 v2.6.0 封装（当前 v1.8.0）
+:::info 🧩 应用层 · 基于 ice-render 引擎 v2.10.1 封装（当前 v1.10.3）
 本页属于 ice-render 家族的**应用层**产品：所有 UI 像素都由引擎绘制，组件库只在其上收敛出 Swing 风格 Canvas 组件 API。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
 :::
 
-**ice-web-components 是构建在 ice-render 引擎之上的 Swing 风格 Canvas UI 组件库（当前 `ice-web-components` v1.8.0）。** 它把所有 UI 像素——按钮、输入框、表格、弹窗、乃至焦点环与阴影——**全部画在一个 `<canvas>` 上**：没有 DOM widget，没有 CSS 框架，每一像素都由引擎绘制。
+**ice-web-components 是构建在 ice-render 引擎之上的 Swing 风格 Canvas UI 组件库（当前 `ice-web-components` v1.10.3）。** 它把所有 UI 像素——按钮、输入框、表格、弹窗、乃至焦点环与阴影——**全部画在一个 `<canvas>` 上**：没有 DOM widget，没有 CSS 框架，每一像素都由引擎绘制。
 
-组件库直接采用 Bootstrap 5 的设计令牌（调色板、`--bs-border-radius`、字体等），并自带一套深色主题，换肤只需一次调用。目前落地 **86 个组件**，覆盖按钮 / 输入 / 选择 / 表格 / 树 / 菜单 / 模态 / 抽屉 / 通知 / 上传 / 日期时间 / 级联 / 穿梭 / 轮播 / 取色等。
+组件库直接采用 Bootstrap 5 的设计令牌（调色板、`--bs-border-radius`、字体等），并自带一套深色主题，换肤只需一次调用。目前落地 **84 个 UI 组件类**（另有 20 个纯逻辑模型、5 个管理器、2 个基类，合计 111 个导出类），覆盖按钮 / 输入 / 选择 / 表格 / 树 / 菜单 / 模态 / 抽屉 / 通知 / 上传 / 日期时间 / 级联 / 穿梭 / 轮播 / 取色等。
 
 MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
-> ⚠️ **Just for fun**：作者明确说明这是出于探索与乐趣的项目，并非生产级、经实战检验的 UI 库。但它**有真实测试**——837 个单元测试（108 个套件）外加 8 个浏览器 QA 套件（277 条断言，用真实鼠标 / 键盘事件驱动 demo 页，任何 console 错误都会让 QA 失败），本轮还补了一条**示例页冒烟**（9 个合成页，逐页断言无 console/pageerror 且画布内容像素占比达标）。
+> ⚠️ **Just for fun**：作者明确说明这是出于探索与乐趣的项目，并非生产级、经实战检验的 UI 库。但它**有真实测试**——1348 个单元测试（190 个套件）外加 8 个浏览器 QA 套件（303 条断言，用真实鼠标 / 键盘事件驱动 demo 页，任何 console 错误都会让 QA 失败），另有一条**示例页冒烟**（9 个合成页，逐页断言无 console/pageerror 且画布内容像素占比达标）。
 
 ## 一个完整的实时例子（就是仓库里的 `examples/gallery.html`）
 
-下面这个例子**直接由文档静态托管的 ice-render + ice-web-components UMD 运行时在文档页里画出**（无需联网）：86 个组件在一张画布上逐个排布，按钮点击、输入框、下拉、表格、弹窗、通知等交互全部可用。
+下面这个例子**直接由文档静态托管的 ice-render + ice-web-components UMD 运行时在文档页里画出**（无需联网）：84 个组件在一张画布上逐个排布，按钮点击、输入框、下拉、表格、弹窗、通知等交互全部可用。
 
 <LiveExample
   html="/ice-web-components/gallery.html"
@@ -122,13 +122,13 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
 | 能力 | 说明 |
 | --- | --- |
-| 86 个组件 | 按钮 / 输入 / 选择 / 表格 / 树 / 菜单 / 模态 / 抽屉 / 通知 / 上传 / 日期时间 / 级联 / 穿梭 / 轮播 / 取色，以及标签、徽标、头像、骨架、加载等小件 |
+| 84 个 UI 组件类 | 按钮 / 输入 / 选择 / 表格 / 树 / 菜单 / 模态 / 抽屉 / 通知 / 上传 / 日期时间 / 级联 / 穿梭 / 轮播 / 取色，以及标签、徽标、头像、骨架、加载等小件 |
 | 统一的浮层栈 | Modal / Drawer / Dropdown / Tooltip / Popover / Popconfirm / Select / DatePicker / Cascader 全部走 `ICEOverlayManager`：12 种 Placement、自动翻转 + 夹紧到可视区、Esc / 点击外部关闭、焦点陷阱、进退场动画 |
 | 表单同步 + 异步校验 | `ICEFormModel`（required / min / max / length / pattern / custom / **asyncValidator**），`ICEFormItem` 展示错误与「校验中」态，`submitAsync()` 等待异步规则 |
 | 键盘与焦点 | Tab / Shift+Tab 轮换、Enter/Space 激活、方向键驱动滑块 / 菜单 / 标签页 / 评分；焦点环绘制在所有内容之上 |
 | 主题 | Bootstrap 5 令牌主题（含深色主题），一次调用换肤 |
 | 与引擎无命名冲突 | 运行时导出与 `ice-render` 互不相交（有专门的回归测试守护） |
-| 真实测试 | 837 单测（108 套件）+ 8 个浏览器 QA 套件（277 断言，真实键鼠驱动 demo 页，console 报错即失败）+ 示例页冒烟（9 页） |
+| 真实测试 | 1348 单测（190 套件）+ 8 个浏览器 QA 套件（303 断言，真实键鼠驱动 demo 页，console 报错即失败）+ 示例页冒烟（9 页） |
 
 :::info 1.5.3 一个值得注意的点
 - **日历首日 `weekStart` 按语言推导 + 显式覆盖**。`ICEDatePicker` / `ICECalendar` 的周首日默认由 `props.locale` 推导（如中文环境从周一开始），传入 `weekStart`（0 = 周日 … 6 = 周六）即强制覆盖——国际化场景下无需手动算偏移。
