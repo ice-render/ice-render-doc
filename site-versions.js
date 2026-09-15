@@ -5,13 +5,13 @@
 // 版本值取自 2026-09-15 家族版本现状盘点；若某包已发新版本，在此处 bump 即可。
 module.exports = {
   // 渲染引擎内核（本站核心，也是所有应用层的地基）
-  iceRender: '2.11.2',
+  iceRender: '2.12.0',
   // 应用层产品
-  entityDesigner: '0.4.2',
-  iceChart: '0.23.3',
-  iceWebComponents: '1.11.1',
+  entityDesigner: '0.4.3',
+  iceChart: '0.23.4',
+  iceWebComponents: '1.11.2',
   // DSL 兄弟包（ice-chart / ice-entity-designer 落地页与生态表引用）
-  iceChartDsl: '0.2.7',
-  entityDesignerDsl: '0.0.27',
-  iceRenderDsl: '0.1.5',
+  iceChartDsl: '0.2.8',
+  entityDesignerDsl: '0.0.28',
+  iceRenderDsl: '0.1.6',
 };
