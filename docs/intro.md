@@ -39,6 +39,10 @@ graph TD
   D3 --> A1
 ```
 
+:::info 🤝 已无缝对接 AG-UI —— AI Agent 直接驱动画布
+ICE 系列原生对接 **AG-UI** 协议：Agent 的事件流（`run started` / `text message` / `tool call` / `state delta` …）直接增量驱动 Canvas 渲染，绘图区即页面主体，**无需手写任何胶水代码**。可运行样例见 [ice-agent-console](https://github.com/ice-render/ice-agent-console)——Agent 产出的 JSON DSL 由引擎按事件流落墨；接入方式见 [DSL 与 AI Agent 接入](/docs/guide/dsl)。
+:::
+
 ## 为什么选择 ICERender
 
 ### 极端规模下的内存与构建效率
