@@ -1,0 +1,279 @@
+---
+sidebar_position: 1
+---
+
+import LiveExample from '@site/src/components/LiveExample';
+
+# ice-chart-dsl · 图表 JSON DSL（当前 v0.2.8）
+
+:::info 🔌 DSL 层 · 应用级 · 让 AI Agent 用「一张表 + encoding」编译出 ChartOption（当前 v0.2.8）
+本页属于 ice-render 家族的**应用层**：它是图表库 `ice-chart` 之上的一层「意图翻译器」，只负责把一份 JSON 意图翻译成 `ChartOption`，渲染与交互依旧交给图表层与引擎内核。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
+
+它补的是一份手写 `ChartOption` 不做、而模型最容易写错的三件事：
+- **数据表 + `encoding` 模型**：你只声明「哪列是 x、哪列是 y、用哪一列做系列拆分」，不用把每一行拍进 `series[].data`；
+- **意图级默认**：轴类型、图例显隐、提示框触发方式按图表类型自动定（显式写在 `options` 里的永远优先）；
+- **结构化自修复诊断**：列不存在（带可用列名）、类型不匹配（带数字占比）、空数据、公式错误（带字符位置），全部带路径返回，模型能就地修。
+
+**编译产物就是一份普通的 `ChartOption`**——悬停、缩放、框选、序列化、跨图联动全部照旧。
+:::
+
+**ice-chart-dsl 是 `ice-chart` 图表库的 agent 友好层（当前 `@damoqiongqiu/ice-chart-dsl` v0.2.8）。** 它守住三条明确的增量，而不是「把 option 换个写法」：
+
+1. **数据绑定**：一张表（`columns` + `rows`）加一份 `encoding`，编译出 `series`；
+2. **意图级默认**：轴类型、图例显隐、提示框触发方式按类型保守推断；
+3. **结构化诊断**：任何写错都能带着「位置」返回给调用方去自修复。
+
+于是**AI Agent 不必背诵一长串 option 字段**，只需产出一张表加通道绑定，剩下的轴、图例、提示框、标注定位全部由这一层兜底。
+
+MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
+
+## 为什么用 DSL 而不是手写 ChartOption
+
+`ice-chart` 的 `ChartOption` 本来就是纯 JSON（`toJSON()` / `fromJSONString()` 已经吃掉了序列化契约），所以这一层**不是 option 的马甲**。它把「模型最容易写错」的部分接过去：
+
+| | 手写 ChartOption | ice-chart-dsl |
+| --- | --- | --- |
+| 输入 | 自己把每行数据拍进 `series[].data` | **一张表 + `encoding`**：`{ x: '月份', y: '销量', series: '渠道' }` |
+| 默认值 | 轴类型 / 图例显隐 / 提示框触发方式逐项自己写 | 按图表类型自动定，显式写的优先 |
+| 出错时 | 画出来是空的，只能自己猜 | **结构化诊断**：列不存在（带可用列名）、类型不匹配、空数据、公式错误（带字符位置） |
+
+编译出来的 `ChartOption` 与手写逐像素一致（仓库里的 `dsl-vs-option` 演示带几何自检，任意不一致都会红字报出），因此它只是「更省心的一道工序」，而不是另一条渲染链路。
+
+## 安装
+
+```bash
+# DSL 层 + 图表库 + 引擎（三者都要装；ice-render 是 peer 依赖，一个页面多张图共用同一引擎实例池）
+npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
+```
+
+> `ice-chart-dsl` 把 `@damoqiongqiu/ice-chart` 与 `ice-render` 都声明为 peer 依赖：同一页面上多张图要共享引擎实例池，所以这两个依赖由宿主工程统一安装。
+
+## 30 秒上手
+
+下面这份「月度销量」就是一份真实可编译、可自检的 DSL 文档（不是截图）：
+
+```json title="ice-chart-dsl 文档（AI Agent 可直接产出）"
+{
+  "schemaVersion": 1,
+  "kind": "line",
+  "title": "月度销量（DSL 编译）",
+  "data": {
+    "columns": ["月份", "销量", "渠道"],
+    "rows": [
+      ["1月", 120, "线上"], ["1月", 86, "线下"],
+      ["2月", 142, "线上"], ["2月", 92, "线下"],
+      ["3月", 168, "线上"], ["3月", 78, "线下"]
+    ]
+  },
+  "encoding": { "x": "月份", "y": "销量", "series": "渠道" },
+  "options": {
+    "interaction": {
+      "hover": { "enabled": true, "dimOthers": true },
+      "zoom": { "enabled": true, "axes": "x", "wheel": true },
+      "pan": { "enabled": true, "axes": "x" },
+      "brush": { "enabled": true, "axes": "x", "mode": "zoom" },
+      "keyboard": true
+    }
+  }
+}
+```
+
+编译与渲染：
+
+```ts
+import { compileChartDsl, renderChartDsl } from '@damoqiongqiu/ice-chart-dsl';
+
+// 只要配置：编译出来的就是一份普通 ChartOption，交给 createChart
+const option = compileChartDsl(dsl);
+ICEChart.createChart('canvas', option);
+
+// 或者一步到位：编译并渲染，返回 { chart, option, diagnostics }
+const { chart, option, diagnostics } = renderChartDsl('canvas', dsl);
+```
+
+左边这份 DSL 与「手写 `option`、把每一行拍进 `series[].data`」**编译出同一份 ChartOption（逐像素相同）**——区别在于 agent 不需要知道 `series` 内部的数据形状，只要描述「表 + 通道」即可。
+
+浏览器里直接用（UMD，注意引擎要先于图表、图表要先于 DSL 引入）：
+
+```html
+<canvas id="chart" width="900" height="480"></canvas>
+<script src="./ice-render.umd.js"></script>
+<script src="./ice-chart.umd.js"></script>
+<script src="./ice-chart-dsl.umd.js"></script>
+<script>
+  ICEChartDSL.renderChartDsl('chart', {
+    kind: 'line',
+    data: { columns: ['月份', '销量'], rows: [['1月', 120], ['2月', 132]] },
+    encoding: { x: '月份', y: '销量' },
+  });
+</script>
+```
+
+## 数据集（dataset）
+
+数据表两种写法都收——模型最常吐的是对象数组，列名按 key 首次出现顺序推出来；结构化写法显式给出 `columns` 与 `rows`：
+
+```json title="写法一：列 + 行（column-rows）"
+{ "columns": ["月份", "销量"], "rows": [["1月", 120], ["2月", 132]] }
+```
+
+```json title="写法二：对象数组（模型最常产出）"
+[{ "月份": "1月", "销量": 120 }, { "月份": "2月", "销量": 132 }]
+```
+
+三个数据集工具在「自建通道映射」时有用（都从 `internal/dataset` 导出）：
+
+| 工具 | 说明 |
+| --- | --- |
+| `resolveDataset(dsl)` | 把两种写法归一成 `{ columns, rows }`；拿不到有效数据返回 `null` |
+| `columnIndex(dataset, name)` | 列名 → 下标，找不到返回 `-1` |
+| `numericRatio(dataset, index)` | 一列里「非空值的数字占比」，用来判断这列是不是数值列（`< 0.6` 判定为非数值，`< 1` 只报警告） |
+
+> 校验阶段就用这三个工具判断「y 列是不是数值列、占比多少」——诊断信息里的「数字占比 0%」「有 20% 的值不是数字」正来自 `numericRatio`。
+
+## `kind` 覆盖表
+
+来自 `CHART_DSL_KINDS`（支持的图表类型）。其中**走 data/encoding 编译路径**的进 `CHART_DSL_COMPILED_KINDS`，其余（`treemap` / `graph` / `boxplot` 等）走 `series` 直通：
+
+| kind | 需要的通道 | 说明 |
+| --- | --- | --- |
+| `line` / `area` | `x` + `y`（+ `series`） | 数值 x 自动用数值轴 + `[x, y]` 数据点 |
+| `bar` | `x` + `y`（+ `series`） | 堆叠用 `options.stack` |
+| `scatter` | `x` + `y`（+ `size`） | 绑 `size` 即气泡图 |
+| `pie` | `name` + `value` | 负值会被警告（饼图不表达负值） |
+| `radar` | `x`（指标）+ `y`（数值）+ `series` | 指标名从 x 列推，上限自动取整到好看刻度 |
+| `heatmap` | `x` + `y`（两个类目列）+ `value` | 二维矩阵表直接画 |
+| `candlestick` | `x` + `y`＝**四列** `[开, 收, 低, 高]` | 少给列会明确报错 |
+| `waterfall` | `name` + `value`（+ `total`） | `total` 列非 0 的行当合计项 |
+| `funnel` / `gauge` / `liquid` | `name` + `value` | 仪表盘/水位球只取第一行（多行会警告） |
+| `sankey` | `source` + `target` + `value` | 一张「起点 / 终点 / 流量」的连线表 |
+| `function` | `expression`（+ `domain` / `params`） | 不需要 data，画 `y = f(x)` |
+| `treemap` / `graph` / `boxplot` / `parametric` | 直给 `series` | 不在编译清单内，走 `series` 直通 |
+
+**直通**：`series` 字段直给 `option.series`（给了它就跳过 data/encoding）。**逃生舱**：`options` 里的键覆盖编译结果（`series` 除外，避免半替换产出四不像），DSL 跟不上核心演进时仍有路可走。
+
+## `encoding` 与标注
+
+**通道（`encoding`）**把列名映射到视觉通道：
+
+| 通道 | 含义 |
+| --- | --- |
+| `x` | 横轴：类目列、时间列或数值列（数值列自动用数值轴 + `[x, y]` 数据点） |
+| `y` | 纵轴：一个列名或一组列名，每个列名编译成一个系列 |
+| `series` | 分组列：同一 x 上的取值拆成多个系列 |
+| `color` / `size` | 逐项配色 / 气泡大小（热力图的数值列也走这里） |
+| `name` / `value` | 名称列 / 数值列（饼图、漏斗、仪表盘、水位球等单值类型） |
+| `source` / `target` / `total` | 桑基起点 / 终点、瀑布合计标记列 |
+
+**标注（`annotation`，与 `encoding` 平级）**是坐标系上的图层，不是新图表类型——目标线 / 阈值线 / 异常点 / 目标区间：
+
+```json title="带标注的 DSL 文档"
+{
+  "schemaVersion": 1,
+  "kind": "line",
+  "title": "月度销量与目标",
+  "data": { "columns": ["月份", "销量"], "rows": [["1月", 120], ["2月", 132], ["3月", 101]] },
+  "encoding": { "x": "月份", "y": "销量" },
+  "annotation": {
+    "lines": [
+      { "axis": "y", "value": 150, "text": "目标 150" },
+      { "axis": "y", "value": 100, "text": "告警阈值", "color": "#dc3545" },
+      { "axis": "x", "value": "2月", "text": "上线" }
+    ],
+    "points": [{ "x": "3月", "y": 101, "text": "异常点", "symbol": "diamond" }],
+    "areas": [{ "axis": "y", "from": 0, "to": 100, "text": "达标区" }]
+  }
+}
+```
+
+- `lines[].value` / `areas[].from`、`to` / `points[].x`、`y` 都是**数据值**（不是像素）：数值轴写数字、类目轴写类目名或下标、时间轴写时间戳或日期串。
+- 它挂在坐标系上，所以**跟着缩放 / 平移走**，不进图例、不占数据下标、不抢命中测试；越界的标注不画，原因由 `chart.annotationDiagnostics()` 给出。
+- 只对直角坐标的 kind 有意义（`line` / `area` / `bar` / `scatter`）；给饼图 / 雷达 / 桑基等会被警告 `annotation-non-cartesian`。
+
+## 校验与诊断码
+
+`validateChartDsl()` **不抛异常**（null / 数组 / 乱七八糟的对象都能吃），返回结构化诊断 `{ valid, errors, warnings }`，每条带 `severity` / `code` / `message` / `path`。Agent 自修复闭环就是：
+
+```
+诊断 → 模型按 path 改 DSL → 再 validateChartDsl → 通过 → compileChartDsl → createChart
+```
+
+编译期诊断会精确到条目（如 `annotation.lines[0].value`）；下面是 `src` 里能遇到的诊断码：
+
+| code | 级别 | 含义 |
+| --- | --- | --- |
+| `invalid-root` | error | 根节点不是对象 |
+| `unsupported-schema-version` | error | `schemaVersion` 与 `CHART_DSL_SCHEMA_VERSION` 不符 |
+| `missing-kind` / `unsupported-kind` | error | 缺 `kind` 或 `kind` 不在 `CHART_DSL_KINDS` |
+| `unknown-field` | warning | 根节点出现未知字段（会被忽略） |
+| `missing-data` / `invalid-data` | error | 缺 `data` 或两种写法都不匹配 |
+| `missing-columns` / `empty-data` | error | 列空 / 行空 |
+| `row-length-mismatch` | error | 某行值数与列数不一致（`data.rows[2]`） |
+| `missing-encoding` / `unknown-encoding` | error/warning | 缺 `encoding` 或含未知通道 |
+| `unknown-column` / `empty-column` | error | 列名不存在 / 整列空值（带可用列名） |
+| `non-numeric-column` / `partly-non-numeric` | error/warning | 不是数值列（带数字占比）/ 部分非数字 |
+| `missing-encoding-channel` | error | 必填通道缺失（带可用列名） |
+| `pie-negative-value` / `single-value-kind` | warning | 饼图负值 / 单值类型多行 |
+| `ohlc-needs-four-columns` | error | K 线 `y` 不是四列 |
+| `too-many-series` | warning | `y` 绑定超过 8 列 |
+| `sankey-non-positive` | warning | 桑基流量非正数 |
+| `radar-*` | warning | 雷达指标过少 / 缺组合数据 / 多 y |
+| `missing-expression` / `expression-*` | error | 函数类缺表达式，或经「采样诊断」抓到的语法/运行层错误（带字符位置） |
+| `annotation-non-cartesian` | warning | 非直角坐标系给了标注 |
+| `missing-annotation-value` / `invalid-annotation-*` | error | 标注缺值 / 结构不对（带 `annotation.lines[0].value` 这类路径） |
+| `annotation-value-type` / `annotation-unknown-category` / `annotation-empty-area` | warning | 数值轴写了非数字 / 类目不存在 / 区间宽度为 0 |
+
+> 公式类会**采样一遍再诊断**：静态检查抓语法错误，运行层抓「整段开不出来」「输出恒定」——这两类恰恰是「公式写错但没报错」最常见的表现。诊断格式化用 `formatDiagnostics(result)`。
+
+## API 参考
+
+所有导出均在 `src/index.ts`：
+
+| 导出 | 说明 |
+| --- | --- |
+| `validateChartDsl(dsl)` | 结构 + 语义校验，返回 `{ valid, errors, warnings }`；**永不抛异常** |
+| `formatDiagnostics(result)` | 诊断 → 多行文本（`[错误] …（path）` / `[警告] …`） |
+| `compileChartDsl(dsl)` | DSL → `ChartOption`；有 error 时抛 `ChartDslCompileError`（`.diagnostics` 带原因） |
+| `chartDslToJsonString(dsl)` | 直接拿编译产物的 JSON 字符串（存盘 / 进日志 / 跨进程） |
+| `renderChartDsl(target, dsl, chartOptions?)` | 编译并渲染，返回 `{ chart, option, diagnostics }` |
+| `resolveDataset` / `columnIndex` / `numericRatio` | 数据集工具（自建通道映射时用得上） |
+| `ChartDslCompileError` | 编译失败错误类，`.diagnostics` 即校验结果 |
+| `CHART_DSL_SCHEMA_VERSION` / `CHART_DSL_KINDS` | 版本号（当前 `1`）与支持的 kind 清单 |
+| `CHART_DSL_COMPILED_KINDS` | 走 data/encoding 编译路径的 kind 清单 |
+
+典型用法：
+
+```ts
+import {
+  validateChartDsl,
+  formatDiagnostics,
+  compileChartDsl,
+  chartDslToJsonString,
+  renderChartDsl,
+  CHART_DSL_KINDS,
+} from '@damoqiongqiu/ice-chart-dsl';
+
+const result = validateChartDsl(dsl);              // Agent 产出即自检：缺列 / 未知 kind / encoding 错绑
+if (!result.valid) {
+  console.log(formatDiagnostics(result));          // 带位置的诊断文本
+} else {
+  const option = compileChartDsl(dsl);             // → ChartOption，交给 createChart
+  const json = chartDslToJsonString(dsl);          // 或要 JSON 字符串
+}
+```
+
+> `compileChartDsl` 在**有 error 时**才抛 `ChartDslCompileError`；只有 warning 仍可正常编译（warning 是「可能画得不好看」而非「画不出来」）。
+
+## 示例画廊
+
+下面这个例子**由打包好的运行时在文档页里直接画出**了仓库里的 `examples/chart-dsl.html`：左边写 DSL（一张表 + `encoding`），右边实时编译成 `ChartOption` 渲染，下方诊断面板把列错 / 公式错带位置报回（含「错误示例」预设，可直接看到列名纠错长什么样）：
+
+<LiveExample html="/ice-chart-dsl/chart-dsl.html" height={760} note="左边写 DSL（表 + encoding），右边编译成 ChartOption 实时渲染；诊断面板把列错 / 公式错带位置报回" />
+
+## 相关链接
+
+- GitHub：[ice-chart-dsl](https://github.com/ice-render/ice-chart-dsl)
+- npm：[@damoqiongqiu/ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl)
+- 图表库文档：[ice-chart](/docs/ice-chart)
+- 通用 DSL 与 AI Agent 接入：[DSL 与 AI Agent 接入](/docs/guide/dsl)
+- 引擎内核文档：[ICE Render 介绍](/docs/intro)

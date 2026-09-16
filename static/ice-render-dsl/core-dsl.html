@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>ice-render-dsl core example</title>
+  <style>
+    body {
+      margin: 0;
+      font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      height: 100vh;
+    }
+    textarea {
+      width: 100%;
+      height: calc(100vh - 60px);
+      box-sizing: border-box;
+      border: 0;
+      border-right: 1px solid #e2e8f0;
+      padding: 12px;
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      resize: none;
+    }
+    .preview {
+      padding: 12px;
+      overflow: auto;
+    }
+    button {
+      margin: 8px;
+      padding: 7px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+    canvas {
+      display: block;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #ffffff;
+    }
+  </style>
+  <body>
+    <main>
+      <div>
+        <button id="render">渲染</button>
+        <textarea id="dsl">
+{
+  "schemaVersion": 1,
+  "nodes": [
+    {
+      "id": "box1",
+      "type": "rect",
+      "left": 120,
+      "top": 120,
+      "width": 180,
+      "height": 80,
+      "style": { "fillStyle": "#dbeafe", "strokeStyle": "#2563eb" }
+    },
+    {
+      "id": "box2",
+      "type": "circle",
+      "left": 480,
+      "top": 100,
+      "width": 120,
+      "height": 120,
+      "style": { "fillStyle": "#fee2e2", "strokeStyle": "#dc2626" }
+    },
+    {
+      "id": "label",
+      "type": "text",
+      "left": 260,
+      "top": 300,
+      "text": "Hello ice-render DSL",
+      "style": { "fillStyle": "#0f172a", "fontSize": 22 }
+    }
+  ],
+  "edges": [
+    {
+      "source": "box1",
+      "target": "box2",
+      "routeType": "orthogonal",
+      "arrow": "end",
+      "label": "edge"
+    }
+  ]
+}
+        </textarea>
+      </div>
+      <div class="preview">
+        <canvas id="canvas" width="1200" height="800"></canvas>
+      </div>
+    </main>
+
+    <script src="../ice-render.js"></script>
+    <script src="../ice-render-dsl.js"></script>
+    <script>
+      const textarea = document.getElementById('dsl');
+      document.getElementById('render').addEventListener('click', () => {
+        const oldCanvas = document.getElementById('canvas');
+        const nextCanvas = oldCanvas.cloneNode(false);
+        oldCanvas.parentNode.replaceChild(nextCanvas, oldCanvas);
+        try {
+          window.__dslResult = ICEDSL.renderDsl('canvas', JSON.parse(textarea.value));
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+      window.__dslResult = ICEDSL.renderDsl('canvas', JSON.parse(textarea.value));
+    </script>
+  </body>
+</html>

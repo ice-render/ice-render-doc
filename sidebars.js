@@ -117,6 +117,18 @@ const sidebars = {
         { type: 'doc', id: 'entity-designer/index', label: `2.1 Entity Designer v${V.entityDesigner}` },
         { type: 'doc', id: 'ice-chart/index', label: `2.2 ice-chart v${V.iceChart}` },
         { type: 'doc', id: 'ice-web-components/index', label: `2.3 ice-web-components v${V.iceWebComponents}` },
+        { type: 'doc', id: 'ice-smart-water/index', label: `2.4 ice-smart-water v${V.iceSmartWater}` },
+        { type: 'doc', id: 'ice-game/index', label: `2.5 ice-game v${V.iceGame}` },
+        { type: 'doc', id: 'ice-agent-console/index', label: `2.6 ice-agent-console v${V.iceAgentConsole}` },
+        {
+          type: 'category',
+          label: '2.7 DSL 层',
+          items: [
+            { type: 'doc', id: 'ice-render-dsl/index', label: `2.7.1 ice-render-dsl v${V.iceRenderDsl}` },
+            { type: 'doc', id: 'ice-chart-dsl/index', label: `2.7.2 ice-chart-dsl v${V.iceChartDsl}` },
+            { type: 'doc', id: 'ice-entity-designer-dsl/index', label: `2.7.3 ice-entity-designer-dsl v${V.entityDesignerDsl}` },
+          ],
+        },
       ],
     },
   ],

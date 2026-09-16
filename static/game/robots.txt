@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# 本站尚未配置对外域名，因此未生成 sitemap.xml。
+# 配置 ICE_GAME_SITE_URL 后重新构建即可（见 README 的 SEO 一节）。

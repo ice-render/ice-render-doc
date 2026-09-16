@@ -1,0 +1,237 @@
+---
+sidebar_position: 1
+---
+
+import LiveExample from '@site/src/components/LiveExample';
+
+# ice-render-dsl · 引擎级 JSON DSL（当前 v0.1.6）
+
+:::info 🔌 DSL 层 · 引擎级 · 让 AI Agent 直接驱动 ice-render 内核（当前 v0.1.6）
+本页属于 ice-render 家族的**引擎级** DSL：Agent 产出一份结构化 JSON（`nodes` / `edges` / `options`，或直接声明 `schemaVersion`），引擎内核就把这份数据渲染成图元 + 连线 + 交互，**全程不调用任何命令式 API**（`ICE.ICERect` / `ICE.ICECircle` 这类都碰不到）。想看家族里更高层的封装，见左侧的图表库、ER 设计器等「应用层」分组。
+:::
+
+**ice-render-dsl 是 ice-render 家族里唯一「引擎级」的 JSON-first DSL（当前 `ice-render-dsl` v0.1.6）。** 一句话讲清它的定位：AI Agent 不需要知道引擎内部有多少种图元类、连线族怎么建、端口怎么算——它只管产出一份描述「有哪些节点、节点之间怎么连、整张图怎么渲染与编排」的 JSON，剩下的交给 ice-render 内核。命中测试、事件派发、序列化、撤销重做、脏矩形局部重绘这些内核能力，因为本就是引擎自己的，DSL 渲染出来的图天然全都带着。
+
+MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
+
+## 它解决什么问题
+
+AI Agent 接入图形引擎通常只有两条路：
+
+1. **手撸命令式代码**：Agent 生成一长串 `new ICE().init(...)`、`new ICERect({...})`、`new ICEPolyLine({...})`——它得先学完引擎的整棵类树、构造参数和事件模型，任何一次 API 改签名都会让生成结果直接报废。
+2. **产出结构化数据（本包的做法）**：Agent 只描述「要画什么」，引擎负责「怎么画」。JSON 是稳定契约——只要 `schemaVersion` 不变，引擎升级（哪怕图元类改名）也几乎不影响 Agent 的产出。
+
+> 核心差异就一句话：**Agent 产出的是数据，不是代码。** 数据可被 `validateDsl` 即时自检、可被 `compileDsl` 单测、可被版本号锁死，而命令式代码只能「跑一下试试」。
+
+家族里 ER 建模用 `ice-entity-designer-dsl`、通用图形用 `ice-render-dsl`、图表用 `ice-chart-dsl`，三者互不混用——本页只讲通用的「节点 + 连线」这一层。
+
+## 核心能力
+
+| 能力 | 说明 |
+| --- | --- |
+| 图元覆盖 | `rect` / `circle` / `ellipse` / `text` / `polyline` / `image` / `isogon` / `star` / `rose` / `group` 共 10 种节点类型，全部映射到引擎内核图元 |
+| 连线族 | `polyline` / `bezier` / `visio` 三种连线；支持 `sourcePort` / `targetPort`（T/R/B/L/C 五端）、`routeType`（straight / orthogonal）、箭头、标签 |
+| 命中共用 | DSL 渲染出的每一个图元都实现了引擎的 `containsLocalPoint`，所以「看得见」与「点得到」是同一份像素缓存——悬停、点击、框选零插件成本 |
+| 主题与 token | `theme` 字段支持命名主题（内置 `default` / `dark`）或部分主题对象；样式里可直接写 `'$primary'`、`'$chrome.slot.fill'`，换主题整图跟随 |
+| 序列化 | 纯 JSON 文档天然可落盘、可 diff、可版本化——同一份 DSL 既能直出画面，也能在服务端做结构化校验 |
+| 声明式编排 | `orchestration` 块用 JSON 声明「谁在什么时候以什么节奏入场」，运行时仍由引擎调度器执行（见[编排](#编排错峰入场--播放控制)） |
+
+## 快速开始
+
+### 安装
+
+```bash
+# DSL + 引擎（二者都要装；ice-render 是 peer 依赖，一个页面共用同一引擎实例）
+npm install ice-render-dsl ice-render
+```
+
+### 30 秒上手
+
+下面这份「两个节点 + 一条正交连线」就是一份真实可渲染的 DSL 文档（不是截图）：
+
+```json title="ice-render-dsl 文档（AI Agent 可直接产出）"
+{
+  "schemaVersion": 1,
+  "nodes": [
+    { "id": "box1", "type": "rect", "left": 120, "top": 120, "width": 160, "height": 80,
+      "text": "起点", "style": { "fillStyle": "$primary" } },
+    { "id": "box2", "type": "circle", "left": 480, "top": 100, "radius": 48,
+      "text": "终点" }
+  ],
+  "edges": [
+    { "source": "box1", "target": "box2", "routeType": "orthogonal",
+      "arrow": "end", "label": "流向" }
+  ]
+}
+```
+
+**在浏览器里（无构建，UMD 全局 `ICEDSL`）**——注意引擎要先于 DSL 引入：
+
+```html
+<canvas id="canvas" width="960" height="480"></canvas>
+<script src="./ice-render.js"></script>
+<script src="./ice-render-dsl.js"></script>
+<script>
+  const dsl = {
+    schemaVersion: 1,
+    nodes: [
+      { id: 'box1', type: 'rect', left: 120, top: 120, width: 160, height: 80, text: '起点' },
+      { id: 'box2', type: 'circle', left: 480, top: 100, radius: 48, text: '终点' },
+    ],
+    edges: [{ source: 'box1', target: 'box2', routeType: 'orthogonal', arrow: 'end' }],
+  };
+
+  const { ice } = ICEDSL.renderDsl('canvas', dsl); // 直出画面，不碰命令式 API
+</script>
+```
+
+**在打包工程 / Node 里（ES Module）**：
+
+```ts
+import { renderDsl } from 'ice-render-dsl';
+
+const result = renderDsl('canvas', dsl);   // 浏览器：挂载到 canvas
+// 或 Node 侧做编译期检查（无需 canvas）
+import { validateDsl, compileDsl, buildOrchestrationPlan } from 'ice-render-dsl';
+```
+
+> 包同时提供 ESM / CJS / UMD 三种产物与完整类型声明，Vite / webpack / Rollup 直接 import；Node 侧 `require('ice-render-dsl')` 也能拿到 CJS。安装即自动带 `ice-render`。
+
+## DSL 文档形状
+
+根节点只含这几个字段（`schemaVersion` 强烈建议带上，缺省也按当前版本处理）：
+
+| 字段 | 说明 |
+| --- | --- |
+| `schemaVersion` | DSL 版本号（当前 `1`，即常量 `DSL_SCHEMA_VERSION`） |
+| `nodes` | 节点数组，必需。每项含 `id`（唯一）、`type`（见下）、几何（`left`/`top`/`width`/`height`/`radius` 等）、`text`、`style`、`transform`、`animations` 等 |
+| `edges` | 连线数组（可省）。每项 `source` / `target` 必须引用已存在的节点 `id`，额外可选 `type` / `sourcePort` / `targetPort` / `routeType` / `arrow` / `label` |
+| `options` | 渲染选项：`renderMode`（`'dirty-rect'` / `'full'`）、`dpr`、`viewport`、`fitViewport`、`fitViewportPadding` |
+| `theme` | 命名主题（`'default'` / `'dark'`）或部分主题对象，样式里可用 `'$token'` 引用 |
+| `orchestration` | 声明式编排：见[编排](#编排错峰入场--播放控制) |
+
+节点类型（`type`）取值：
+
+| `type` | 对应内核图元 |
+| --- | --- |
+| `rect` / `circle` / `ellipse` | 矩形 / 圆 / 椭圆 |
+| `text` / `polyline` | 文本 / 折线（可含 `points`） |
+| `image` | 位图（`src`，支持 `clipType` / `sx,sy,sw,sh` 裁剪） |
+| `isogon` / `star` / `rose` | 正多边形 / 星形 / 玫瑰线 |
+| `group` | 容器节点，可嵌套 `children[]` |
+
+:::tip
+连线端口 `sourcePort` / `targetPort` 取 `T` / `R` / `B` / `L` / `C`（上 / 右 / 下 / 左 / 中心）；`routeType` 取 `straight` / `orthogonal`。两边都不写时默认从右端口连到左端口。
+:::
+
+## 校验与诊断码
+
+`validateDsl(dsl)` 返回结构化结果，Agent 可以据此**自我修复**，而不是靠肉眼看报错：
+
+```ts
+import { validateDsl } from 'ice-render-dsl';
+
+const result = validateDsl(dsl);
+// result.valid: boolean
+// result.errors: string[]                  —— 仅 error 行的纯文本（历史字段）
+// result.diagnostics: DslDiagnostic[]      —— 含 warning；每条带稳定 code + 精确 path
+console.log(result.valid, result.diagnostics);
+```
+
+`DslDiagnostic` 的形状：`{ severity: 'error' | 'warning', code: string, message: string, path: string }`。关键点：**Agent 应该匹配 `code`（稳定码），不要匹配 `message`（人话，会随版本变）**。
+
+`DSL_DIAGNOSTIC_CODES`（本包的结构检查，前缀 `ICE_DSL_*`）：
+
+| 类别 | 码 |
+| --- | --- |
+| 根 / 主题 | `ICE_DSL_ROOT_NOT_OBJECT` · `ICE_DSL_THEME_INVALID` · `ICE_DSL_THEME_NAME_UNKNOWN`（警告）· `ICE_DSL_THEME_TOKEN_UNKNOWN`（警告）· `ICE_DSL_SCHEMA_VERSION_UNSUPPORTED` |
+| `nodes` | `ICE_DSL_NODES_NOT_ARRAY` · `ICE_DSL_NODE_NOT_OBJECT` · `ICE_DSL_NODE_ID_INVALID` · `ICE_DSL_NODE_ID_DUPLICATED` · `ICE_DSL_NODE_TYPE_REQUIRED` · `ICE_DSL_NODE_TYPE_UNSUPPORTED` · `ICE_DSL_NODE_CHILDREN_NOT_ARRAY` |
+| `edges` | `ICE_DSL_EDGES_NOT_ARRAY` · `ICE_DSL_EDGE_NOT_OBJECT` · `ICE_DSL_EDGE_SOURCE_INVALID` · `ICE_DSL_EDGE_SOURCE_UNKNOWN` · `ICE_DSL_EDGE_TARGET_INVALID` · `ICE_DSL_EDGE_TARGET_UNKNOWN` · `ICE_DSL_EDGE_TYPE_UNSUPPORTED` · `ICE_DSL_EDGE_PORT_INVALID` |
+
+> 编排相关的结构检查走另一套前缀 `ICE_DSL_ORCHESTRATION_*`（见下节）；节点 `animations` / 轨道 `animation` 里**动画参数本身**的错误由引擎出码（前缀 `ICE_ANIM_*`），本包只把节点路径补进 `path`——两套前缀让 Agent 一眼区分「JSON 写错了」还是「动画参数不合法」。
+
+**Agent 自检闭环**：产出 DSL → `validateDsl` → 若 `diagnostics` 里有 `severity === 'error'`，按 `code` 定位问题（如 `NODE_ID_DUPLICATED` 说明有重复 id，`EDGE_TARGET_UNKNOWN` 说明连线指向了不存在的节点），修 JSON 后重跑，直到 `valid === true` 再 `renderDsl`。
+
+## 编译与渲染
+
+三个入口函数，职责互不重叠：
+
+```ts
+import { compileDsl, buildOrchestrationPlan, renderDsl } from 'ice-render-dsl';
+
+const scene = compileDsl(dsl);                  // 1. DSL → 引擎组件 props（纯数据，可单测）
+const plan = buildOrchestrationPlan(dsl);       // 2. 抽出编排计划（autoplay + groups → steps）
+const result = renderDsl('canvas', dsl);        // 3. = 校验 + 编译 + 建引擎 + 建图元 + 跑编排
+```
+
+- `compileDsl(dsl)` → `CompiledScene` `{ nodes, edges, options }`。它只做标准化（给没 id 的连线补 `edge-<src>-<tgt>`、展开 `children`），不创建任何引擎对象，所以可在 Node 侧无 canvas 跑单测。
+- `buildOrchestrationPlan(dsl)` → `OrchestrationPlan` `{ autoplay: string | null, groups: Record<string, OrchestrationStep[]> }`。`OrchestrationStep` 含 `kind`（`'add'` 单目标 / `'stagger'` 多目标错峰）、`targets`、`at`、`each`、`animation`——同样是纯数据，可单测。
+- `renderDsl(canvasOrId, dsl)` → `RenderDslResult` `{ ice, nodes, edges, orchestration }`。内部会先 `validateDsl`，不通过直接抛错（错误信息正是 `diagnostics` 里的 error 文本）；通过后建 `ICE` 实例、应用 `theme`、按类型建图元、连连线、`fitViewport`，最后把编排计划翻译成引擎 timeline。
+
+## 编排（错峰入场 / 播放控制）
+
+`orchestration` 块声明「什么时候播、按什么节奏播」，运行时仍由引擎的 `animationManager.timeline()` 调度——缓动、关键帧、量化、位图缓存复用、空闲停帧全部自动继承。不在文档里写 `orchestration` 时，行为与以前完全一致（节点 `animations` 创建即播）。
+
+```json title="声明式错峰入场"
+{
+  "schemaVersion": 1,
+  "nodes": [
+    { "id": "card1", "type": "rect", "left": 80, "top": 80, "width": 140, "height": 90 },
+    { "id": "card2", "type": "rect", "left": 320, "top": 80, "width": 140, "height": 90 },
+    { "id": "card3", "type": "rect", "left": 560, "top": 80, "width": 140, "height": 90 }
+  ],
+  "orchestration": {
+    "autoplay": "entrance",
+    "groups": {
+      "entrance": {
+        "tracks": [
+          { "targets": ["card1", "card2", "card3"], "at": 0, "each": 80,
+            "animation": { "opacity": { "from": 0, "to": 1, "duration": 300 } } },
+          { "targets": ["card1"], "at": "+=200",
+            "animation": { "left": { "from": 40, "to": 160, "duration": 500 } } }
+        ]
+      }
+    }
+  }
+}
+```
+
+`renderDsl` 返回的 `result.orchestration` 句柄，每个组一条独立 timeline，宿主可随时控制：
+
+| 方法 | 说明 |
+| --- | --- |
+| `orchestration.groups` | 已声明组的名字列表（声明顺序） |
+| `orchestration.play(group)` | 播放该组；同一组第二次调用 = 重播（走 `restart`，不依赖引擎补丁版本） |
+| `orchestration.pause(group?)` | 暂停（不传则用最近播放的组） |
+| `orchestration.resume(group?)` | 继续 |
+| `orchestration.stop(group?)` | 停止并回到起点 |
+| `orchestration.restart(group?)` | 重播该组 |
+| `orchestration.finished(group?)` | 该组播完的 Promise（引擎 `timeline.finished`），无此组返回 `null` |
+| `orchestration.active` | 最近一次播放的组名 |
+
+编排的结构诊断走 `ORCHESTRATION_CODES`（前缀 `ICE_DSL_ORCHESTRATION_*`）：`INVALID`（groups / tracks / targets / animation 形状错）、`TARGET_UNKNOWN`（targets 指了不存在的节点）、`TIME_INVALID`（`at` 只接受 ≥0 数字或 `'+=N'`，`each` 只接受 ≥0 数字）、`GROUP_UNKNOWN`（`autoplay` 指向不存在的组）。
+
+## Agent 发现
+
+这个包是**为 AI Agent 设计的**，所以 Agent 不必靠猜——它随包附带了多种「自我发现」入口：
+
+- **npm 包导出**：`validateDsl` / `compileDsl` / `buildOrchestrationPlan` / `renderDsl` 及常量 `DSL_SCHEMA_VERSION` / `DSL_DIAGNOSTIC_CODES` / `ORCHESTRATION_CODES`。
+- **`AGENTS.md`**：仓库根的 Agent 规则（必带 `schemaVersion`、节点 `id` 唯一、连线 `source`/`target` 必须存在）。
+- **`skills/ice-render-dsl/SKILL.md`**：技能文件，含输出契约 + 主题（Theming）用法 + 自检清单。
+- **`prompts/agent-prompt.md`**：短版系统提示词（输出契约 + 自检清单），可直接塞进 Agent 的 system prompt。
+- **可选 MCP 包装**：在独立包里，核心运行时本身不依赖 MCP。
+
+> 文档里的 JSON 例子由 `tests/skill-examples.test.ts` 自动校验：示例一旦不合法（字段写错、节点 id 悬空、编排 `targets` 指错），测试就会红——保证 Agent 照抄的是「能跑的文档」。
+
+下面两个例子**由文档静态托管的运行时在文档页里直接画出**（无需联网），左边改 JSON、右边实时渲染：
+
+<LiveExample html="/ice-render-dsl/core-dsl.html" height={560} note="左边改 JSON，右边实时渲染：纯数据驱动，不碰命令式 API" />
+
+<LiveExample html="/ice-render-dsl/orchestration.html" height={480} note="错峰入场编排：JSON 里声明谁在什么时候播，按钮走 play/pause/resume" />
+
+## 相关链接
+
+- GitHub：[ice-render-dsl](https://github.com/ice-render/ice-render-dsl)
+- npm：[ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl)
+- 引擎内核文档：[ICE Render 介绍](/docs/intro)
+- 通用 DSL 与 AI Agent 接入：[DSL 与 AI Agent 接入](/docs/guide/dsl)

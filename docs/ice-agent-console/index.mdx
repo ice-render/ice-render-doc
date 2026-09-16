@@ -1,0 +1,204 @@
+---
+sidebar_position: 1
+---
+
+import LiveExample from '@site/src/components/LiveExample';
+
+# ice-agent-console · AG-UI 事件流驱动的 ICE 画布控制台（当前 v0.1.0）
+
+:::info 🧩 应用层 · 把 AG-UI 协议接到 ICE 渲染家族（当前 v0.1.0）
+本页属于 ice-render 家族的**应用层**产品：它把 **AG-UI 协议**接到引擎内核之上，让一个 agent 的**事件流**直接驱动浏览器里的 **ICE 画布**（画出工艺图 / 图表 / 表单），而不是在消息流里插一张张卡片。绘图区填满了整个视口，对话面板浮在它的右边缘。它**没有**自己的 ICE DSL —— 演示用的是 `ice-chart-dsl`（图表）+ `ice-entity-designer`（工艺图，kind-first 图 DSL），表单用 `ice-web-components-dsl`。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
+:::
+
+**ice-agent-console 把 ICE 家族接到 AG-UI 协议上：agent 的事件流驱动 ICE 画布。** 开页不需要跟 AI 说任何话，绘图区上已经是一张某 10 万 m³/d 市政污水厂的污水处理 AAO 工艺图；对话是浮在它右边缘上的一块面板。切换界面 = 在绘图区里**换图层**，不是往消息流里插卡片。
+
+于是「推镜头、高亮某段工艺、用 JSON Patch 动态增删图元、缺参数时弹出表单等人填」都是 agent 说的话在画布上的自然结果，而不是事后给聊天框打的补丁 —— 因为绘图层只声明「事件流 → 图层」，命中测试、视口、声明式动画全部交给引擎内核。
+
+遵循 MIT License · 当前 `v0.1.0` · `private: true`（未发布到 npm）· GitHub：[ice-agent-console](https://github.com/ice-render/ice-agent-console)
+
+## 一个完整的实时例子（就是仓库自带的纯前端演示产物）
+
+下面这个例子**直接由文档静态托管的 ice-agent-console 运行时在文档页里画出**（无需联网、无需后端）：开页即画出 68 单元 / 81 管线的污水处理 AAO 工艺图，agent 可推镜头、高亮、用 JSON Patch 动态增删图元。它走的是演示模式（纯前端，`build:demo`），与连后端的版本画面完全一致，区别只在顶栏那一行「演示模式 · 纯前端」徽标。
+
+<LiveExample html="/agent-console/index.html" height={820} note="AG-UI 事件流驱动 ICE 画布：开页画出 68 单元 / 81 管线的污水处理 AAO 工艺图，agent 可推镜头、高亮、用 JSON Patch 动态增删图元" />
+
+> 这就是 ice-agent-console 的核心卖点：**绘图区是页面主体，agent 的事件流直接落到画布上，对话只是浮层。** 同一份事件序列既能被确定性剧本产出，也能被真模型产出。
+
+## 1. 它是什么
+
+**ice-agent-console 是一个 AG-UI → ICE 的桥接层**，落在家族的应用层。它回答的问题是：当一个 agent 按 AG-UI 协议吐出一串事件（文字、工具调用、状态快照、自定义指令、中断），浏览器端该怎么把它们变成一张可交互的画布。
+
+它的两个刻意的设计决定：
+
+- **绘图区即页面主体。** `#stage` 是 `position:fixed; inset:0` 的一整块画布；`#chat` 是浮在右边缘、可折叠的 DOM 面板。折叠后绘图区占满整个视口。对话不是主体，图才是。
+- **切界面 = 换图层，不是插卡片。** 工艺图 / 图表 / 表单是绘图区里的三种图层（`diagram` / `chart` / `form`），同一时刻只显示一层。所以「把刚才那张图放大」「指着第三章讲」都有「刚才那张图」可指，且**不重画**——同一份 DSL 再挂一次，按内容比对，只重新显示，一个符号都不重建（`stageInfo().builds.diagram` 必须恒为 `1`）。
+
+两条维度正交组合：
+
+| 维度 | 取值 | 说明 |
+| --- | --- | --- |
+| **模式**（谁产生事件） | 剧本（默认）/ 模型 | 两种模式产出**同一串 AG-UI 事件**，传输层、归约器、渲染层完全分辨不出来。换实现只动 `server/agents/llm.ts` 一行。 |
+| **传输**（事件怎么到页面） | 连后端 SSE（默认）/ 纯前端 | 两种 transport 共用同一个输入映射与 `RunTransport` 签名。演示站点走纯前端。 |
+
+## 2. 快速开始
+
+### 演示模式（纯前端，无需后端）
+
+把同一份剧本搬进浏览器，`build:demo` 的产物是自包含的静态目录（一个 `index.html` + 一个 JS），用相对路径，所以子路径部署直接可用：
+
+```bash
+cd ice-agent-console
+npm install
+npm run build:demo      # 产物默认走演示模式（纯前端）
+npm run serve           # 静态服务，默认 :8100（也可 npx http-server dist -p 8200 -c-1）
+```
+
+打开 [http://localhost:8100](http://localhost:8100) —— **后端没起也照样能用**。演示产物默认开页自动开演（`?autoplay=1`）；想安静地自己点加 `?autoplay=0`。`?demo=1/0` 与 `?autoplay=1/0` 是两个独立开关。
+
+### 自带模型（连后端 SSE）
+
+```bash
+npm run dev             # 同时起 AG-UI 后端(8099) + 前端 dev server(8100)
+```
+
+不配任何东西就走内置剧本。接真模型只需 `.env` 里填三行（`ICE_LLM_API_KEY` / `ICE_LLM_BASE_URL` / `ICE_LLM_MODEL`，接口兼容 OpenAI 的 `/chat/completions 即可），配完先跑 `npm run llm:check` 自检。
+
+> 前置：五个兄弟仓库要先 `npm run build`（运行时靠 webpack `resolve.alias` 指向同级目录，类型靠 tsconfig `paths`，测试靠 jest `moduleNameMapper`，`node_modules` 里不塞任何家族包）。
+
+其它脚本：`npm run build`（连后端默认产物）、`npm run test` / `npm run test:e2e`、`npm run verify` / `npm run verify:full`（types:check + jest + build + playwright）、`npm run deploy:pages`（构建演示产物 → 自检 → 推 gh-pages）。
+
+## 3. 演示的回路
+
+下面每一条都是这个工程存在的理由，全部可断言、可重放：
+
+1. **单向：事件流驱动画布（图表内联卡片）。** `TOOL_CALL_ARGS` 分片流式，对话里能看到图表 DSL 一个字一个字拼出来；拼完 → `validateChartDsl` → `compileChartDsl` → 切到 chart 图层。文字与画布在时间上交错到达。
+2. **单向：Agent 指着图讲（推镜头 / 高亮）。** `ice/point-at` 把某单元移到视野中央并高亮，带 `blink` 再多闪几下；`ice/zoom` 推近 / 拉远 / 复位 / 整图适配（`fit`）。这些是**瞬时演示动作**，走 `CUSTOM` 事件，不进 state、不建新图层。
+3. **双向：用户在图上的操作回到 agent。** 点数据点（`item:click`）/ 框选区间（`brush:end`）/ 点控件按钮（第二块画布），都作为**结构化 `context`** 塞进下一轮 run——agent 分得清「用户做的」与「用户说的」。
+4. **双向：`state` 让 agent 知道「现在画面上是什么」。** 客户端把当前图表定义回传 `RunAgentInput.state.chart`；「解释这张图」「换个画法」据此工作，模型不需你复述刚画了什么。
+5. **双向：人机回环（中断 → 填表 → resume）。** Agent 缺参数时走协议中断（`RUN_FINISHED` 带 `outcome.interrupt`），前端进 `waiting`、把 `collect_input` 的产物画成表单图层；填完提交 = 带 `resume` 开新 run。这是目前唯一一处「Agent 要用户做一件事」的能力。
+6. **双向：诊断回灌自修复。** 坏 DSL → 客户端 `validateChartDsl` 拦下 → 结构化诊断走 `context` 回灌 → agent 吐修正版 → 画出来。全程自动，用户不用再说话。剧本模式与模型模式共用同一条回路。
+7. **双向：改图 —— 动态增删图元。** 不走「重画一张新图」，而是 `STATE_DELTA` 里的标准 JSON Patch：拆初沉池（连带删管线、摘掉 focus 项）、加臭氧 / 活性炭 / 膜池三段深度处理，图层重建次数保持 `1`、视口不重置、`validateWater()` 仍零问题。
+
+## 4. 架构
+
+### 三层
+
+| 层 | 位置 | 职责 |
+| --- | --- | --- |
+| 协议层 | `server/`、`src/domain/agui/` | AG-UI 事件的编解码、归约 |
+| 翻译层 | `server/agents/dsl-to-events.ts`、`src/domain/ice/` | 「想画什么」 ↔ 事件序列 ↔ ICE 调用 |
+| 渲染层 | `src/view/` | 浮在画布上的对话面板（DOM）+ 绘图区与它的三种图层（canvas） |
+
+归约器 `src/domain/agui/reducer.ts` 是**纯函数**，返回 `{ state, effects }`：只描述「要做什么」，不碰 DOM。碰 canvas 的活在 `src/entries/boot.ts` 的 `applyEffects` 里，把 effect 打给 `StageView`——effect 形状没变，只是落点从「最后一张卡片」换成了「绘图区当前那一层」。所以归约器可以被穷举测试（连「边画边指」的事件顺序都能断言）。
+
+### 一个刻意的分界：DOM 管对话，canvas 管绘图区
+
+| | 谁画 | 为什么 |
+| --- | --- | --- |
+| `#chat`（消息、输入框、工具条目、滚动） | **真 DOM** | 需要选中复制、输入法、原生滚动惯性、屏幕阅读器 |
+| `#stage`（工艺图 / 图表 / 表单） | **canvas（ICE）** | 需要视口、命中测试、声明式动画、主题 |
+
+这不是纯 canvas 应用，是**有意为之**。浮层面板必须 `stopPropagation` 挡住引擎装在 `window` 上的全局事件拦截器，否则在面板上滚一下画布也会当成滚轮缩放。
+
+### 按 tool 名切图层，三种形态互斥
+
+| 工具名 | 图层 | 画布 | 生命周期 |
+| --- | --- | --- | --- |
+| `render_diagram` | `diagram` | 一块（`ice-entity-designer`，kind-first 图 DSL，目前 `water-process`） | boot 时建，**永不销毁** |
+| `render_chart` | `chart` | 两块：图表（`ice-chart`）+ 控件条（`ice-web-components`） | 按需建，被顶掉即销毁 |
+| `collect_input` | `form` | 一块（`ice-web-components-dsl`） | 按需建，被顶掉即销毁 |
+
+**一次只有一层在显示**（图层并排，不叠加）。加一种图层只是加一个工具名，归约器与协议层一行不用动；复用判据也刻意不一样：diagram 按内容比对只 `show`、chart 复用宿主走 `setOption` 换数据、form 每次重建。
+
+### 两种 transport 共用同一输入映射
+
+连后端（`fetch` + SSE）与纯前端（`local-agent.ts` 把 `ScriptedAgent` 喂成同一条事件流）共用 `src/domain/agui/run-input.ts` 的输入映射与 `RunTransport` 签名，**别各拼一份输入**（`resume` 空数组不带那个条件很容易漏）。演示模式运行的是**同一份** `server/agents/scripted.ts`，没有第二份 mock 要维护。
+
+## 5. 协议 → ICE 映射表
+
+这张表是这个工程的全部价值，剩下的都是管道：
+
+| AG-UI 事件 | ICE 侧动作 | 备注 |
+| --- | --- | --- |
+| `RUN_STARTED` / `RUN_FINISHED` / `RUN_ERROR` | 状态机 | 驱动对话与绘图区状态 |
+| `TEXT_MESSAGE_*` | 纯 DOM 气泡 | 这层不需要 ICE |
+| `TOOL_CALL_START/ARGS/END` | 对话条目：参数流式拼装 → 解析成 DSL → **切到对应图层** | `ARGS` 分片可见 |
+| `TOOL_CALL_RESULT` | 条目进入终态 | |
+| `STATE_SNAPSHOT` | `compileChartDsl` → `setOption`（**同一实例**） | 快照是替换语义 |
+| `STATE_DELTA` | JSON Patch：纯追加走 `appendData`，增删图元走增量 `createSymbol`/`remove`，否则全量 `setOption` | 见 §6 |
+| `CUSTOM: ice/point-at` | `showHoverAtValue(x)` | 指着讲（`blink` 同事件带） |
+| `CUSTOM: ice/zoom` | 视口推近 / 拉远 / 复位 / 整图适配 | 瞬时演示动作 |
+| 上行 `item:click` / `brush:end` | → 新 run，`context` 带结构化交互 | 见 §3.3 |
+| 上行 控件按钮 `click` | → 新 run，`context` 带 `widget-action` | 来自第二块画布 |
+| 下行 读 `RunAgentInput.state` | agent 据此知道当前图表是什么 | 见 §3.4 |
+| `RUN_FINISHED` + `outcome.interrupt` | 状态进 `waiting`；绘图区切成**表单图层** | 见 §3.5 |
+| 上行 `RunAgentInput.resume` | 用户提交表单 → 带答案开新 run | 协议原生通道 |
+
+事件顺序固定**先画后讲**：`TOOL_CALL_* → STATE_SNAPSHOT → 解说（可插 CUSTOM 指点 / STATE_DELTA 追加）→ RUN_FINISHED`。`CUSTOM` 指点的对象是绘图区当前那一层，那一层得先在——第一版把解说排在 tool call 前，结果指点事件到达时图上什么都没有，前端只能缓冲、「指着讲」与文字不再同步。
+
+## 6. ICE 侧约束
+
+画布侧有几条硬约束，违反时症状往往不报错、只在某次更新后才浮现：
+
+- **图表实例只建一次，不要 `renderChartDsl`。** 它内部每次 `createChart`，流式更新会泄漏实例并丢掉交互监听（症状：「更新几次之后点了没反应」）。本工程拆成 `validateChartDsl → compileChartDsl → createChart / setOption`。
+- **`appendData` 只能用在数值 / 时间轴。** 它只 `concat` 到 `series.data`，不补 `xAxis.data`；类目轴追加新类目会错位。判不了就走全量 `setOption`（判断逻辑在 `option-mapping.ts`）。「实时吞吐量」剧本因此用数值轴（秒）而不是类目轴（月份）。
+- **自定义事件用于瞬时高亮，不进 state。** 推镜头 / 高亮是「当时放大到 1.4 倍」没有恢复意义的瞬时动作，走 `CUSTOM` 而非 state；`fit` 整图适配必须由内容包围盒算，不能用手算常数倍率（否则图纸被推出屏幕边界、零报错）。
+- **改图走 `STATE_DELTA` + JSON Patch，不自造「图元增删事件」。** 补丁按形状分流：只往 rows 追加 → `appendData`；只增删 `/diagram/units` `/diagram/pipes` → 增量，图层不重建、视口不重置；其它 → 全量重建。两个实测坑：①渲染层会级联删连线，但 JSON Patch 只管 `units` 数组——删单元要连带列它的管线、摘掉 `viewport.focus` 里的它；②`STATE_DELTA` 顺序应用，下标会变，`remove` 一个存在的下标不报错——要用 `IndexCursor` 维护 id 镜像、降序删。
+
+## 7. 显式非目标
+
+范围边界，写下来免得被当成遗漏：
+
+1. **模型模式不做多轮工具循环。** 固定两圈（选工具 → 给结论）。
+2. **不做 mark 拖动改历史。** `addMark` + `mark:drag` 属于就地改历史，与 Thread「消息发出即定」语义冲突。
+3. **不做「点旧工具条目把那个视图调回绘图区」。** 条目已标 `data-active`，但点它没反应。
+4. **不做对话面板宽度拖拽，也不做多面板。**
+5. **不做 thread 持久化。** 刷新即清空，绘图区回到开页那张工艺图。
+6. **不做 reasoning / subagent / activity 事件。** 归约器对未知事件丢弃，不崩溃只是不显示。
+7. **不做多中断并发。** 协议允许一次带多个 `interrupts`，本工程一次只处理一个（取第一个）。
+
+## 8. 目录与约定 / 校验
+
+```
+ice-agent-console/
+├── server/        AG-UI endpoint（原生 node:http，运行时只依赖 @ag-ui/core）
+│   ├── index.ts        路由、SSE、错误处理、取消、选 agent
+│   ├── config.ts       .env + 环境变量 → 两种模式判定（含 token 脱敏）
+│   └── agents/         types / dsl-to-events / scripted / scenarios / llm / llm-client / tools
+├── src/
+│   ├── domain/         纯逻辑，无 DOM
+│   │   ├── agui/       事件→状态归约 / JSON Patch / 两条 transport（run-input / transport / autoplay / client / local-agent）
+│   │   ├── ice/        协议→ICE 纯翻译 + Layer/LayerSet
+│   │   ├── diagram/    图 DSL：白名单 / 校验 / 编译（纯逻辑，node 可测）
+│   │   └── theme.ts    主题：一份 token 分发给画布与 DOM
+│   ├── view/           绘图区（canvas）+ 对话面板（DOM）
+│   └── entries/boot.ts 接线：开页画图、分发动作、执行 effects、触发 run
+├── shared/        contract.ts（事件名 / context 键 / ZoomDirection 唯一出处）/ diagram.ts（类型）/ water-process-case.ts（内置工艺图）
+├── public/        index.html（骨架 + TDK + 文字替身）+ robots.txt + sitemap.xml + og-cover.jpg
+└── scripts/       dev.mjs / llm-check.ts / shoot-docs.cjs / deploy-pages.mjs
+```
+
+工程约定（与家族一致）：家族包三处解析都不用 `file:`（webpack `alias` / tsconfig `paths` / jest `moduleNameMapper`）；双 tsconfig（web 加载 DOM、server 故意不加载，让 `document`/`window` 在后端编译失败）；端口 **8099**（后端）/ **8100**（页面）；`reuseExistingServer` 一律 `false`（端口被占响亮失败，不静默复用）。
+
+**校验**：`validateWater()`（引擎工艺校验）对内置案例**零问题**——位号唯一、无孤立单元、管线都有介质与管径、出水路径有在线监测、剩余污泥有出路、AAO 有内回流。工艺图 68 单元 / 81 管线、用满 31/31 种给排水符号、9/9 种介质。`build:demo` 是**自包含静态产物**，用相对路径，子路径部署直接可用；派发站点时 `deploy-pages.mjs` 会自检「产物是否真走演示模式」（判据是 `resolveRunMode` 默认参数编译成 `!0` 还是 `!1`，而非 `__ICE_DEMO__` 残留——后者两种构建都成立、等于没检）。
+
+## 9. canvas 的 SEO
+
+整页主体是 canvas，那张工艺图的 68 单元 / 81 管线 / 位号 / 工艺段名称**一个都不在 DOM 里**——爬虫把页面跑完也只能读到 `<canvas>` 空壳。所以 SEO 分三层做，缺任何一层都等于没做：
+
+| 层 | 落点 | 解决什么 |
+| --- | --- | --- |
+| TDK + OG + JSON-LD | `public/index.html` 的 `head` | 搜索结果长啥样、分享卡片封面、引擎「认出这是个什么软件」 |
+| **文字替身** `#site-summary`（`.sr-only`） | `public/index.html` 末尾 | 爬虫**有没有正文可读**——画布内容的等价语义化描述 |
+| `robots.txt` / `sitemap.xml` / `og-cover.jpg` | `public/` → 站点根目录 | 爬虫进不进得来、图片站点地图、卡片封面是不是真文件 |
+
+文字替身约 1400 字符、与右面板可见文案不重复，视觉上用无障碍通行的 visually-hidden 手法（1px + `clip-path`）藏，**不用 `display:none` / `visibility:hidden`**（那两种连无障碍树与一部分爬虫一起跳过，等于白写），也**不写成关键词堆砌**。文案里报的「68 单元 / 81 段管线」由单测从 `shared/water-process-case.ts` 对着真实数量判，改图忘了改文案会红。`<noscript>` 里那段说明是不执行 JS 的爬虫看到的唯一「这不是坏页面」。明确不做 SSR / 预渲染——canvas 页面的正确解法是「给内容配文字替身」，不是「把画布变成 HTML」。
+
+## 相关链接
+
+- GitHub：[ice-agent-console](https://github.com/ice-render/ice-agent-console)（private，未发 npm）
+- 引擎内核：[ICE Render 介绍](/docs/intro)
+- 图表 DSL：[ice-chart-dsl](/docs/ice-chart-dsl)
+- 设计器 DSL：[ice-entity-designer-dsl](/docs/ice-entity-designer-dsl)
+- 图表：[ice-chart](/docs/ice-chart)
+- 设计器：[Entity Designer](/docs/entity-designer)

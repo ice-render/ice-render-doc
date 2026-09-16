@@ -1,0 +1,278 @@
+---
+sidebar_position: 1
+---
+
+import LiveExample from '@site/src/components/LiveExample';
+
+# ice-entity-designer-dsl · 领域建模 JSON DSL（当前 v0.0.28）
+
+:::info 🔌 DSL 层 · 应用级 · 7 种 kind 的 JSON 文档驱动设计器（当前 v0.0.28）
+一份 JSON 文档同时驱动**渲染、校验与导出**三种能力；七种 `kind`（ER / flowchart / BPMN / UML / statechart / gantt / power）共用同一套**图层自动布局**（`layeredLayout`），并通过 `toDsl()` 实现**往返写回**——用户改过的画布能原样导出成同一份 DSL，再渲染回去。
+:::
+
+这是 `ice-entity-designer` 之上的一层 **JSON-first DSL**：AI Agent 不需要学习命令式的画布 API（`new EntityDesigner(...)`、`createEntity`、`createRelation`……），只要产出结构化 JSON，同一份文档既能直出设计器实例，也能在服务端做校验与序列化。它和 ice-render 通用 DSL（`ice-render-dsl`）是同一套「数据 → 引擎」哲学，但**词汇表不互通**——领域建模用本包，通用图形用 `ice-render-dsl`。
+
+MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
+
+## 1. 它是什么
+
+`ice-entity-designer-dsl` 以**一份 JSON 文档**覆盖 7 种图 kind。整张文档是「节点 + 连线」（ER 文档用 `entities` / `relations` 的同源写法）的平坦描述，**坐标大多可省略**——缺省时由共享的分层自动布局推出来：
+
+- **ER**（`entities` / `relations`）：实体-关系模型与数据库 Schema。
+- **flowchart**：流程图、决策树、算法，可选坐标（分层自动布局）。
+- **BPMN**：业务流，含池 / 泳道（真容器）、事件 / 网关 / 任务角标 / 数据对象 / 注释，可导出 BPMN 2.0 XML。
+- **UML**：类图（类 / 接口 / 枚举 + 自由文本成员），含六种关系，可互操作 PlantUML / Mermaid。
+- **statechart**：状态机（伪状态 / 状态 / 复合状态容器 + 转移标签 `事件[守卫]/动作`）。
+- **gantt**：排期（任务含 `start` / `days` / `progress`，连线是完成→开始依赖），**完全无坐标**，横轴时间、纵轴声明顺序。
+- **power**：电力一次系统图（设备符号与 `ice-entity-designer` 的电力包对齐，`attachedTo` 表达母线 T 接、`voltageLevel` 驱动色标）。
+
+## 2. 安装与 UMD 加载顺序
+
+```bash
+# DSL 运行时会顺带安装 ice-entity-designer（它经由设计器渲染）
+npm install ice-entity-designer-dsl ice-entity-designer ice-render
+```
+
+引擎（`ice-render`）是两者的 **peer 依赖**，在 UMD 产物里保持**外部引用**（`globals: { 'ice-render': 'ICE' }` / `{ 'ice-entity-designer': 'IED' }`）。所以一个纯 `<script>` 页面必须按下面顺序加载三个 UMD：
+
+```html
+<canvas id="canvas" width="1200" height="800"></canvas>
+
+<script src="node_modules/ice-render/dist/index.umd.js"></script>
+<script src="node_modules/react/umd/react.production.min.js"></script>
+<script src="node_modules/react-dom/umd/react-dom.production.min.js"></script>
+<script src="node_modules/dayjs/dayjs.min.js"></script>
+<script src="node_modules/antd/dist/antd.min.js"></script>
+<script src="node_modules/ice-entity-designer/dist/index.umd.js"></script>
+<script src="node_modules/ice-entity-designer-dsl/dist/index.umd.js"></script>
+<script>
+  const dsl = {
+    schemaVersion: 1,
+    layout: 'layered',
+    entities: [
+      { id: 'customer', name: 'Customer', fields: [{ name: 'id', type: 'number', primary: true }] },
+      { id: 'order', name: 'Order', fields: [{ name: 'id', type: 'number', primary: true }] },
+    ],
+    relations: [{ source: 'customer', target: 'order', type: 'one-to-many' }],
+  };
+  const { ice, designer } = ICEDSL.renderDsl('canvas', dsl); // 全局命名空间 ICEDSL
+</script>
+```
+
+> 加载顺序铁律：**ice-render → react / react-dom / dayjs / antd → ice-entity-designer → ice-entity-designer-dsl**。设计器依赖 React 生态与引擎全局 `ICE`，DSL 又依赖设计器全局 `IED`；顺序错则运行时报依赖缺失。
+
+Node / ESM 工程里直接 `import` 即可，无需关心 UMD 顺序：
+
+```ts
+import {
+  validateDsl, compileDsl, compileFlowDsl, renderDsl,
+} from 'ice-entity-designer-dsl';
+```
+
+## 3. 七种 kind 速览
+
+| `kind` | 用途 | 典型场景 |
+| --- | --- | --- |
+| _（缺省，ER）_ | 实体-关系模型 | 数据库 Schema 设计、ORM 落地 |
+| `flowchart` | 流程 / 判定 | 算法步骤、审批流、决策树 |
+| `bpmn` | 业务流程建模 | 跨部门协作流程、可互操作 BPMN 2.0 |
+| `uml` | UML 类图 | 类关系梳理、接口契约 |
+| `statechart` | 有限状态机 | 订单状态、协议状态流转 |
+| `gantt` | 项目排期 | 研发计划、关键路径分析 |
+| `power` | 电力一次系统图 | 变电站主接线、电压色标与五防 |
+
+> 各 kind 的词汇表**不互通**：ER 用 `entities` / `relations`，其余六种统一用 `nodes` / `edges`。Agent 每次只选一种 `kind`，不要混写字段。
+
+## 4. DSL 文档形状（以 ER 为例）
+
+根节点只含这五个字段（ER 文档例外：无 `kind`，用 `entities` / `relations`）：
+
+| 字段 | 说明 |
+| --- | --- |
+| `schemaVersion` | DSL 版本号（当前 `1`，对外常量 `DSL_SCHEMA_VERSION`） |
+| `entities` | 实体数组，每项含 `id` / `name` / `fields[]`；字段含 `type` 与约束（`primary` / `foreignKey` / `unique` / `nullable` / `autoIncrement` / `default` / `length` / `comment` / `index`） |
+| `relations` | 关系数组，`type` 取 one-to-many / many-to-one / one-to-one / many-to-many；many-to-many 必须带 `joinTableName` |
+| `layout` | 自动布局：`grid` / `layered` / `horizontal` / `vertical`；不填则用 `options.gapX/gapY` |
+| `options` | `fitViewport`、`fitViewportPadding`、`routeType`、`gapX`、`gapY` 等 |
+
+下面这份「电商模型」是一份真实可渲染、可序列化的 DSL 文档（不是截图）：
+
+```json title="ice-entity-designer-dsl 文档（AI Agent 可直接产出）"
+{
+  "schemaVersion": 1,
+  "layout": "layered",
+  "entities": [
+    {
+      "id": "customer",
+      "name": "Customer",
+      "fields": [
+        { "name": "id", "type": "number", "primary": true, "autoIncrement": true },
+        { "name": "email", "type": "string", "unique": true, "nullable": false },
+        { "name": "name", "type": "string", "nullable": false }
+      ]
+    },
+    {
+      "id": "order",
+      "name": "Order",
+      "fields": [
+        { "name": "id", "type": "number", "primary": true, "autoIncrement": true },
+        { "name": "customerId", "type": "number", "foreignKey": true, "nullable": false },
+        { "name": "status", "type": "string", "default": "pending" },
+        { "name": "total", "type": "decimal", "length": "12,2" }
+      ]
+    },
+    {
+      "id": "product",
+      "name": "Product",
+      "fields": [
+        { "name": "id", "type": "number", "primary": true, "autoIncrement": true },
+        { "name": "sku", "type": "string", "unique": true, "nullable": false },
+        { "name": "price", "type": "decimal", "length": "10,2" }
+      ]
+    }
+  ],
+  "relations": [
+    { "source": "customer", "target": "order", "type": "one-to-many",
+      "sourceField": "id", "targetField": "customerId",
+      "sourceCardinality": "1", "targetCardinality": "0..N",
+      "label": "places", "onDelete": "CASCADE" }
+  ],
+  "options": { "fitViewport": true, "fitViewportPadding": 48, "routeType": "orthogonal", "gapX": 120, "gapY": 60 }
+}
+```
+
+## 5. 校验与 `IED_DSL_*` 诊断码
+
+`validateDsl(dsl)` 按 `kind` 分发到对应校验器，并返回 `{ valid, errors, diagnostics }`：
+
+- `errors: string[]`——给人读的英文句子（保留原样，兼容既有调用方）。
+- `diagnostics: { severity, code, message, path }[]`——给机器读的，**`code` 才是合同**。
+
+> 契约见 ice-render `docs/architecture/17-i18n-boundary.md`：库不翻译文案，但必须给稳定 id。Agent / 工具**请按 `code` 分支、按 `path` 定位**（`path` 形如 `nodes[3].source`），**不要匹配 `message` 里的自然语言**。
+
+单 kind 校验器：`validateFlowDsl` / `validateBpmnDsl` / `validateUmlDsl` / `validateStatechartDsl` / `validateGanttDsl` / `validatePowerDsl`。
+
+完整 `IED_DSL_*` 诊断码（定义见 `src/types.ts` 的 `IED_DSL_CODES`）：
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `IED_DSL_ROOT_NOT_OBJECT` | 根节点不是对象 |
+| `IED_DSL_SCHEMA_VERSION_UNSUPPORTED` | `schemaVersion` 不受支持 |
+| `IED_DSL_NOT_OBJECT` | 节点 / 连线本身不是对象 |
+| `IED_DSL_ID_INVALID` | `id` 缺失或不是非空字符串 |
+| `IED_DSL_ID_DUPLICATED` | `id` 重复 |
+| `IED_DSL_NODES_NOT_ARRAY` | `nodes` 不是数组 |
+| `IED_DSL_EDGES_NOT_ARRAY` | `edges` 不是数组 |
+| `IED_DSL_ENTITIES_NOT_ARRAY` | `entities` 不是数组 |
+| `IED_DSL_RELATIONS_NOT_ARRAY` | `relations` 不是数组 |
+| `IED_DSL_FIELDS_NOT_ARRAY` | `fields` 不是数组 |
+| `IED_DSL_KIND_INVALID` | `kind` / `type` 不在允许集合里 |
+| `IED_DSL_FIELD_TYPE` | 字段类型不对（应为字符串 / 数字 / 字符串数组） |
+| `IED_DSL_FIELD_ENUM` | 字段取值不在枚举集合里 |
+| `IED_DSL_FIELD_FORMAT` | 字段格式不对（日期、电压等级等） |
+| `IED_DSL_FIELD_RANGE` | 字段取值越界（行号 / 天数 / 进度） |
+| `IED_DSL_FIELD_NAME_INVALID` | 字段名（如 `fields[i].name`）非法 |
+| `IED_DSL_EDGE_ENDPOINT_INVALID` | 连线端点不是非空字符串 |
+| `IED_DSL_EDGE_ENDPOINT_UNKNOWN` | 连线端点指向不存在的节点 |
+| `IED_DSL_EDGE_SELF_LOOP` | 连线自环 |
+| `IED_DSL_PARENT_INVALID` | `parent` 不是非空字符串 |
+| `IED_DSL_PARENT_UNKNOWN` | `parent` 指向不存在的节点 |
+| `IED_DSL_PARENT_SELF` | `parent` 指向自己 |
+| `IED_DSL_PARENT_KIND` | `parent` 指向不允许的节点类型（池 / 泳道 / 复合状态…） |
+| `IED_DSL_PARENT_NOT_ALLOWED` | 该节点不允许有 `parent`（如池） |
+| `IED_DSL_ATTACHED_TO_UNKNOWN` | `attachedTo` 指向不存在的节点 |
+| `IED_DSL_ATTACHED_TO_NOT_BUSBAR` | `attachedTo` 指向的不是母线 |
+
+```js
+import { validateDsl } from 'ice-entity-designer-dsl';
+
+const { valid, diagnostics } = validateDsl(dsl);
+if (!valid) {
+  for (const d of diagnostics) {
+    // 按 code 分支纠错、按 path 定位
+    console.log(d.code, d.path, d.message);
+  }
+}
+```
+
+## 6. 编译与渲染
+
+编译层把 DSL 翻成组件 props，每种 kind 一个 `compile*Dsl`；它们共享同一套 `layeredLayout`（参数 `direction: "vertical" | "horizontal"`），只在「层如何分层、容器内如何落位」上有各自的小规则：
+
+| 编译函数 | 产出 | 布局特点 |
+| --- | --- | --- |
+| `compileDsl` | ER：`Entity` / `Relation` props | `layout` 驱动 |
+| `compileFlowDsl` | `FlowNode` / `FlowEdge` props | 分层自动布局（层 0 = 无入边节点） |
+| `compileBpmnDsl` | `FlowNode` / `FlowEdge` props | 容器自动算几何 + 容器内自动落位 |
+| `compileUmlDsl` | `UmlClass` / `UmlRelation` props | 继承关系驱动的上下分层 |
+| `compileStatechartDsl` | `StateNode` / `StateTransition` props | 流向自左而右 + 复合状态自动算尺寸 |
+| `compileGanttDsl` | `GanttTask` / `GanttDependency` props | **无坐标**，行号自动填 |
+| `compilePowerDsl` | `PowerSymbol` / `PowerLine` props | 母线 T 接解析 + 电压色标应用 |
+
+渲染层 `renderDsl(canvasOrId, dsl)` 返回 `{ kind, ice, designer }`，`kind` 字段让你判别拿到的是哪个设计器实例。各 kind 也有对应的 `render*Dsl`（如 `renderFlowDsl` / `renderBpmnDsl` / `renderUmlDsl` / `renderStatechartDsl` / `renderGanttDsl` / `renderPowerDsl`），两者都支持浏览器（UMD 全局 `ICEDSL`）与 Node（ESM import）。
+
+```js
+import { renderDsl } from 'ice-entity-designer-dsl';
+
+const result = renderDsl('canvas', flowchart);
+// result.kind === 'flowchart'，result.designer 是 FlowDesigner（createNode / createEdge / undo …）
+```
+
+设计器实例上还有**语义校验**方法，按 kind 各自存在：`validatePower()` / `validateBpmn()` / `validateGantt()` / `validateUml()` / `validateStatechart()`（ER 与流程图沿用 `ice-entity-designer` 既有的 `validate()`）。
+
+## 7. `toDsl` 往返
+
+`renderDsl()` 返回的 `result` 自带 `toDsl()`，把**用户改过的实例**写回成同一份 DSL 文档。单独使用时也可调用 `toDsl(resultOrDesigner, { kind? })`（不传 `kind` 时按图元自动判别）：
+
+```js
+const result = ICEDSL.renderDsl('canvas', doc);
+
+// 用户在画布上拖动 / 改名 / 分合 / 增删……
+result.designer.updateNode('check', { title: '库存够吗？', left: 500, top: 480 });
+
+const edited = result.toDsl();        // 同一份 DSL：位置与语义改动都在
+ICEDSL.validateDsl(edited).valid;     // true —— 导出结果永远能过校验
+ICEDSL.renderDsl('canvas', edited);   // 也能直接再渲染一遍
+```
+
+往返契约（7 种 `kind` 都有测试兜底）：
+
+- **id 保真**：Agent 产出的 `id` 原样带回（导出顺序 = 实例顺序，BPMN 会把池 / 泳道排在业务图元之前）；文档里没写 `id` 的连线会拿到 `edge-0` 这类稳定 id，而非每次随机 UUID。
+- **坐标是绝对坐标**：嵌套容器（BPMN 池 / 泳道、状态机复合状态）的相对坐标已沿父链还原。
+- **只导出 DSL 词汇表里的字段**：引擎内部字段（zIndex、变换矩阵等）不外泄。
+- **必过校验、必须可序列化**：结果无 `undefined`，`JSON.parse(JSON.stringify(doc))` 无损往返。
+- **再渲染等价**：导出文档再渲染一遍，节点 id 与位置与上遍一致。
+- **推断不出来就报错**：实例里没有任何可识别图元时，`toDsl()` 抛错并提示显式传 `kind`，不会悄悄当成 ER 文档。
+
+## 8. 导出
+
+渲染结果的 `designer` 提供矢量导出，SVG 由组件树 + 路径命令重新生成，与画布同一口径（几何、样式、不透明度、阴影、连线标签），可被任意外部工具栅格化成 PNG / PDF：
+
+- **SVG**：`result.designer.toSvg(options)`（flowchart / BPMN 等）或 `IED.exportSvg(result.ice, options)`。`options = { area: 'content' | 'viewport', padding, scale, background, includeTools }`。
+- **BPMN 2.0 XML**：`IED.toBpmnXml(result.designer)`——含 BPMNDI（互操作格式，非执行模型），用 `result.designer.validateBpmn()` 做语义检查后再导出。
+- **PlantUML**：`IED.toPlantUml(result.designer)`（UML 类图 / 状态图文本互操作），并支持 `IED.fromPlantUml(text, designer)` 反向导入。
+
+甘特图还可 `result.designer.autoSchedule()`（按依赖把排期推到最早可行）与 `result.designer.criticalPath()`（标准 CPM 算关键路径），再 `toSvg()` 导出含日期刻度与进度的矢量图。
+
+## 9. Agent 发现
+
+本包为 AI Agent 提供四路接入，核心运行时**不依赖 MCP**：
+
+1. **npm 包导出**——`validateDsl` / `compile*Dsl` / `renderDsl` / `toDsl` 等（见上文）。
+2. **`AGENTS.md`**——本仓库根目录的 Agent 指南：铁律「`main` 只做集成与发布、开发在临时分支或 `dev`」、必须含 `schemaVersion: 1`、每次只选一种 `kind`、实体 `id` 唯一、关系端点引用已存在的实体、`layered` 用于依赖型图、`grid` 用于简单表格。
+3. **`skills/ice-entity-designer-dsl/SKILL.md`**——可被 Agent 运行时加载的技能说明。
+4. **可选 MCP 包装**——独立包提供，按需接入。
+
+> 最稳的接入形态：让 Agent 产出 JSON DSL → 用 `validateDsl` 自检（按 `code` / `path` 纠错）→ `renderDsl` 直出设计器 → 用户编辑后 `toDsl()` 写回。全程数据驱动，引擎负责渲染与序列化。
+
+## 一个完整的实时例子（就是仓库里的 `examples/entity-editor-dsl.html`）
+
+<LiveExample html="/ied/entity-editor-dsl.html" height={780} note="左边写 ER 的 JSON，右边实时渲染成可继续编辑的设计器实例；「导出当前文档」把画布写回同一份 DSL（toDsl 往返）" />
+
+## 相关链接
+
+- GitHub：[ice-entity-designer-dsl](https://github.com/ice-render/ice-entity-designer-dsl)
+- npm：[ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl)
+- 设计器文档：[Entity Designer](/docs/entity-designer)
+- 通用 DSL 与 AI Agent 接入：[DSL 与 AI Agent 接入](/docs/guide/dsl)
+- 引擎内核：[ice-render 引擎](/docs/intro)

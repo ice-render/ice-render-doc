@@ -7,10 +7,11 @@ sidebar_label: 1.1 介绍
 
 **ICERender** 是一个用纯 TypeScript 编写的 Canvas 2D 交互图形渲染引擎，面向 ER 图、流程图、拓扑图等图编辑场景。它借鉴了 React 的组件模型与 W3C 的事件模型，提供嵌套坐标系、序列化、动画与 Visio 风格连接线，运行时零依赖（gl-matrix 在构建期内联）。
 
-:::tip 本文档站分两层
+:::tip 本文档站分三层
 - **引擎层（ice-render）** —— 本站核心，左侧「ice-render 引擎」分组：介绍 / 快速上手 / 指南 / 架构设计 / API 参考 / 二次开发。讲「渲染引擎本身怎么用、怎么实现」。
-- **应用层（家族产品）** —— 基于引擎内核封装的上层产品，左侧「家族产品 · 应用层」分组：Entity Designer（ER 建模）、ice-chart（图表）、ice-web-components（Canvas UI 组件库），以及它们各自的 DSL。
-- 一句话：**引擎提供坐标系 / 事件 / 渲染 / 序列化等底座；产品在其上收敛出领域能力。** 想搞懂底层，看「ice-render 引擎」；想直接拿来用，看「家族产品」。
+- **应用层（家族产品）** —— 基于引擎内核封装的上层产品，左侧「家族产品 · 应用层」分组：Entity Designer（ER 建模）、ice-chart（图表）、ice-web-components（Canvas UI）、ice-smart-water（智慧水务）、ice-game（游戏厅）、ice-agent-console（AG-UI 控制台）。
+- **DSL 层** —— 让 AI Agent 只产出 JSON 就能驱动引擎 / 产品，左侧「2.7 DSL 层」分组：ice-render-dsl（引擎级）、ice-chart-dsl（图表）、ice-entity-designer-dsl（领域建模）。
+- 一句话：**引擎提供坐标系 / 事件 / 渲染 / 序列化等底座；DSL 层让 Agent 只写数据；产品在其上收敛出领域能力。** 想搞懂底层，看「ice-render 引擎」；想直接拿来用，看「家族产品」；想让 Agent 接入，看「DSL 层」与 [DSL 与 AI Agent 接入](/docs/guide/dsl)。
 :::
 
 ## 为什么选择 ICERender
@@ -79,6 +80,9 @@ ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应
 | 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.4.3**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
 | 应用（DSL） | [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
 | 应用 | [ice-web-components](https://www.npmjs.com/package/ice-web-components) | 仿 Swing 风格的 Canvas 原生 UI 组件库（86 个组件，Bootstrap 5 令牌主题）；**暂无配套 DSL，走命令式组件 API** |
+| 应用 | [ice-smart-water](https://github.com/ice-render/ice-smart-water) | 智慧水务运行控制台（当前 **v0.1.0**）：工艺设计 + 运行监视；演示型「应用层样板」，渲染 / 图表 / 控件 / 设计器全取自家族「四件套」 |
+| 应用 | [ice-game](https://github.com/ice-render/ice-game) | ICE 游戏厅（当前 **v0.1.0**）：掌机四卡带（俄罗斯方块 / 贪吃蛇 / 2048 / CHIP-8）+ 可开机 Windows XP 桌面（含扫雷）；零位图、全 canvas 绘制 |
+| 应用 | [ice-agent-console](https://github.com/ice-render/ice-agent-console) | AG-UI 事件流驱动 ICE 画布的控制台（当前 **v0.1.0**）：agent 的事件流直接驱动 Canvas，绘图区即页面主体 |
 
 ## AI Agent 接入：JSON-first DSL ⭐
 
