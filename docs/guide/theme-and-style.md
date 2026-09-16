@@ -235,7 +235,7 @@ new ICERect({ preset: 'card' });     // 白底 + 细边框 + 圆角 12 + 阴影 
 new ICERect({ preset: 'button' });   // primary 色 + 圆角 8 + 阴影 sm
 new ICEText({ preset: 'title' });    // fontSize 24 + bold + text 色
 
-// 内置预设：card / panel / button / button-danger / title / subtitle / body / label
+// 内置预设：card / panel / button / button-danger / gradient / title / subtitle / body / label
 ```
 
 ### 优先级链

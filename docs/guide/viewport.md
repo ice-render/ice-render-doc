@@ -42,7 +42,7 @@ const [sx, sy] = ice.worldToScreen(wx, wy);
 ice.init(el, { dpr: 2 });
 ```
 
-显式指定设备像素比，或由引擎自动探测 `devicePixelRatio`。窗口/画布尺寸变化后调用 `ice.updateCanvasBoundingRect()` 刷新缓存的包围盒矩形。
+显式指定设备像素比；引擎默认 `dpr = 1`，**不自动探测** `devicePixelRatio`，只有显式传 `dpr > 1` 才启用 HiDPI（backing store 放大到 cssSize × dpr）。窗口/画布尺寸变化后调用 `ice.updateCanvasBoundingRect()` 刷新缓存的包围盒矩形。
 
 ## 其他
 

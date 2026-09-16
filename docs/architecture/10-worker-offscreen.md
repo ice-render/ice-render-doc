@@ -24,15 +24,23 @@
 
 ## 架构分层
 
-```
-主线程 RendererHost                          Worker WorkerRenderer
-  ├─ DOM 事件 → 命中检测（主线程，铁律不变）
-  ├─ 组件状态树 / 序列化（主线程持有）
-  ├─ 图片/字体/文本量测（DOM 侧）
-  ├─ setState / 结构变更 → 标记 dirty
-  └─ 每帧 postMessage: { type:'frame', dirtyIds?, snapshotVersion }  →  收到命令后 refreshQueue + doRender*
-       → transferToImageBitmap / (备选) transferControlToOffscreen
-  主线程 ImageBitmapRenderingContext 展示
+```mermaid
+flowchart LR
+  subgraph Main["主线程 RendererHost"]
+    M1["DOM 事件 → 命中检测（铁律不变）"]
+    M2["组件状态树 / 序列化（主线程持有）"]
+    M3["图片 / 字体 / 文本量测（DOM 侧）"]
+    M4["setState / 结构变更 → 标记 dirty"]
+    M5["每帧 postMessage<br/>{ type:'frame', dirtyIds?, snapshotVersion }"]
+  end
+  subgraph Work["Worker WorkerRenderer"]
+    W1["收到命令 → refreshQueue + doRender*"]
+    W2["transferToImageBitmap（推荐初版）"]
+    W3["（备选）transferControlToOffscreen"]
+  end
+  M5 -->|"postMessage"| W1
+  W1 --> W2
+  W2 -->|"transferFromImageBitmap"| M6["主线程 ImageBitmapRenderingContext 展示"]
 ```
 
 ## 双 buffer 方案对比

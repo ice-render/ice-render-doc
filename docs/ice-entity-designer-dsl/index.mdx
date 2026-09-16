@@ -248,9 +248,9 @@ ICEDSL.renderDsl('canvas', edited);   // 也能直接再渲染一遍
 
 渲染结果的 `designer` 提供矢量导出，SVG 由组件树 + 路径命令重新生成，与画布同一口径（几何、样式、不透明度、阴影、连线标签），可被任意外部工具栅格化成 PNG / PDF：
 
-- **SVG**：`result.designer.toSvg(options)`（flowchart / BPMN 等）或 `IED.exportSvg(result.ice, options)`。`options = { area: 'content' | 'viewport', padding, scale, background, includeTools }`。
-- **BPMN 2.0 XML**：`IED.toBpmnXml(result.designer)`——含 BPMNDI（互操作格式，非执行模型），用 `result.designer.validateBpmn()` 做语义检查后再导出。
-- **PlantUML**：`IED.toPlantUml(result.designer)`（UML 类图 / 状态图文本互操作），并支持 `IED.fromPlantUml(text, designer)` 反向导入。
+- **SVG**：`result.designer.toSvg(options)`（flowchart / BPMN 等通用矢量导出）。`options = { area: 'content' | 'viewport', padding, scale, background, includeTools }`。
+- **BPMN 2.0 XML**：先用 `result.designer.validateBpmn()` 做语义检查，再用 `ice-entity-designer` 的 `toBpmnXml(result.designer)` 导出（含 BPMNDI，互操作格式、非执行模型）；`fromBpmnXml(xml, result.designer)` 反向导入。
+- **PlantUML**：`ice-entity-designer` 的 `toPlantUml(result.designer)`（UML 类图）/ `toPlantUmlState(result.designer)`（状态图）导出文本；`fromPlantUml(text, result.designer)` / `fromPlantUmlState(text, result.designer)` 反向导入。
 
 甘特图还可 `result.designer.autoSchedule()`（按依赖把排期推到最早可行）与 `result.designer.criticalPath()`（标准 CPM 算关键路径），再 `toSvg()` 导出含日期刻度与进度的矢量图。
 

@@ -50,7 +50,7 @@ query.select('#my-canvas').fields({ node: true }).exec((res) => {
 ## 接入契约：宿主最少要做什么
 
 引擎**不需要假 DOM**：画布对象就是小程序 canvas 节点本来的样子（只有 `width` / `height` / `getContext`），
-没有 `getBoundingClientRect` 时引擎按「原点 (0,0) + 画布自身尺寸」兜底（`ICE.readCanvasRect()`），
+没有 `getBoundingClientRect` 时引擎按「原点 (0,0) + 画布自身尺寸」兜底（`ice.readCanvasRect()`），
 正好对上小程序「触摸坐标相对画布」的语义。
 
 宿主只需做三件事：

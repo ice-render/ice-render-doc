@@ -14,6 +14,31 @@ sidebar_label: 1.1 介绍
 - 一句话：**引擎提供坐标系 / 事件 / 渲染 / 序列化等底座；DSL 层让 Agent 只写数据；产品在其上收敛出领域能力。** 想搞懂底层，看「ice-render 引擎」；想直接拿来用，看「家族产品」；想让 Agent 接入，看「DSL 层」与 [DSL 与 AI Agent 接入](/docs/guide/dsl)。
 :::
 
+```mermaid
+graph TD
+  subgraph DSL["DSL 层 · Agent 只写 JSON 就能驱动"]
+    D1["ice-render-dsl<br/>引擎级通用图"]
+    D2["ice-chart-dsl<br/>图表"]
+    D3["ice-entity-designer-dsl<br/>领域建模"]
+  end
+  subgraph APP["应用层 · 家族产品"]
+    A1["Entity Designer"]
+    A2["ice-chart"]
+    A3["ice-web-components"]
+    A4["ice-smart-water"]
+    A5["ice-game"]
+    A6["ice-agent-console"]
+  end
+  subgraph ENG["引擎层 · ice-render"]
+    E1["坐标系 / 事件 / 渲染<br/>序列化 / 动画"]
+  end
+  DSL --> ENG
+  APP --> ENG
+  D1 --> A1
+  D2 --> A2
+  D3 --> A1
+```
+
 ## 为什么选择 ICERender
 
 ### 极端规模下的内存与构建效率
