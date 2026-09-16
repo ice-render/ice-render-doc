@@ -54,6 +54,27 @@ graph TD
 | 单段 | `{ from, to, duration, easing? }` | 在两个值之间补间 |
 | 关键帧 | `{ keyframes: [{ offset, value, easing? }], duration }` | `offset` 为 0~1 时间占比，缺省按顺序均分、超出会被夹紧、乱序自动排序；`easing` 写在**段起始帧**上，只作用于「该帧 → 下一帧」这一段（未写则回落到动画级 `easing`）；时间轴之外的取值保持首/末帧值，不外推 |
 
+```mermaid
+flowchart TD
+  V["取值形态"] --> V1["单段 {from, to, duration}"]
+  V --> V2["关键帧 {keyframes[], duration}"]
+  V1 --> I["interpolators 统一求值"]
+  V2 --> I
+  I --> T["取值类型"]
+  T --> T1["数值 / 等长数字数组"]
+  T --> T2["颜色 #rgb / rgb()（sRGB 空间）"]
+  T --> T3["带单位数字串 '12px'"]
+  I --> E["缓动 Easing"]
+  E --> E1["EasingProgress（归一化,纯函数）"]
+  E --> E2["Easing（值语义,读时钟）"]
+  E --> E3["spring / springSoft（过冲 >1）"]
+  E --> F{"elapsed >= duration?"}
+  F -->|否| P["推进帧（fps 降频）"]
+  F -->|是| Dn["精确落终点值"]
+  Dn --> L["生命周期回调 onStart/onUpdate/onRepeat/onComplete"]
+  L --> TL["时间轴编排 timeline().add / stagger / play"]
+```
+
 - 取值可为**数值**或**等长的数字数组**（`transform.scale` / `transform.translate` / `transform.skew`
   等按分量逐元素补间）。两端长度不一致或含非数字会被拒绝，并只 `console.warn` 一次
   （不再像早期实现那样写出 `NaN` 破坏矩阵）。

@@ -39,7 +39,7 @@ const ice = new ICE();
 | 选项 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `renderMode` | `'dirty-rect' \| 'full'` | `'dirty-rect'` | 渲染模式 |
-| `dpr` | `number` | 自动探测 | 设备像素比 |
+| `dpr` | `number` | `1`（不自动探测；显式传 `>1` 才启用 HiDPI） | 设备像素比 |
 
 ### `destroy()`
 
