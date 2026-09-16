@@ -105,6 +105,24 @@ const config = {
             label: `ice-web-components v${V.iceWebComponents}`,
           },
           {
+            type: 'doc',
+            docId: 'ice-smart-water/index',
+            position: 'left',
+            label: `ice-smart-water v${V.iceSmartWater}`,
+          },
+          {
+            type: 'doc',
+            docId: 'ice-game/index',
+            position: 'left',
+            label: `ice-game v${V.iceGame}`,
+          },
+          {
+            type: 'doc',
+            docId: 'ice-agent-console/index',
+            position: 'left',
+            label: `ice-agent-console v${V.iceAgentConsole}`,
+          },
+          {
             href: 'https://github.com/ice-render/ice-render',
             label: 'GitHub',
             position: 'right',
