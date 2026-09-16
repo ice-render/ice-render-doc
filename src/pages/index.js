@@ -40,6 +40,17 @@ const features = [
       </>
     ),
   },
+  {
+    title: '无缝对接 AG-UI',
+    icon: '🤝',
+    description: (
+      <>
+        原生对接 AG-UI 协议：Agent 的事件流（run started / text message / tool call / state delta …）直接增量驱动 Canvas 渲染，绘图区即页面主体，无需手写胶水代码。可运行样例见{' '}
+        <Link to="https://github.com/ice-render/ice-agent-console">ice-agent-console</Link>，接入方式见{' '}
+        <Link to="/docs/guide/dsl">DSL 与 AI Agent 接入</Link>。
+      </>
+    ),
+  },
 ];
 
 const npmCode = `import { ICE, ICERect } from 'ice-render';
@@ -90,7 +101,7 @@ export default function Home() {
           <div className="container">
             <div className="row">
               {features.map((f, idx) => (
-                <div className="col col--4" key={idx}>
+                <div className="col col--3" key={idx}>
                   <div className="text--center padding--md">
                     <div className={styles.featureIcon}>{f.icon}</div>
                   </div>

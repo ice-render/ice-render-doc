@@ -8,6 +8,12 @@
   text-align: center;
   position: relative;
   overflow: hidden;
+  background-color: #7DD3FC;
+}
+
+/* 覆盖 Infima 的 .hero.hero--primary 默认主色，使其与 Logo 品牌蓝一致 */
+.heroBanner.heroBanner {
+  background-color: #7DD3FC;
 }
 
 .buttons {
