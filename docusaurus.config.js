@@ -139,7 +139,7 @@ const config = {
                 href: 'https://github.com/ice-render/ice-render',
               },
               {
-                label: 'ice-render-dsl（AI Agent DSL）',
+                label: 'ice-render-dsl（引擎级 AI Agent DSL）',
                 href: 'https://www.npmjs.com/package/ice-render-dsl',
               },
               {
@@ -155,8 +155,24 @@ const config = {
                 href: 'https://www.npmjs.com/package/ice-entity-designer',
               },
               {
+                label: 'ice-entity-designer-dsl（领域建模 DSL）',
+                href: 'https://www.npmjs.com/package/ice-entity-designer-dsl',
+              },
+              {
                 label: 'ice-web-components（Canvas UI）',
                 href: 'https://www.npmjs.com/package/ice-web-components',
+              },
+              {
+                label: 'ice-smart-water（智慧水务，演示型）',
+                href: 'https://github.com/ice-render/ice-smart-water',
+              },
+              {
+                label: 'ice-game（ICE 游戏厅，演示型）',
+                href: 'https://github.com/ice-render/ice-game',
+              },
+              {
+                label: 'ice-agent-console（AG-UI 控制台，演示型）',
+                href: 'https://github.com/ice-render/ice-agent-console',
               },
             ],
           },

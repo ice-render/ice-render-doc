@@ -1,0 +1,97 @@
+<!doctype html><html lang=zh-CN><head>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" /><script defer src=family.9046b070.js></script><script defer src=arcade.35888209.js></script><meta charset=utf-8><title>ICE Arcade 掌机 — 画布游戏厅 | ICE Game</title><link rel=icon href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='22 22 84 84'><path d='M79 44 L79 98 L101 82 L101 28 Z' fill='%2379d0ec' stroke='%2336b0d4' stroke-width='3' stroke-linejoin='round'/><path d='M27 44 L79 44 L79 98 L27 98 Z' fill='%23a6e3f5' stroke='%2336b0d4' stroke-width='3' stroke-linejoin='round'/><path d='M27 44 L79 44 L101 28 L49 28 Z' fill='%23e6fbff' stroke='%2336b0d4' stroke-width='3' stroke-linejoin='round'/></svg>"><style>body,html{height:100%;margin:0;padding:0}body{overflow:hidden;background:radial-gradient(circle at 50% 24%,#1b2130 0%,#080a0f 72%);display:flex;align-items:center;justify-content:center}canvas{display:block;width:min(100vw,100vh*1.475);height:min(100vh,100vw/1.475)}</style>    <meta name="viewport" content="width=1180" />
+      <!-- ice-seo:injected -->
+    <!-- 以下 SEO 元数据由 scripts/lib/seo.cjs 统一注入（改文案改那里，别手改产物） -->
+    <meta name="description" content="ICE Arcade 掌机：一台掌机，四张卡带 —— 开机先跑 BIOS 自检再选卡带。画布游戏厅里的整机模拟，支持键盘操作（方向键 / 空格 / P · R · L / F2），浏览器打开…" />
+    <meta name="keywords" content="ICE Arcade 掌机,俄罗斯方块,贪吃蛇,2048,CHIP-8,浏览器模拟器,在线模拟器,免安装模拟器,Canvas 小游戏,在线小游戏,网页小游戏,免安装" />
+    <meta name="author" content="大漠穷秋" />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1" />
+    <meta name="theme-color" content="#080a0f" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="画布游戏厅 ICE Game" />
+    <meta property="og:title" content="ICE Arcade 掌机 — 画布游戏厅 | ICE Game" />
+    <meta property="og:description" content="ICE Arcade 掌机：一台掌机，四张卡带 —— 开机先跑 BIOS 自检再选卡带。画布游戏厅里的整机模拟，支持键盘操作（方向键 / 空格 / P · R · L / F2），浏览器打开…" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="ICE Arcade 掌机 — 画布游戏厅 | ICE Game" />
+    <meta name="twitter:description" content="ICE Arcade 掌机：一台掌机，四张卡带 —— 开机先跑 BIOS 自检再选卡带。画布游戏厅里的整机模拟，支持键盘操作（方向键 / 空格 / P · R · L / F2），浏览器打开…" />
+    <style>
+    /*
+      ice-seo-sr：给搜索引擎与屏幕阅读器读的「文字版」。
+      canvas 里的内容两者都读不到（前者没有 DOM 文本，后者只有一块画布）。
+
+      内容与画布上显示的**完全一致**（同一份 meta.json / 目录数据），所以这不是
+      隐藏关键词，而是同一份内容的可访问替代表示 —— 改文字版之前请先改画布。
+      用 clip 隐藏而不用 display:none：后者会让屏幕阅读器与部分爬虫跳过它。
+      详见 scripts/lib/seo.cjs 顶部说明。
+    */
+    .ice-seo-sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+    </style>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "ICE Arcade 掌机",
+        "description": "ICE Arcade 掌机：一台掌机，四张卡带 —— 开机先跑 BIOS 自检再选卡带。画布游戏厅里的整机模拟，支持键盘操作（方向键 / 空格 / P · R · L / F2），浏览器打开…",
+        "genre": "模拟器",
+        "gamePlatform": "Web browser",
+        "playMode": "SinglePlayer",
+        "applicationCategory": "Game",
+        "operatingSystem": "支持 Canvas 2D 的现代浏览器",
+        "inLanguage": "zh-CN",
+        "author": {
+          "@type": "Person",
+          "name": "大漠穷秋"
+        },
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "画布游戏厅",
+          "alternateName": "ICE Game",
+          "inLanguage": "zh-CN"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "CNY"
+        },
+        "gameTip": "方向键：移动 / 旋转；空格：硬降 / 暂停；P · R · L：暂停 · 重开 · 排行榜；F2：回到 BIOS 菜单"
+      }
+    </script>
+  </head><body><canvas id=canvas width=1180 height=800></canvas>    <!-- 文字版（视觉隐藏，屏幕阅读器与搜索引擎可见）：内容与 canvas 上显示的一致，
+         由 scripts/lib/seo.cjs 从同一份 meta.json / 目录数据生成。改内容请改画布。 -->
+    <div class="ice-seo-sr" role="region" aria-label="ICE Arcade 掌机（文字版）">
+      <p><a href="index.html">← 返回画布游戏厅</a></p>
+      <h1>ICE Arcade 掌机</h1>
+      <p>一台掌机，四张卡带 —— 开机先跑 BIOS 自检再选卡带</p>
+      <h2>怎么玩</h2>
+      <dl>
+        <dt>方向键</dt><dd>移动 / 旋转</dd>
+        <dt>空格</dt><dd>硬降 / 暂停</dd>
+        <dt>P · R · L</dt><dd>暂停 · 重开 · 排行榜</dd>
+        <dt>F2</dt><dd>回到 BIOS 菜单</dd>
+      </dl>
+      <h2>内含程序</h2>
+      <ul>
+        <li>俄罗斯方块</li>
+        <li>贪吃蛇</li>
+        <li>2048</li>
+        <li>CHIP-8</li>
+      </ul>
+      <h2>站内其它页面</h2>
+      <ul>
+          <li><a href="windows-xp.html">Windows XP 桌面</a> —— 会自己开机的画布桌面：开机自检 → 欢迎屏 → 桌面</li>
+          <li><a href="breakout.html">打砖块</a> —— 挡板接球，清空所有砖块 —— 掉球扣命，三命用完结束</li>
+      </ul>
+    </div>
+  </body></html>

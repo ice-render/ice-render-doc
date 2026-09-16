@@ -1,0 +1,193 @@
+---
+sidebar_position: 1
+---
+
+import LiveExample from '@site/src/components/LiveExample';
+
+# ice-game · ICE 游戏厅（当前 v0.1.0）
+
+:::info 🧩 应用层 · 复用 ice-web-components 画布控件拼成能玩的游戏（当前 v0.1.0）
+本页属于 ice-render 家族的**应用层**产品：它不重写引擎、也不另造控件，而是把家族里的引擎内核与 ice-web-components 的画布控件当作「积木」直接拼出能玩的游戏。所有画面都画在同一张 `<canvas>` 上，**画面里没有一个位图资源**。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
+:::
+
+**ice-game 是构建在 ice-render 家族之上的「游戏厅」（当前 v0.1.0，私有仓库、未发 npm）。** 它把家族里现成的引擎内核与 ice-web-components 画布控件（`ICEStatCard` / `ICECarousel` / `ICECard` / `ICEBadge` / `ICETag` / `ICEButton` / `ICESeparator` / `ICEProgressBar`）当作组件目录来用，拼出小游戏、掌机、一台会开机的桌面——而游戏本身全部由引擎画在 canvas 上，零图片、零音频文件（音效是 WebAudio 现场合成）。
+
+于是**它既是「能玩的游戏合集」，也是一份活的家族控件样板**：首页的 hero 规模卡、精选展厅轮播、卡片、徽标、标签、按钮、分隔线、页脚进度条，背后全是在 canvas 上绘制的画布控件。
+
+MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
+
+> ⚠️ **Just for fun.** 纯娱乐与探索项目，不是生产级 UI 框架，不要拿它当正式组件库来用。
+
+## 示例（文档内实时运行，不是截图）
+
+下面三个都是文档站静态托管的 ice-game 构建产物，在文档页里直接跑起来——所有画面由引擎画在 canvas 上，画面里没有任何位图资源：
+
+### ICE Arcade 掌机（俄罗斯方块 / 贪吃蛇 / 2048 / CHIP-8）
+
+<LiveExample html="/game/arcade.html" height={640} note="ICE Arcade 掌机：Tetris / Snake / 2048 / CHIP-8，画面里没有一个位图资源，全部画在 canvas 上" />
+
+### 自研打砖块
+
+<LiveExample html="/game/breakout.html" height={560} note="自研打砖块：多 canvas 分层 + 帧循环 / 输入 / 音频套件" />
+
+### Windows XP 桌面（含扫雷）
+
+<LiveExample html="/game/windows-xp.html" height={620} note="一台会开机的 Windows XP 桌面（含扫雷），纯 canvas 绘制" />
+
+## 1. 里面有什么
+
+**一个页面 = 一个游戏 = 一个入口 = 一个 HTML**：每个游戏独占整屏与键盘、彼此零共享状态、各有自己的开场流程。内容分两块——自研小游戏 + 从上游移植的整机展厅：
+
+| | 页面 | 玩法 / 内容 |
+| --- | --- | --- |
+| **打砖块**（自研） | `breakout.html` | 挡板接球、清空砖块；掉球扣命，三命用完结束；越靠上的砖越值钱 |
+| **ICE Arcade 掌机**（移植整机） | `arcade.html` | 开机先跑 BIOS 自检（CPU / RAM / VRAM / SOUND / CART），再过启动菜单插卡带。四张卡带：俄罗斯方块、贪吃蛇、2048、CHIP-8 |
+| **Windows XP 桌面**（移植整机） | `windows-xp.html` | 一台**会开机**的桌面：黑屏自检 → 蓝色欢迎屏 → 桌面淡入 + 开机音。八个程序：扫雷、ICE Arcade、记事本、画图、我的电脑、我的文档、Internet Explorer、显示属性 |
+
+> **零位图资产**是贯穿全场的硬约束：游戏画面、图标、音效全部由引擎图元绘制或 WebAudio 合成，**不含任何外部图片文件**（上游示例页的音效是原创合成音、图标全部由引擎图元绘制）。这也正是它适合当「家族控件样板」的原因——能验证「纯 canvas 控件拼出复杂界面」这条路走得通。
+
+## 2. 快速开始
+
+仓库依赖通过 `file:` 软链到同级家族仓库，先装依赖再起服务：
+
+```bash
+npm install            # 三个 file: 依赖（ice-render / ice-web-components / ice-chart）软链到同级仓库
+npm run dev            # gen:catalog（生成组件目录）→ serve，本机 http://localhost:8098
+npm run build          # 扫目录构建（自动 gen:catalog，并把封面拷进 dist/covers/）
+npm run serve          # 预览构建产物，本机 http://localhost:8098
+```
+
+> **必须走 http，不能直接开 `file://`**：Windows XP 里的 Internet Explorer 是真 `fetch()`，`file://` 下不工作。端口撞了用 `ICE_GAME_PORT=8099 npm run dev` 覆盖。自研小游戏**不依赖 fetch**，构建产物是相对路径——单个 HTML + JS 拷走就能玩。
+
+## 3. 加一个新游戏（三步，零配置）
+
+新游戏脚手架走 `new-game`，生成即一个能跑起来的最小玩法（限时计分 + 暂停 + 重开 + 最高分存档）：
+
+```bash
+npm run new-game -- tic-tac-toe --title "井字棋"
+# → 生成 src/games/<slug>/{meta.json, model.ts, main.ts} + 一份规则单测
+```
+
+三步走完即可，不用改任何配置：
+
+```
+1. 改 meta.json      标题 / 说明 / 操作 / 主色 —— 会直接出现在游戏厅首页的卡片上
+2. 改 model.ts       你的游戏规则（纯逻辑，零运行时依赖）；
+   改 tests/games/<slug>/model.test.ts 换成你自己规则里最容易写错的那几条
+3. npm run dev        自动出现在构建、首页与 e2e（http://localhost:8098/<slug>.html）
+```
+
+**构建入口、首页卡片、e2e 冒烟三处都是目录驱动**，加了游戏自动生效，不用去 webpack 里手写 entry、不用改首页、也不用改 e2e：
+
+| 环节 | 怎么自动跟上 |
+| --- | --- |
+| 构建入口 + HTML | `webpack.config.js` 扫 `src/games/*` 与 `src/ported/*` 与 `src/machines/*`（`scripts/lib/scan-games.cjs`） |
+| 首页卡片 | 读 `src/domain/catalog.ts`（数据来自生成的 `catalog.generated.json`） |
+| e2e 冒烟 | `e2e/catalog.spec.ts` 遍历 `entryPages()`；小游戏还自动套「通用不变量」 |
+
+`meta.json` 是「已注册」的标志：没有它 = 半成品目录，不进构建、不进首页（`gen:catalog` 会提醒哪些目录没登记）。删掉一个游戏 = 删目录（`check:games` 会提醒你重新构建以清掉 `dist/` 里的旧产物）。
+
+## 4. 架构
+
+### 多 canvas 分层
+
+游戏厅首页用**三块画布**，需求完全不同的三层各自独立——把「会动的那层」隔离出来，否则「让背景动起来」就等于每帧重绘整页两千像素高的内容：
+
+| 画布 | 定位 | 职责 |
+| --- | --- | --- |
+| `#bg` | `fixed`，视口大小 | 背景动效层：网格 / 粒子星座 / 光斑，**每帧重绘**（低 alpha 冷色，少而慢） |
+| `#canvas` | `static`，内容高度 | 主体内容（卡片网格 + 页脚文字），**静态**，只在交互时重绘 |
+| `#navbar` | `fixed`，吸顶条 | 吸顶导航（品牌 + 分区锚点 + 文档/GitHub 入口），永远可见 |
+
+`#bg` 固定而主体滚动，于是得到免费的视差感——「星星在玻璃后面不动、内容从前面滑过」。导航必须是独立画布：画在主体里会跟着内容滚走。库里的 `ICEAffix` / `ICEAnchor` 服务的是画布内滚动容器（`ICEScrollPane`），窗口滚动用不上。
+
+### 小游戏底座（kit）
+
+自研游戏共用一套 `src/kit/` 底座，别再各写一遍：
+
+| 套件 | 职责 |
+| --- | --- |
+| `page.ts` | 画布 + 引擎 + 主题 + dpr 装配 |
+| `shell.ts` | 标题带 / 数值卡 / 按钮 / 操作说明 / 暂停与结束覆盖层（构造期自检版面越界） |
+| `loop.ts` | 帧循环（dt 上限、暂停即停帧） |
+| `input.ts` | 键盘 → 语义动作（repeat 抑制、失焦清键） |
+| `storage.ts` | localStorage 容错（零依赖，可纯 node 单测） |
+| `high-scores.ts` | 最高分榜（复用库里的 `ICEHighScoreModel`） |
+| `audio.ts` | WebAudio 合成音效（零音频文件） |
+
+### 组件目录 = ice-web-components
+
+首页所有 UI 一律先用现成画布控件，不手拼几何图形（`src/home/*` 的定位就是「展示家族控件本身」）：
+
+| 位置 | 画布控件 |
+| --- | --- |
+| hero 规模数字 | `ICEStatCard`（图标 + 标题 + 数值 + 趋势，带自持布局） |
+| 精选展厅 | `ICECarousel`（自动播放 + 箭头 + 圆点） |
+| 卡片本体 | `ICECard`（`title` 与 `extra` 两插槽） |
+| 类型徽标 / 标签 / 按钮 / 分隔线 / 进度条 | `ICEBadge` / `ICETag` / `ICEButton` / `ICESeparator` / `ICEProgressBar` |
+
+游戏规则（`model.ts`）必须是零运行时依赖的纯逻辑——不 import 引擎、不碰 DOM，才能在 node 里 0.2 秒跑完单测。
+
+## 5. 质量门
+
+画布应用的版面错乱**没有天然报错**（两个构件压在一起、引擎照常绘制，只有人眼看截图才发现），所以这里有一整套门禁：
+
+```bash
+npm test            # jest：domain / kit / 各游戏 model（不需要引擎产物、不需要 jsdom）
+npm run check:wiring  # 家族三件套接线：真打一次包，断言每个包只进来一份
+npm run check:catalog # 目录生成物是否最新（改了 meta.json 忘了生成会红）
+npm run check:games   # 目录 ↔ 生成物 ↔ 构建产物 ↔ 封面 四者一致
+npm run test:e2e      # 真 Chrome：像素 + 真鼠标真键盘 + 目录驱动逐页冒烟
+npm run verify        # 上面除 e2e 外全部
+```
+
+- **版面体检（layout lint）**：`e2e/support.ts` 的 `expectLayoutClean` 用引擎的 `getAccessibilityTree()` 查越界与「部分交叠」，每个小游戏自动覆盖（待发球 + 进行中两状态），掌机按 BIOS/卡带两阶段、XP 按开机/登录/桌面/开窗口四阶段查。判据做了四层排除（祖先-后代 / 不占地的透明容器 / 完全包含 / ≤2px 分线）与跨窗口遮挡放行。
+- **自动封面（shoot-covers）**：`npm run covers` 用真 Chrome 打开每个页面、驱动它到有内容的状态、再把画布合成为 16:9 封面（圆角/描边/光泽烘进 PNG）。改了游戏画面重跑一次即可，封面不会和代码脱节；缺封面不算错误，真正会被门禁拦下的是「不一致」。
+- **e2e 三层判据**：状态机（断言 `model` 相位/分数/命数）→ 交互（真鼠标点画布控件、真键盘驱动输入）→ 像素（`opaqueRatio` + `inkRatio` + 颜色数，只刷一层底色的空画布会在后两项露馅）。缺一层就会出现「看起来通过其实没验证」。
+
+## 6. canvas 的 SEO
+
+这些页面是**整屏画布**：文字是 `fillText` 画上去的像素，DOM 里只有一个 `<canvas>`。对搜索引擎爬虫和屏幕阅读器来说，页面基本是空壳——读不到标题、读不到说明、也**无法顺着链接发现其它页面**。
+
+所以构建期为每个 HTML 注入一层 SEO 元数据（`scripts/lib/seo.cjs` + `webpack.config.js` 的 `SeoPlugin`，**不改任何模板文件**，因此上游移植页也不用动）：
+
+| 注入什么 | 作用 |
+| --- | --- |
+| `<title>` / `description` / `keywords` + Open Graph / Twitter Card | TDK 与分享卡片（页面名、说明、按键都从 `meta.json` 动态生成） |
+| `<meta name="viewport" content="width=<画布宽>">` | 移动端初始视口与画布一致（不设会把画布两侧裁掉） |
+| `<link rel="icon" href="favicon.svg">` | 可抓取的站点图标（内联 data URI 图标搜索引擎不认，保留它挡隐式 `/favicon.ico` 请求） |
+| JSON-LD（`WebSite` + `ItemList` / `VideoGame`） | 结构化数据：这是个游戏合集、有哪些页面、免费 |
+| **文字版**（`.ice-seo-sr`，视觉隐藏） | 与画布上显示**一致**的标题/说明/操作 + **真实可点的 `<a>` 链接** |
+| `robots.txt` / `sitemap.xml` / `favicon.svg` | 站点级文件 |
+
+**文字版是这一层最关键的**：它让爬虫从任意一个页面都能爬到全站，也让屏幕阅读器第一次能「读」到这些游戏。它用 `clip-path` 隐藏（不是 `display:none`——那会让辅助技术直接跳过），内容与画布**同源**（都从 `meta.json` / 目录数据生成），所以这不是「隐藏关键词」。没有对外域名时，`canonical` / `og:url` / `og:image` / `sitemap.xml` 默认不写（编假域名比不写更糟），配 `ICE_GAME_SITE_URL` 即全部补齐。
+
+## 7. 依赖与已知问题
+
+### 依赖
+
+```jsonc
+"dependencies": {
+  "@damoqiongqiu/ice-chart": "file:../ice-chart",      // 图表（新游戏可能用到）
+  "ice-render": "file:../ice-render",                  // 引擎内核
+  "ice-web-components": "file:../ice-web-components"   // 画布控件 + 游戏模型
+}
+```
+
+三个包都是 `file:` 软链到同级仓库（与 ice-smart-water 同模式），改完兄弟仓 `npm run build` 立刻吃到新产物。加新依赖时必须同时补三处（package.json → webpack alias → tsconfig paths），漏了会在构建或类型检查期直接报错。
+
+> 环境提示：`ice-render` 引擎仓正在被其他人并行重构，若恰好撞上对方重建 `dist/` 的瞬间，本仓的 `tsc` / webpack 可能报「找不到模块」之类的**瞬时**错误——重跑即恢复，不用改代码。
+
+### 已知现象（上游示例的既有行为，非本仓缺陷）
+
+| 现象 | 说明 |
+| --- | --- |
+| XP 的 IE 程序会报 404（`/gallery.html`） | 上游的 IE 演示会真 `fetch()` 一个演示页面，本仓 `dist/` 里没有它，于是 IE 显示「找不到页面」——**那正是它要演示的效果** |
+| XP 任务栏的任务按钮不显示 | 移植页里没有把它们画出来（实测按钮位置像素与任务栏空白处完全相同）；windows-xp 在 `src/machines/` 自维护，属上游保真取舍，本仓未改，e2e 按子树放行并写清依据 |
+
+## 相关链接
+
+- GitHub：[ice-game](https://github.com/ice-render/ice-game)（私有仓库，未发 npm）
+- 引擎内核：[ICE Render 介绍](/docs/intro)
+- 画布控件目录：[ice-web-components](/docs/ice-web-components)
+- 图表：[ice-chart](/docs/ice-chart)

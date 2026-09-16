@@ -1,0 +1,108 @@
+<!doctype html><html lang=zh-CN><head>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" /><script defer src=family.9046b070.js></script><script defer src=home.ce48fdb6.js></script><meta charset=utf-8><title>画布游戏厅 — ICE 家族的 Canvas 单页小游戏合集</title><link rel=icon href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='22 22 84 84'><path d='M79 44 L79 98 L101 82 L101 28 Z' fill='%2379d0ec' stroke='%2336b0d4' stroke-width='3' stroke-linejoin='round'/><path d='M27 44 L79 44 L79 98 L27 98 Z' fill='%23a6e3f5' stroke='%2336b0d4' stroke-width='3' stroke-linejoin='round'/><path d='M27 44 L79 44 L101 28 L49 28 Z' fill='%23e6fbff' stroke='%2336b0d4' stroke-width='3' stroke-linejoin='round'/></svg>"><style>:root{--navbar-height:64px;--canvas-width:1180px}body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:calc(var(--navbar-height) + 20px) 0 40px;background-color:#080a0f;background-image:radial-gradient(circle at 50% 12%,#1b2130 0%,#080a0f 62%);background-attachment:fixed}#bg{position:fixed;top:0;left:50%;transform:translate(-50%);width:var(--canvas-width);display:block;z-index:0;pointer-events:none}#canvas{display:block;position:relative;z-index:1;border-radius:14px;box-shadow:0 18px 60px#0000008c}#navbar{position:fixed;top:0;left:50%;transform:translate(-50%);width:var(--canvas-width);z-index:100;display:block}</style>    <meta name="viewport" content="width=1180" />
+      <!-- ice-seo:injected -->
+    <!-- 以下 SEO 元数据由 scripts/lib/seo.cjs 统一注入（改文案改那里，别手改产物） -->
+    <meta name="description" content="画布游戏厅：用 ICE 家族的渲染引擎与画布控件做的单页小游戏合集 —— 打砖块、ICE Arcade 掌机、Windows XP 桌面。浏览器打开即玩，无需服务端、无需安装。" />
+    <meta name="keywords" content="画布游戏厅,ICE Game,打砖块,ICE Arcade 掌机,Windows XP 桌面,俄罗斯方块,贪吃蛇,2048,CHIP-8,扫雷,ICE Arcade,记事本,画图,我的电脑,我的文档,Internet Explorer" />
+    <meta name="author" content="大漠穷秋" />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1" />
+    <meta name="theme-color" content="#080a0f" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="画布游戏厅 ICE Game" />
+    <meta property="og:title" content="画布游戏厅 — ICE 家族的 Canvas 单页小游戏合集" />
+    <meta property="og:description" content="画布游戏厅：用 ICE 家族的渲染引擎与画布控件做的单页小游戏合集 —— 打砖块、ICE Arcade 掌机、Windows XP 桌面。浏览器打开即玩，无需服务端、无需安装。" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="画布游戏厅 — ICE 家族的 Canvas 单页小游戏合集" />
+    <meta name="twitter:description" content="画布游戏厅：用 ICE 家族的渲染引擎与画布控件做的单页小游戏合集 —— 打砖块、ICE Arcade 掌机、Windows XP 桌面。浏览器打开即玩，无需服务端、无需安装。" />
+    <style>
+    /*
+      ice-seo-sr：给搜索引擎与屏幕阅读器读的「文字版」。
+      canvas 里的内容两者都读不到（前者没有 DOM 文本，后者只有一块画布）。
+
+      内容与画布上显示的**完全一致**（同一份 meta.json / 目录数据），所以这不是
+      隐藏关键词，而是同一份内容的可访问替代表示 —— 改文字版之前请先改画布。
+      用 clip 隐藏而不用 display:none：后者会让屏幕阅读器与部分爬虫跳过它。
+      详见 scripts/lib/seo.cjs 顶部说明。
+    */
+    .ice-seo-sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+    </style>
+    <script type="application/ld+json">
+      [
+        {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          "name": "画布游戏厅",
+          "alternateName": "ICE Game",
+          "inLanguage": "zh-CN",
+          "description": "画布游戏厅：用 ICE 家族的渲染引擎与画布控件做的单页小游戏合集 —— 打砖块、ICE Arcade 掌机、Windows XP 桌面。浏览器打开即玩，无需服务端、无需安装。",
+          "author": {
+            "@type": "Person",
+            "name": "大漠穷秋"
+          },
+          "license": "https://opensource.org/licenses/MIT",
+          "isFamilyFriendly": true
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          "name": "画布游戏厅收录的全部页面",
+          "numberOfItems": 3,
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "打砖块",
+              "description": "挡板接球，清空所有砖块 —— 掉球扣命，三命用完结束"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "ICE Arcade 掌机",
+              "description": "一台掌机，四张卡带 —— 开机先跑 BIOS 自检再选卡带"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "Windows XP 桌面",
+              "description": "会自己开机的画布桌面：开机自检 → 欢迎屏 → 桌面"
+            }
+          ]
+        }
+      ]
+    </script>
+  </head><body><canvas id=bg width=1180 height=900></canvas><canvas id=navbar width=1180 height=64></canvas><canvas id=canvas width=1180 height=660></canvas>    <!-- 文字版（视觉隐藏，屏幕阅读器与搜索引擎可见）：内容与 canvas 上显示的一致，
+         由 scripts/lib/seo.cjs 从同一份 meta.json / 目录数据生成。改内容请改画布。 -->
+    <div class="ice-seo-sr" role="region" aria-label="画布游戏厅页面导航（文字版）">
+      <h1>画布游戏厅 —— 用 ICE 家族的渲染引擎与画布控件做的单页小游戏合集</h1>
+      <p>画布游戏厅：用 ICE 家族的渲染引擎与画布控件做的单页小游戏合集 —— 打砖块、ICE Arcade 掌机、Windows XP 桌面。浏览器打开即玩，无需服务端、无需安装。</p>
+      <h2>小游戏</h2>
+      <ul>
+          <li><a href="breakout.html">打砖块</a> —— 挡板接球，清空所有砖块 —— 掉球扣命，三命用完结束</li>
+      </ul>
+      <h2>整机展厅</h2>
+      <ul>
+          <li><a href="arcade.html">ICE Arcade 掌机</a> —— 一台掌机，四张卡带 —— 开机先跑 BIOS 自检再选卡带</li>
+          <li><a href="windows-xp.html">Windows XP 桌面</a> —— 会自己开机的画布桌面：开机自检 → 欢迎屏 → 桌面</li>
+      </ul>
+      <h2>技术栈</h2>
+      <p>页面与控件全部由 ICE 家族在 HTML5 Canvas 上绘制，画面里没有任何位图资源。</p>
+      <ul>
+        <li>ice-render：Canvas 2D 渲染引擎（家族的地基）</li>
+        <li>ice-web-components：画布原生 UI 控件库</li>
+        <li>@damoqiongqiu/ice-chart：交互式图表库</li>
+      </ul>
+      <p>源码与文档：<a href="https://github.com/ice-render">github.com/ice-render</a></p>
+    </div>
+  </body></html>
