@@ -27,6 +27,26 @@ const config = {
   // src 必须带 baseUrl 前缀（见上方说明）；baseUrl 改了这里也要跟着改，故用同一常量。
   scripts: [{ src: `${baseUrl}ice-render.js`, defer: true }],
 
+  // Google Analytics 4（gtag.js）—— 用户提供的官方向导片段原样接入 <head>。
+  // GA4 默认「增强型衡量」已包含「网页更改（history 变化）」，SPA 路由切换会被自动计为页面浏览。
+  headTags: [
+    {
+      tagName: 'script',
+      attributes: {
+        async: true,
+        src: 'https://www.googletagmanager.com/gtag/js?id=G-X4GCPSJRMH',
+      },
+    },
+    {
+      tagName: 'script',
+      attributes: {},
+      innerHTML: `window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-X4GCPSJRMH');`,
+    },
+  ],
+
   markdown: {
     mermaid: true,
     hooks: {
