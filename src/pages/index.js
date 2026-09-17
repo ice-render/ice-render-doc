@@ -4,6 +4,7 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import CodeBlock from '@theme/CodeBlock';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 import styles from './index.module.css';
 
@@ -72,6 +73,94 @@ const umdCode = `<script src="https://unpkg.com/ice-render/dist/index.umd.js"></
   ice.addChild(new ICE.ICERect({ left: 100, top: 100, width: 160, height: 90 }));
 </script>`;
 
+// 首页「案例」区：全部取自家族各仓的 README 示例截图，画面里的每一个像素都由引擎在 Canvas 上绘制。
+// 宽幅主图用 ice-chart 的六套大屏（2.4:1，正好铺满一行不裁切）；下面 6 张按产品各取一张。
+const showcaseFeatured = {
+  img: 'img/showcase/ice-chart-dashboards.jpg',
+  tag: 'ice-chart',
+  title: '六套数据大屏与图表库',
+  docs: '/docs/ice-chart',
+};
+
+const showcase = [
+  {
+    img: 'img/showcase/web-components-admin.jpg',
+    tag: 'ice-web-components',
+    title: '后台管理系统（80+ Canvas 控件）',
+    docs: '/docs/ice-web-components',
+  },
+  {
+    img: 'img/showcase/smart-water-process.jpg',
+    tag: 'ice-smart-water',
+    title: '污水处理工艺流程图',
+    docs: '/docs/ice-smart-water',
+  },
+  {
+    img: 'img/showcase/agent-console-chart.jpg',
+    tag: 'ice-agent-console',
+    title: 'AI Agent 驱动的绘图控制台',
+    docs: '/docs/ice-agent-console',
+  },
+  {
+    img: 'img/showcase/entity-designer-overview.jpg',
+    tag: 'ice-entity-designer',
+    title: 'ER 实体关系建模（可导出 Schema）',
+    docs: '/docs/entity-designer',
+  },
+  {
+    img: 'img/showcase/game-xp-desktop.jpg',
+    tag: 'ice-game',
+    title: '整机厅 · Windows XP 桌面',
+    docs: '/docs/ice-game',
+  },
+  {
+    img: 'img/showcase/web-components-arcade.jpg',
+    tag: 'ice-web-components',
+    title: 'ICE Arcade 掌机（俄罗斯方块）',
+    docs: '/docs/ice-web-components',
+  },
+];
+
+function Showcase() {
+  // useBaseUrl 是 hook，不能在 map 里调用；这里取一次 baseUrl 再手工拼接
+  const baseUrl = useBaseUrl('/');
+  const asset = (p) => baseUrl.replace(/\/?$/, '/') + p.replace(/^\//, '');
+
+  return (
+    <section className={styles.showcase}>
+      <div className="container">
+        <h2 className="text--center">看看用它能做出什么</h2>
+        <p className="text--center">
+          下面每一张界面都由引擎在 Canvas 上逐像素绘制 —— 没有 DOM 控件，也没有位图贴图。
+        </p>
+        <Link className={styles.featuredCard} to={showcaseFeatured.docs}>
+          <img
+            className={styles.featuredImg}
+            src={asset(showcaseFeatured.img)}
+            alt={showcaseFeatured.title}
+            loading="lazy"
+          />
+          <span className={styles.caption}>
+            <span className={styles.tag}>{showcaseFeatured.tag}</span>
+            <span className={styles.captionTitle}>{showcaseFeatured.title}</span>
+          </span>
+        </Link>
+        <div className={styles.showcaseGrid}>
+          {showcase.map((s, idx) => (
+            <Link className={styles.card} to={s.docs} key={idx}>
+              <img className={styles.cardImg} src={asset(s.img)} alt={s.title} loading="lazy" />
+              <span className={styles.caption}>
+                <span className={styles.tag}>{s.tag}</span>
+                <span className={styles.captionTitle}>{s.title}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
   return (
@@ -97,6 +186,7 @@ export default function Home() {
     <Layout description="ICERender（雪花渲染器）：面向 ER 图 / 流程图 / 拓扑图的高性能 Canvas 2D 交互图形渲染引擎">
       <HomepageHeader />
       <main>
+        <Showcase />
         <section className={styles.features}>
           <div className="container">
             <div className="row">
