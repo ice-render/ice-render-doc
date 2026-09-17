@@ -38,7 +38,7 @@ flowchart LR
     root --> g & a & w & c & x & r & p & s & d
 ```
 
-![组件总览](../images/gallery.png)
+![组件总览](../images/gallery.webp)
 
 ---
 
@@ -101,11 +101,11 @@ flowchart LR
 顶部搜索 `ICEAutoComplete`、通知 `ICEBadge` + `ICEDropdown`、右下角 `ICEFloatButton`
 （新建订单 / 导出 / 新手引导）、`ICEBackTop`、首次进入的 `ICETour` 四步引导。
 
-![仪表盘](../images/admin-dashboard.png)
+![仪表盘](../images/admin-dashboard.webp)
 
 | 订单管理 | 履约中心 |
 |---|---|
-| ![订单](../images/admin-orders.png) | ![履约](../images/admin-fulfillment.png) |
+| ![订单](../images/admin-orders.webp) | ![履约](../images/admin-fulfillment.webp) |
 
 ## 三、`workbench.html`：客服工单工作台
 
@@ -120,7 +120,7 @@ flowchart LR
 * 三栏由 `ICESplitter` 分栏（可拖），会话区是可滚动的 `ICEScrollPane` +
   `ICEBackTop`，右下角 `ICEFloatButton` 里藏着 `ICETour` 三步引导。
 
-![客服工作台](../images/workbench.png)
+![客服工作台](../images/workbench.webp)
 
 ## 四、`custom-component.html`：写自己的组件
 
@@ -187,13 +187,13 @@ const doLogin = () => {
 
 | 开机画面 | 欢迎界面 | 密码页 |
 |---|---|---|
-| ![XP 开机](../images/xp-boot.png) | ![XP 登录](../images/xp-login.png) | ![XP 密码](../images/xp-login-password.png) |
+| ![XP 开机](../images/xp-boot.webp) | ![XP 登录](../images/xp-login.webp) | ![XP 密码](../images/xp-login-password.webp) |
 
-![Windows XP 桌面](../images/xp-desktop.png)
+![Windows XP 桌面](../images/xp-desktop.webp)
 
 Windows 里的「IE」是真会抓网页的（下图是它 `fetch()` 本目录 `gallery.html` 后的渲染结果）：
 
-![IE 真的打开了页面](../images/xp-ie.png)
+![IE 真的打开了页面](../images/xp-ie.webp)
 
 **为此新添的两个通用组件**：
 
@@ -232,7 +232,7 @@ Windows 里的「IE」是真会抓网页的（下图是它 `fetch()` 本目录 `
   60ms 的步进定时器（否则关掉窗口后定时器还在后台跑）；
 * **图标**：`xpIcon('arcade', size)` 多了掌机一档（自绘：机身 + 屏幕 + 十字键 + 两个按钮）。
 
-![ICE Arcade 在 XP 窗口里](../images/xp-arcade.png)
+![ICE Arcade 在 XP 窗口里](../images/xp-arcade.webp)
 
 ### 美化：主题、图标、Retina
 
@@ -280,7 +280,7 @@ model.chord(row, col);                      // 双击数字：周围旗数够就
 setInterval(() => model.tick(), 1000);      // 计时（只有 playing 会累加）
 ```
 
-![扫雷](../images/xp-minesweeper.png)
+![扫雷](../images/xp-minesweeper.webp)
 
 按 Windows XP 的规则：**首次点击才布雷**（排除首点及其 8 邻域，第一下永远不会炸）、
 相邻雷为 0 时洪水填充、插旗循环、chord、胜负判定（胜利自动给雷插旗并记录最佳成绩）、
@@ -333,13 +333,13 @@ setInterval(() => model.tick(), 1000);      // 计时（只有 playing 会累加
 
 | 开机自检 POST | BIOS 启动菜单 |
 |---|---|
-| ![ICE Arcade BIOS 自检](../images/arcade-bios.png) | ![ICE Arcade BIOS 菜单](../images/arcade-bios-menu.png) |
+| ![ICE Arcade BIOS 自检](../images/arcade-bios.webp) | ![ICE Arcade BIOS 菜单](../images/arcade-bios-menu.webp) |
 
 | 俄罗斯方块 | 贪吃蛇 | 2048 |
 |---|---|---|
-| ![ICE Arcade 俄罗斯方块](../images/arcade-tetris.png) | ![ICE Arcade 贪吃蛇](../images/arcade-snake.png) | ![ICE Arcade 2048](../images/arcade-2048.png) |
+| ![ICE Arcade 俄罗斯方块](../images/arcade-tetris.webp) | ![ICE Arcade 贪吃蛇](../images/arcade-snake.webp) | ![ICE Arcade 2048](../images/arcade-2048.webp) |
 
-![ICE Arcade · CHIP-8](../images/arcade-chip8.png)
+![ICE Arcade · CHIP-8](../images/arcade-chip8.webp)
 
 ### 四块卡带共用一套契约
 
@@ -378,7 +378,7 @@ setInterval(() => model.tick(), 1000);      // 计时（只有 playing 会累加
 | `ICEModal` + `ICETable` + `ICEScrollPane` | 「排行榜 (L)」 | 排行榜 = 弹窗里的表格（榜长了能滚），内容建在内容工厂里，避开 zIndex 坑 |
 | `ICETileMap` 的 `cellclick` | 贪吃蛇点格子转向 | 组件内部做「组件坐标 → 格子」换算，外部只接事件 |
 
-![排行榜](../images/arcade-leaderboard.png)
+![排行榜](../images/arcade-leaderboard.webp)
 
 > **自绘组件的必知坑**：`super.doRender()` 会把 CTM 换成「世界 → 设备」去画调试包围盒，
 > 所以在它**之后**自绘必须调 `this.applyActiveTransform()` 把本渲染通道的完整变换取回来，
@@ -495,7 +495,7 @@ model.pause(); model.resume(); // 和其它卡带共用同一套暂停契约
 调色板里的格子样式带 `fontSize` / `fontWeight` / `textColor` —— 所以「4×4 的棋盘 + 16 个数字」
 依旧只有 **1 个节点**。这一层是这轮为 2048 加的（单测用假 ctx 记 `fillText` 的坐标与字体）。
 
-![ICE Arcade 2048](../images/arcade-2048.png)
+![ICE Arcade 2048](../images/arcade-2048.webp)
 
 ### 卡带 4：CHIP-8（真的模拟器，不是规则模型）
 
@@ -542,7 +542,7 @@ model.pause(); model.resume();         // 与其它三块卡带共用同一套�
 > 2. **卡带需要声明自己占用的键**。外壳原本把 `P/R/L` 写死成自己的快捷键，
 >    CHIP-8 的 `R` 就永远按不出来；现在卡带用 `keys` 声明优先级，外壳让路。
 
-![ICE Arcade 暂停提示](../images/arcade-paused.png)
+![ICE Arcade 暂停提示](../images/arcade-paused.webp)
 
 > 顺手修的一个真实 UX 问题：`ICEMessage` 默认是**堆叠**的，掌机连着弹三四个提示就会盖住
 > 下面的卡带行 —— QA 里「点卡带」真的被气泡吃掉了。现在掌机只保留**一条状态线**
@@ -564,7 +564,7 @@ model.pause(); model.resume();         // 与其它三块卡带共用同一套�
 画布、工具列、色板、状态栏全是组件，只有画布里的像素是自绘的（一个 `ICETileMap` 节点）。
 铅笔 / 橡皮 / 直线 / 矩形 / 油漆桶、撤销重做、PNG 与 SVG 导出。
 
-![ICE Pixel Studio](../images/pixel-editor.png)
+![ICE Pixel Studio](../images/pixel-editor.webp)
 
 模型有两个，都是纯逻辑（[模型 API](../api/models)）：
 
@@ -610,7 +610,7 @@ model.toRGBA(16);                        // 直接喂 ImageData（PNG 导出）
 
 | 排序（快速排序跑到一半） | 寻路（A*） |
 |---|---|
-| ![算法沙盒 · 排序](../images/algorithm-sandbox.png) | ![算法沙盒 · A*](../images/algorithm-maze.png) |
+| ![算法沙盒 · 排序](../images/algorithm-sandbox.webp) | ![算法沙盒 · A*](../images/algorithm-maze.webp) |
 
 ```ts
 import { ICESortModel, ICEMazeModel, ICETracePlayerModel } from 'ice-web-components';
@@ -646,7 +646,7 @@ maze.solve('astar');                    // 一帧 = 网格快照 + 当前格 + �
 
 一个真能敲的 DOS 终端：虚拟文件系统 + 16 条命令，逻辑全在 `ICEDosModel` 里（不碰 DOM）。
 
-![ICE-DOS 终端](../images/dos-terminal.png)
+![ICE-DOS 终端](../images/dos-terminal.webp)
 
 ```ts
 import { ICEDosModel } from 'ice-web-components';
