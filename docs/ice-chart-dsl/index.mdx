@@ -4,9 +4,9 @@ sidebar_position: 1
 
 import LiveExample from '@site/src/components/LiveExample';
 
-# ice-chart-dsl · 图表 JSON DSL（当前 v0.2.8）
+# ice-chart-dsl · 图表 JSON DSL（当前 v0.2.9）
 
-:::info 🔌 DSL 层 · 应用级 · 让 AI Agent 用「一张表 + encoding」编译出 ChartOption（当前 v0.2.8）
+:::info 🔌 DSL 层 · 应用级 · 让 AI Agent 用「一张表 + encoding」编译出 ChartOption（当前 v0.2.9）
 本页属于 ice-render 家族的**应用层**：它是图表库 `ice-chart` 之上的一层「意图翻译器」，只负责把一份 JSON 意图翻译成 `ChartOption`，渲染与交互依旧交给图表层与引擎内核。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
 
 它补的是一份手写 `ChartOption` 不做、而模型最容易写错的三件事：
@@ -17,7 +17,7 @@ import LiveExample from '@site/src/components/LiveExample';
 **编译产物就是一份普通的 `ChartOption`**——悬停、缩放、框选、序列化、跨图联动全部照旧。
 :::
 
-**ice-chart-dsl 是 `ice-chart` 图表库的 agent 友好层（当前 `@damoqiongqiu/ice-chart-dsl` v0.2.8）。** 它守住三条明确的增量，而不是「把 option 换个写法」：
+**ice-chart-dsl 是 `ice-chart` 图表库的 agent 友好层（当前 `@damoqiongqiu/ice-chart-dsl` v0.2.9）。** 它守住三条明确的增量，而不是「把 option 换个写法」：
 
 1. **数据绑定**：一张表（`columns` + `rows`）加一份 `encoding`，编译出 `series`；
 2. **意图级默认**：轴类型、图例显隐、提示框触发方式按类型保守推断；

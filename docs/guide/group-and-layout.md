@@ -49,7 +49,7 @@ for (let i = 0; i < 9; i++) {
 | `ICEOverlayLayout` | 所有子项叠在容器左上角 | — |
 | `ICELayeredLayout` | **图布局**：按节点与连线做拓扑分层 + 层内排序，面向流程图 / ER 图 | `gapX=80`、`gapY=40`、`direction='horizontal'`、`crossAlign='start'` |
 
-各布局参数详见 `examples/layout/` 下的 13 个示例（border / box / card / dashboard / flow / grid / layered / overlay 等）。
+各布局参数详见 `examples/layout/` 下的 14 个示例（border / box / card / dashboard / flow / grid / layered / overlay 等）。
 
 ## 布局反射（reflow）
 
