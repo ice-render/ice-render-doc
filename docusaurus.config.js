@@ -45,6 +45,20 @@ const config = {
   gtag('js', new Date());
   gtag('config', 'G-X4GCPSJRMH');`,
     },
+    // 第三方分析域名提前建连：gtag.js 来自 googletagmanager.com，埋点 beacon 发往 google-analytics.com。
+    // preconnect + dns-prefetch 能省掉首屏那一次 DNS+TCP+TLS 往返，对首屏时间有帮助（它俩是站外最大请求）。
+    {
+      tagName: 'link',
+      attributes: { rel: 'preconnect', href: 'https://www.googletagmanager.com', crossorigin: 'anonymous' },
+    },
+    {
+      tagName: 'link',
+      attributes: { rel: 'preconnect', href: 'https://www.google-analytics.com', crossorigin: 'anonymous' },
+    },
+    {
+      tagName: 'link',
+      attributes: { rel: 'dns-prefetch', href: 'https://www.googletagmanager.com' },
+    },
     // Open Graph 社交分享卡片（og:title/description/url/type/locale 由 Docusaurus 自动注入；
     // twitter:card 在已配置 og:image 时会被 Docusaurus 自动设为 summary_large_image，无需手动补）
     {

@@ -76,7 +76,7 @@ const umdCode = `<script src="https://unpkg.com/ice-render/dist/index.umd.js"></
 // 首页「案例」区：全部取自家族各仓的 README 示例截图，画面里的每一个像素都由引擎在 Canvas 上绘制。
 // 宽幅主图用 ice-chart 的六套大屏（2.4:1，正好铺满一行不裁切）；下面 6 张按产品各取一张。
 const showcaseFeatured = {
-  img: 'img/showcase/ice-chart-dashboards.jpg',
+  img: 'img/showcase/ice-chart-dashboards.webp',
   tag: 'ice-chart',
   title: '六套数据大屏与图表库',
   docs: '/docs/ice-chart',
@@ -84,37 +84,37 @@ const showcaseFeatured = {
 
 const showcase = [
   {
-    img: 'img/showcase/web-components-admin.jpg',
+    img: 'img/showcase/web-components-admin.webp',
     tag: 'ice-web-components',
     title: '后台管理系统（80+ Canvas 控件）',
     docs: '/docs/ice-web-components',
   },
   {
-    img: 'img/showcase/smart-water-process.jpg',
+    img: 'img/showcase/smart-water-process.webp',
     tag: 'ice-smart-water',
     title: '污水处理工艺流程图',
     docs: '/docs/ice-smart-water',
   },
   {
-    img: 'img/showcase/agent-console-chart.jpg',
+    img: 'img/showcase/agent-console-chart.webp',
     tag: 'ice-agent-console',
     title: 'AI Agent 驱动的绘图控制台',
     docs: '/docs/ice-agent-console',
   },
   {
-    img: 'img/showcase/entity-designer-overview.jpg',
+    img: 'img/showcase/entity-designer-overview.webp',
     tag: 'ice-entity-designer',
     title: 'ER 实体关系建模（可导出 Schema）',
     docs: '/docs/entity-designer',
   },
   {
-    img: 'img/showcase/game-xp-desktop.jpg',
+    img: 'img/showcase/game-xp-desktop.webp',
     tag: 'ice-game',
     title: '整机厅 · Windows XP 桌面',
     docs: '/docs/ice-game',
   },
   {
-    img: 'img/showcase/web-components-arcade.jpg',
+    img: 'img/showcase/web-components-arcade.webp',
     tag: 'ice-web-components',
     title: 'ICE Arcade 掌机（俄罗斯方块）',
     docs: '/docs/ice-web-components',

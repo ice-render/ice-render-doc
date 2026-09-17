@@ -69,7 +69,7 @@ class MyPainter implements ICEPainter {
 可以直接放进 `ICEForm` 参与校验。完整源码在 ``docs/examples/ICEMetric.ts``，
 在线效果在 ``examples/custom-component.html``。
 
-![自定义组件示例](../images/custom-component.png)
+![自定义组件示例](../images/custom-component.webp)
 
 ```ts
 // 你自己的项目里从包名导入
