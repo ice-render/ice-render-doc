@@ -1,7 +1,13 @@
 ---
 sidebar_position: 3
+description: "ICE Render 图元与图形：内置形状、自定义绘制与命中检测，如何用声明式 API 构建可交互的图元节点。"
+keywords:
+  - "图元"
+  - "图形绘制"
+  - "命中检测"
+  - "自定义形状"
+  - "Canvas 节点"
 ---
-
 import IceCanvas from '@site/src/components/IceCanvas';
 
 # 图元手册

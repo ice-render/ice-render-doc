@@ -1,3 +1,13 @@
+---
+description: "ICE Render 架构设计总览（单一事实来源）：引擎定位、核心设计约束、子系统划分与渲染管线，面向需要二次开发与维护的工程师。"
+keywords:
+  - "架构设计"
+  - "渲染引擎架构"
+  - "渲染管线"
+  - "Canvas 2D"
+  - "二次开发"
+---
+
 # ICERender 架构设计文档
 
 > 一份关于 ICERender Canvas 2D 渲染引擎的系统性架构说明，作为该引擎的**单一事实来源**（single source of truth），与代码库同仓、随版本演进。

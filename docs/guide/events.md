@@ -1,7 +1,13 @@
 ---
 sidebar_position: 7
+description: "ICE Render 事件系统：借鉴 W3C EventTarget 的冒泡 / 捕获与委托机制，在 Canvas 上实现精准的指针与交互事件处理。"
+keywords:
+  - "Canvas 事件"
+  - "事件冒泡"
+  - "事件委托"
+  - "指针事件"
+  - "交互处理"
 ---
-
 # 事件系统
 
 ICERender 实现了 W3C 风格的事件模型：组件与全局事件总线（`ice.evtBus`）共用同一套 `ICEEventTarget` API。

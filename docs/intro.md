@@ -1,8 +1,16 @@
 ---
 sidebar_position: 0
 sidebar_label: 1.1 介绍
+description: "ICE Render（雪花渲染器）介绍：一个用纯 TypeScript 编写、运行时零依赖的高性能 Canvas 2D 交互图形渲染引擎，面向 ER 图 / 流程图 / 拓扑图，借鉴 React 组件模型与 W3C 事件模型。"
+keywords:
+  - "Canvas 2D 引擎"
+  - "交互图形渲染"
+  - "ER 图"
+  - "流程图"
+  - "TypeScript"
+  - "零依赖"
+  - "ICE Render"
 ---
-
 # ICE Render · 雪花渲染器（当前 v2.12.2）
 
 **ICERender** 是一个用纯 TypeScript 编写的 Canvas 2D 交互图形渲染引擎，面向 ER 图、流程图、拓扑图等图编辑场景。它借鉴了 React 的组件模型与 W3C 的事件模型，提供嵌套坐标系、序列化、动画与 Visio 风格连接线，运行时零依赖（gl-matrix 在构建期内联）。

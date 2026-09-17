@@ -1,7 +1,13 @@
 ---
 sidebar_position: 1
+description: "ICE Render 核心概念：React 式组件 / props / state 编程模型、W3C 式事件系统与场景树，理解引擎如何组织与渲染交互图形。"
+keywords:
+  - "核心概念"
+  - "组件模型"
+  - "props state"
+  - "场景树"
+  - "事件模型"
 ---
-
 import IceCanvas from '@site/src/components/IceCanvas';
 
 # 核心概念
