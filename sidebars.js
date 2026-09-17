@@ -199,6 +199,7 @@ const sidebars = {
       label: '3. 工程约定',
       items: [
         { type: 'doc', id: 'conventions/member-ordering', label: '3.1 成员顺序契约' },
+        { type: 'doc', id: 'conventions/app-pages', label: '3.2 应用层页面写法' },
       ],
     },
   ],

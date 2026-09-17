@@ -37,6 +37,21 @@ ICE 家族的文档站（Docusaurus，部署在 GitHub Pages：`https://ice-rend
 
 ## 发布时记得刷新的东西
 
+### 镜像来的页面：改了源头要过来同步（2026-09-17 立）
+
+站上有一部分页面是**从别的仓镜像过来的副本**（单一来源在那边，站点只是给人读的一份）：
+
+| 站点页面 | 源头 | 同步方式 |
+|---|---|---|
+| `docs/ice-web-components/guides/*.md`（9 篇） | `ice-web-components/docs/guides/*.md` | 手改：把相对 `.md` 链接改成无扩展名（`./x.md` → `./x`），示例路径按站点根重写 |
+| `docs/conventions/app-pages.md` | `ice-web-components/docs/guides/app-pages.md` | 同上，另加 front matter（description / keywords） |
+| `docs/conventions/member-ordering.md` | 各仓 `AGENTS.md` 里的成员顺序契约 | 归纳成一篇，跟着契约改 |
+| `docs/ice-agent-console/upstream-gaps.md`、`docs/ice-chart/annotation-design`、`docs/entity-designer/notation-*` | 对应仓的 `docs/` | 整篇搬过来 |
+
+⚠️ **镜像会漂**：2026-09-17 体检时，`guides/` 里已经有 5 篇与源头不一致（`examples.md` 差 44 行、
+`custom-components.md` 差 10 行、`layout.md` / `forms.md` / `testing.md` 各差 2~4 行，多是链接与
+个别措辞）。改了库仓的指南就顺手过来对一遍 —— 站上那份是用户唯一会读到的。
+
 - `static/` 下的预打包产物：`ice-render.js`、`ice-render-dsl.js`、`ice-web-components/*.umd.js`、
   `ice-chart/vendor/*.umd.js`、`ied/index.umd.js`（与各仓 `dist/index.umd.js` 同源）。
 - `site-versions.js`（顶部导航 / 左侧菜单 / 产品页版本号的**单一来源**），
