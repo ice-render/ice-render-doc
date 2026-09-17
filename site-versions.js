@@ -9,7 +9,7 @@ module.exports = {
   // 应用层产品
   entityDesigner: '0.4.3',
   iceChart: '0.23.4',
-  iceWebComponents: '1.17.0',
+  iceWebComponents: '1.18.0',
   // DSL 兄弟包（ice-chart / ice-entity-designer 落地页与生态表引用）
   iceChartDsl: '0.2.9',
   entityDesignerDsl: '0.0.29',
