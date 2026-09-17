@@ -6,7 +6,7 @@
 
 所有 UI 组件的基类（继承引擎 ICEGroup）。  在引擎的绘制能力之上只加四件事：交互态（enabled / hovered / focused）、键盘焦点 （`focusable` / `activate()`）、表单校验态（`validateStatus`）、表单取值约定 （`getFormValue` / `setFormValue`）。
 
-源码：``src/core/ICEWidget.ts``
+源码：`src/core/ICEWidget.ts`
 
 **方法**
 
@@ -37,13 +37,27 @@
 | `getPainter()` | `ICEPainter ｜ null` |  |
 | `paintDecoration()` | `void` | 让 painter 画一次内部装饰。`doRender()` 每帧自动调用；单测可以直接调它来断言画笔行为 |
 | `addChild(child: any, markDirty: boolean)` | `void` | UI 组件内部的图元只负责外观，不参与画布级拖拽、变换、连线。 |
+| `onMount()` | `void` | 挂进 ICE 场景后调用一次（引擎 `AFTER_ADD`，与 `afterAddHandler` 同源）。 |
+| `onUnmount()` | `void` | 被移出场景前调用一次（引擎 `AFTER_REMOVE`；`removeChild()` 与 `ICE.remove()` 两条路都会触发）。 |
+| `onShow()` | `void` | 自身 `state.display` 由假变真时调用（对齐 Swing 的 `componentShown`）。祖先隐藏不算。 |
+| `onHide()` | `void` | 自身 `state.display` 由真变假时调用（对齐 Swing 的 `componentHidden`）。祖先隐藏不算。 |
+| `onResize()` | `void` | 自身宽或高变化时调用，**包含父容器布局器摆位引起的尺寸变化**。 |
+| `initEvents()` | `void` | 注册默认事件：转发给引擎基类（鼠标 / 键盘），再补上生命周期钩子要的一次性监听。 |
 | `theme()` |  |  |
 
 ## `ICEContainer`
 
-容器基类：在此挂布局策略（`setLayout`，链式返回自身）。
+容器型组件基类：**应用层对外的主要入口** —— 页面、面板、工作区的默认基类。
 
-源码：``src/core/ICEContainer.ts``
+- **契约**：继承本类 = ① 我能持有子节点、也能被嵌套；② 我负责把子节点排到正确位置； ③ 子节点坐标相对本容器的内容区（已扣 `padding`），因此可以无限嵌套。
+- **选哪条线**：要 `addChild` 并负责排布 → 本类；画不持有子节点、也不负责排布的叶子控件 （指针、状态灯…）→ `ICEWidget`。判定只需问一句：**我要不要给它 `addChild` 并负责排布？**
+- **布局**：优先挂布局策略（`setLayout`）；不挂才由调用方给绝对坐标（等价 Swing 的 `setLayout(null)`）。库内新增容器必须「挂布局」或「写清豁免原因」二选一，棘轮测试管着。
+- **不涉及页面 / 路由 / 激活**：谁挂载我、什么时候让我出现，是**宿主**的决定。宿主用 `setState({ display })` 切换可见性，容器收到 `onShow` / `onHide` / `onResize` / `onMount` / `onUnmount`（定义与分发点见 `ICEWidget`）。`onUpdate(deps)` 不是引擎回调， 是应用层自己的约定：页面自己声明关心哪些值、自己调用它。
+- **嵌套是能力，不是义务**：具体工程选扁平挂载（页面节点直接挂根、一套绝对坐标）还是 逐层嵌套，属于挂载方的策略，两者不冲突。
+- **不覆盖 `toJSON()`**：容器是结构，属于文档本身，应当被序列化。要排除内部零件，由组件 自己覆盖（`ICEMenu` / `ICETabs` / `ICEScrollPane` 是范例）。
+- 完整口径见 `docs/guides/layout.md`。
+
+源码：`src/core/ICEContainer.ts`
 
 **方法**
 
@@ -55,7 +69,7 @@
 
 面板：带填充、描边、圆角与阴影的基础容器，业务页面的“卡片底座”。
 
-源码：``src/components/ICEPanel.ts``
+源码：`src/components/ICEPanel.ts`
 
 ## `ICESpace`
 
@@ -69,7 +83,7 @@
 - 纵向、以及横向不换行 → `ICEBoxLayout`（交叉轴 `align` 就是它的 `align`）；
 - 横向且 `wrap: true` → `ICEFlowLayout`（`crossAlign` 是引擎补的行内交叉轴对齐）。 本组件自己只保留一条策略：**没给宽/高的那一轴按内容自适应**（布局器不管这件事， 它只按容器当前的盒子排版）。做法是先问布局器「内容想要多大」，写回自身后再让它排。
 
-源码：``src/components/ICESpace.ts``
+源码：`src/components/ICESpace.ts`
 
 **构造参数** `ICESpaceOptions` — 间距容器：按固定间距排列一组子组件。
 
@@ -102,7 +116,7 @@
 
 24 栅格列：`span` 占多少格、`offset` 左边空多少格，`content` 是列内容。  一般配合 `ICEGrid`（行）使用，由行统一算宽度与位置，不需要手动设 width。
 
-源码：``src/components/ICEGrid.ts``
+源码：`src/components/ICEGrid.ts`
 
 **构造参数** `ICEGridOptions` — 24 栅格行：把若干 `ICEGridCol` 排成一行，放不下自动换行。  规则：先按 `span + offset` 把列分行（每行不超过 24 格），再按 `unit = (width - gutter × (列数 - 1)) / 24` 算每格宽度； 行高取该行最高列，行间距离是 `gutterY`。
 
@@ -131,7 +145,7 @@
 
 24 栅格列：`span` 占多少格、`offset` 左边空多少格，`content` 是列内容。  一般配合 `ICEGrid`（行）使用，由行统一算宽度与位置，不需要手动设 width。
 
-源码：``src/components/ICEGrid.ts``
+源码：`src/components/ICEGrid.ts`
 
 **构造参数** `ICEGridColOptions` — 24 栅格列：`span` 占多少格、`offset` 左边空多少格，`content` 是列内容。  一般配合 `ICEGrid`（行）使用，由行统一算宽度与位置，不需要手动设 width。
 
@@ -154,7 +168,7 @@
 
 按钮：`primary` / `default` / `text` / `link` 变体，`danger` 与三种尺寸， 自带 hover / 焦点 / 禁用态，点击时触发 `click`。
 
-源码：``src/components/ICEButton.ts``
+源码：`src/components/ICEButton.ts`
 
 **方法**
 
@@ -175,7 +189,7 @@
 
 文本标签：包装引擎 `ICEText`，支持水平（`align`）与垂直（`verticalAlign`）对齐； 未显式给尺寸时采用文字的实测尺寸，便于参与流式/盒式布局。
 
-源码：``src/components/ICELabel.ts``
+源码：`src/components/ICELabel.ts`
 
 **方法**
 
@@ -196,7 +210,7 @@
 - `type`：语义色（`secondary` / `success` / `warning` / `danger` / `primary`）；
 - `ellipsis: true`（或给了 `rows`）时按宽度截断——画布不会自动换行，长文案必须显式处理。
 
-源码：``src/components/ICETypography.ts``
+源码：`src/components/ICETypography.ts`
 
 **构造参数** `ICETypographyOptions` — 排版文本：标题层级 / 正文 / 链接，自带省略与折行。
 
@@ -233,7 +247,7 @@
 
 图标：一个居中的字形（★ ✓ ℹ …），字号与颜色可配。
 
-源码：``src/components/ICEIcon.ts``
+源码：`src/components/ICEIcon.ts`
 
 **方法**
 
@@ -245,7 +259,7 @@
 
 SVG 路径图标：给一段 `d` 路径数据，按 `viewBox` 缩放到目标尺寸并描边。
 
-源码：``src/components/ICESvgIcon.ts``
+源码：`src/components/ICESvgIcon.ts`
 
 **方法**
 
@@ -265,7 +279,7 @@ SVG 路径图标：给一段 `d` 路径数据，按 `viewBox` 缩放到目标尺
 - **双击打开**（`dblclick` → `open` 事件 + `onOpen`），Enter/Space 等价（键盘可达）；
 - `selected` 为受控初始值，`setSelected()` 是程序式接口（取消全选时用）。
 
-源码：``src/components/ICEIconTile.ts``
+源码：`src/components/ICEIconTile.ts`
 
 **构造参数** `ICEIconTileOptions` — 图标磁贴（桌面图标 / 应用宫格）：大图标字形 + 下方文字标签。
 
@@ -302,4 +316,4 @@ SVG 路径图标：给一段 `d` 路径数据，按 `viewBox` 缩放到目标尺
 
 分隔线：1px 的水平或垂直分隔。
 
-源码：``src/components/ICESeparator.ts``
+源码：`src/components/ICESeparator.ts`
