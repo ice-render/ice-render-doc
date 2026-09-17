@@ -27,6 +27,29 @@ ice.addChild(group);
 - 设定布局后，**子组件的位置由布局接管**（默认把后代递归设为 `transformable: false`；
   要"边排边拖"用 `setLayout(manager, { disableTransform: false })`）
 
+## 绘制顺序（引擎 2.13 起：树序 + 兄弟按 `zIndex`）
+
+绘制顺序 = **先父后子**（树序），同一父容器下的兄弟按 `state.zIndex` 升序排列；相等时保持加入顺序。
+**`zIndex` 只在兄弟之间比较**，不再是全局序列。工具层（`ice.addTool()`，浮层 / 控制面板 / 消息）
+整体画在组件层之上。
+
+```js
+const group = new ICE.ICEGroup({ width: 200, height: 200 });
+group.addChild(low);   // 先加 → 先画（在下面）
+group.addChild(high);  // 后加 → 后画（在上面）
+ice.addChild(group);
+```
+
+⚠️ **2.13 之前的语义是"全局按 `zIndex` 排序"**，而默认 `zIndex` 是**构造顺序计数器** ——
+于是「父容器比子组件后构造」会让父的 `zIndex` 反超自己的孩子，**父把自己的子树整个盖住**
+（画出来一片空白、**不报错**）。新语义下这种倒挂不可能发生：**子永远画在父之上**。
+
+写页面时记住两条：
+
+- **先建父、再建子**（自然的写法），不要反过来"先摆零件、再套外框"；
+- 想跨子树压层（"我这块要盖住隔壁那块"）要抬**共同祖先那一层的兄弟**，不能只抬深层节点 ——
+  子树的叠放位置由它在兄弟里的位置决定（与 DOM / Swing 同语义）。
+
 ## 布局管理器
 
 通过 `ICEGroup.setLayout(manager)` 设定：
