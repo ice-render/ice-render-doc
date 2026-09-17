@@ -86,7 +86,7 @@
 |  | [`ICEDropdown`](./api/navigation) | 下拉菜单：点击触发组件弹出选项列表。 |
 |  | [`ICEPagination`](./api/navigation) | 分页器：页码 + 上一页/下一页 + 可选「共 N 条」与每页条数切换。 |
 |  | [`ICETabs`](./api/navigation) |  |
-| [核心与布局](./api/core) | [`ICEScrollPane`](./api/core) | 滚动视口（Swing 的 JScrollPane / CSS 的 overflow:auto 容器）。  依赖引擎的**子树裁剪**（`clipChildren`）：内容超出视口的部分被裁掉，滚出去的子组件 也命不中（命中检测同样尊重裁剪区）。  结构： ``` ICEScrollPane (clipChildren: true)   ├── contentBox   位置 = (-scrollX, -scrollY)，尺寸 = 内容尺寸   │     └── 调用方的内容组件   └── scrollbarTrack + scrollbarThumb   滚动条（内容超出时才显示） ``` 内容盒与滚动条都在构造期创建，保证滚动条的 zIndex 恒高于内容（引擎按 zIndex 排序渲染）。 |
+| [核心与布局](./api/core) | [`ICEScrollPane`](./api/core) | 滚动视口（Swing 的 JScrollPane / CSS 的 overflow:auto 容器）。  依赖引擎的**子树裁剪**（`clipChildren`）：内容超出视口的部分被裁掉，滚出去的子组件 也命不中（命中检测同样尊重裁剪区）。  结构： ``` ICEScrollPane (clipChildren: true)   ├── contentBox   位置 = (-scrollX, -scrollY)，尺寸 = 内容尺寸   │     └── 调用方的内容组件   └── scrollbarTrack + scrollbarThumb   滚动条（内容超出时才显示） ``` 内容盒与滚动条与内容盒是**兄弟**，滚动条的 zIndex 恒高于内容（引擎 2.13 起按「树序 + 兄弟按 zIndex」绘制）。 |
 |  | [`ICEAffix`](./api/core) | 吸顶容器（CSS `position: sticky` 的画布版本）。  长页面里「筛选条 / 表头 / 批量操作栏」跟着滚走是后台最常见的抱怨；DOM 里一行 `position: sticky` 就解决，画布里没有这回事，于是这里把它补上： |
 |  | [`ICELayout`](./api/core) | 布局骨架：顶栏 / 侧栏 / 内容 / 页脚。  后台外壳每个示例都在手搭（算坐标、算剩余宽度、侧栏收起时手动把内容挪过去）， 这里把它沉淀成一个件。版式本身**交给引擎的五区布局**（`ICEBorderLayout`）： 顶栏 north / 侧栏 west（右置时 east）/ 内容 center / 页脚 south，本组件只负责 「哪个节点是哪个区」和「各区声明多大」—— |
 |  | [`ICESplitter`](./api/core) | 分隔面板：两栏 + 可拖动的分隔条。 |
