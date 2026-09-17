@@ -114,8 +114,24 @@ const sidebars = {
       type: 'category',
       label: '2. 家族产品 · 应用层',
       items: [
-        { type: 'doc', id: 'entity-designer/index', label: `2.1 Entity Designer v${V.entityDesigner}` },
-        { type: 'doc', id: 'ice-chart/index', label: `2.2 ice-chart v${V.iceChart}` },
+        {
+          type: 'category',
+          label: `2.1 Entity Designer v${V.entityDesigner}`,
+          items: [
+            { type: 'doc', id: 'entity-designer/index', label: '概览' },
+            { type: 'doc', id: 'entity-designer/power-symbol-spec', label: '电力符号记法' },
+            { type: 'doc', id: 'entity-designer/power-secondary-spec', label: '厂站二次侧记法' },
+            { type: 'doc', id: 'entity-designer/water-process-spec', label: '水处理工艺记法' },
+          ],
+        },
+        {
+          type: 'category',
+          label: `2.2 ice-chart v${V.iceChart}`,
+          items: [
+            { type: 'doc', id: 'ice-chart/index', label: '概览' },
+            { type: 'doc', id: 'ice-chart/annotation-design', label: '标注能力设计' },
+          ],
+        },
         {
           type: 'category',
           label: `2.3 ice-web-components v${V.iceWebComponents}`,
@@ -158,7 +174,14 @@ const sidebars = {
         },
         { type: 'doc', id: 'ice-smart-water/index', label: `2.4 ice-smart-water v${V.iceSmartWater}` },
         { type: 'doc', id: 'ice-game/index', label: `2.5 ice-game v${V.iceGame}` },
-        { type: 'doc', id: 'ice-agent-console/index', label: `2.6 ice-agent-console v${V.iceAgentConsole}` },
+        {
+          type: 'category',
+          label: `2.6 ice-agent-console v${V.iceAgentConsole}`,
+          items: [
+            { type: 'doc', id: 'ice-agent-console/index', label: '概览' },
+            { type: 'doc', id: 'ice-agent-console/upstream-gaps', label: '上游差距盘点' },
+          ],
+        },
         {
           type: 'category',
           label: '2.7 DSL 层',
@@ -166,8 +189,16 @@ const sidebars = {
             { type: 'doc', id: 'ice-render-dsl/index', label: `2.7.1 ice-render-dsl v${V.iceRenderDsl}` },
             { type: 'doc', id: 'ice-chart-dsl/index', label: `2.7.2 ice-chart-dsl v${V.iceChartDsl}` },
             { type: 'doc', id: 'ice-entity-designer-dsl/index', label: `2.7.3 ice-entity-designer-dsl v${V.entityDesignerDsl}` },
+            { type: 'doc', id: 'ice-web-components-dsl/index', label: `2.7.4 ice-web-components-dsl v${V.iceWebComponentsDsl}` },
           ],
         },
+      ],
+    },
+    {
+      type: 'category',
+      label: '3. 工程约定',
+      items: [
+        { type: 'doc', id: 'conventions/member-ordering', label: '3.1 成员顺序契约' },
       ],
     },
   ],

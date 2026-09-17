@@ -1,0 +1,162 @@
+---
+sidebar_position: 1
+---
+
+import LiveExample from '@site/src/components/LiveExample';
+
+# ice-web-components-dsl · 表单 JSON DSL（当前 v0.3.2）
+
+:::info 🔌 DSL 层 · 应用级 · 让 AI Agent 用一份扁平 `fields[]` 编译出 ICE 表单（当前 v0.3.2）
+本页属于 ice-render 家族的**应用层**：它是组件库 `ice-web-components` 之上的一层「意图翻译器」，只负责把一份 JSON 表单意图翻译成 `ICEForm` / `ICEFormItem` / 控件树，渲染与交互依旧交给组件层与引擎内核。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
+
+它补的是一份手写三层表单不做、而模型最容易写错的三件事：
+- **扁平 `fields[]`**：控件 + `ICEFormItem` + `ICEForm` 三层构造收敛成一个 `{ name, type, label, ... }` 数组，`name` / `label` / `control` / `rules` 不再散落在两个对象里；
+- **一处声明、两处生效**：写一次 `min: 18`，`ICEInputNumber` 的步进夹取与 `ICEFormRule` 的越界校验同时有了；
+- **结构化诊断**：类型不认识（带可用类型）、依赖写错（带可用字段名）、白名单外的键（带该类型接受的键）全部带路径返回，模型能就地修。
+
+**编译产物就是普通的 `ICEPanel` + `ICEForm` + `ICEFormItem` + 控件**——命中测试、键盘导航、无障碍镜像、主题、序列化全部照旧。
+:::
+
+**ice-web-components-dsl 是 `ice-web-components` 的 agent 友好表单层（当前 `ice-web-components-dsl` v0.3.2）。** 它守住三条明确的增量，而不是「把 `new ICEForm(...)` 换个写法」：
+
+于是 **AI Agent 不必背诵三层构造与 `name`/`label`/`control`/`rules` 的摆放**，只需产出一份扁平 `fields[]`，约束与诊断交给这一层兜底。它被 `ice-agent-console` 用作事件流驱动表单的落地机制。
+
+MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
+
+## 为什么用 DSL 而不是手写三层表单
+
+`ice-web-components` 的表单是**三层**的：控件（`ICETextField` / `ICESelect` / `ICEInputNumber`…）+ `ICEFormItem`（标签与错误排版）+ `ICEForm`（把控件与模型接起来）。每个字段要写三层构造，而 `name` / `label` / `control` / `rules` 分散在两个对象里。
+
+| | 原生写法 | ice-web-components-dsl |
+| --- | --- | --- |
+| 输入 | 每个字段三层构造，`name`/`label`/`control`/`rules` 分散 | **一个扁平 `fields[]`**：`{ name, type, label, ... }` |
+| 约束 | `new ICEInputNumber({ min: 18 })` 与 `rules: [{ min: 18 }]` **互不相干** | **写一次 `min: 18`，控件夹取与校验两处都有了** |
+| 出错时 | 控件画出来了但行为不对，只能自己猜 | **结构化诊断**：类型不认识列出可用类型、依赖写错列出可用字段名 |
+
+## 安装
+
+```bash
+npm install ice-web-components-dsl ice-web-components ice-render
+```
+
+> `ice-web-components-dsl` 把 `ice-web-components` 与 `ice-render` 都声明为 peer 依赖：同一页面上多个表单要共享引擎实例池，所以这两个依赖由宿主工程统一安装。
+
+## 30 秒上手
+
+下面这份「泵站参数确认」就是一份真实可编译、可自检的 DSL 文档（不是截图）：
+
+```json title="ice-web-components-dsl 文档（AI Agent 可直接产出）"
+{
+  "schemaVersion": 1,
+  "kind": "form",
+  "title": "泵站参数确认",
+  "description": "这三项确认后才会下发控制指令。",
+  "fields": [
+    { "name": "station", "type": "text", "label": "泵站名称", "required": true, "maxLength": 20 },
+    { "name": "mode", "type": "select", "label": "运行模式", "required": true, "default": "auto",
+      "options": [{ "value": "auto", "label": "自动" }, { "value": "manual", "label": "手动" }] },
+    { "name": "flow", "type": "number", "label": "目标流量 (m³/h)", "required": true, "min": 0, "max": 5000, "step": 10 }
+  ],
+  "submitText": "确认下发"
+}
+```
+
+```ts title="编译并接管提交"
+import { renderFormDsl, validateFormDsl, compileFormDsl } from 'ice-web-components-dsl';
+
+const { compiled, diagnostics } = renderFormDsl('canvas-id', dsl, {
+  onSubmit(values) {
+    console.log(values); // { station: '一号泵站', mode: 'auto', flow: 800 }
+  },
+});
+
+// 或者只要诊断（validate 不抛异常，任何输入都能吃）
+const result = validateFormDsl(dsl);
+if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
+
+// 或者只要组件树（自己挂到已有的 ICE 实例上）
+const { container, form, model } = compileFormDsl(dsl);
+ice.addChild(container);
+```
+
+浏览器直接用（UMD，**注意顺序**）：
+
+```html
+<canvas id="form" width="440" height="500"></canvas>
+<script src="https://unpkg.com/ice-render/dist/index.umd.js"></script>
+<script src="https://unpkg.com/ice-web-components/dist/index.umd.js"></script>
+<script src="https://unpkg.com/ice-web-components-dsl/dist/index.umd.js"></script>
+<script>
+  ICEWEBDSL.renderFormDsl('form', { kind: 'form', fields: [{ name: 'a', type: 'text' }] });
+</script>
+```
+
+## 四个导出
+
+| 导出 | 说明 |
+| --- | --- |
+| `validateFormDsl(dsl)` | **任何输入都不抛异常**。返回 `{ valid, errors, warnings }`，每条诊断带 `severity` / `code` / `message` / `path` |
+| `formatDiagnostics(result)` | 把校验结果转成可读文本 |
+| `compileFormDsl(dsl, opts?)` | → `{ container, form, model, submitButton, fieldNames, getValues, setValues, reset, setWidth, submit, submitAsync, onSubmit, destroy }`。`opts.width` / `opts.maxWidth` 见下文。校验不过抛 `FormDslCompileError`（带诊断） |
+| `renderFormDsl(target, dsl, opts?)` | 一步到位：建 ICE 实例 + 挂组件 + 接提交。返回 `{ ice, compiled, diagnostics, width, resize, setWidth, measureContentHeight, destroy }`。`width` 是表单**最终**宽度（已夹过 `maxWidth`） |
+
+## 字段类型与接受的属性
+
+共 **20 个类型**（`FORM_DSL_FIELD_TYPES`）。加新类型的**硬条件**是"值能经 JSON 往返"——判据是运行时的，不是从文档看来的。
+
+| `type` | 取值类型 | 该类型额外接受 |
+| --- | --- | --- |
+| `text` / `textarea` | string | `allowClear` `showCount` |
+| `password` | string | `allowClear` `showCount` `showToggle` |
+| `number` | number | `step` `precision` |
+| `slider` | number | `step` `range` |
+| `checkbox` / `switch` | boolean | — |
+| `radio-group` / `checkbox-group` | string / string[] | `options` `direction`（多选组还有 `maxChecked`） |
+| `select` | string（`mode: multiple` 时 string[]） | `options` `mode`（`single`/`multiple`/`tags`）`showSearch` |
+| `date` | string（`YYYY-MM-DD`） | `placement` |
+| `color` | string（hex） | `options`（色板） |
+| `rate` | number | —（`max` = 满分几颗星） |
+| `time` | string（`HH:mm:ss`） | `format`（`HH:mm:ss` / `HH:mm`） |
+| `segmented` | string | `options` `block` |
+| `autocomplete` | string | `options`（候选） |
+| `cascader` | string（最深一层的叶子） | `options`（带 `children`）`separator` |
+| `tree-select` | string（`mode: multiple` 时 string[]） | `options`（带 `children`）`mode` `showSearch` |
+| `transfer` | string[] | `options`（候选池） |
+| `date-range` | `[起, 止]` | —（`required` = 两头都在） |
+
+所有类型都还接受：`name` `type` `label` `placeholder` `default` `required` `min` `max` `minLength` `maxLength` `pattern` `message` `rules` `dependencies` `width` `props`。
+
+**白名单之外的键会被忽略，并给出警告**——警告里会列出这个类型接受哪些键。这就是"字段表封闭"的好处：模型不会静默地写一个不生效的属性。
+
+**`options` 两种写法都收**：`[{ "value": "a", "label": "甲" }]` 或直接 `["a", "b"]`。库里不同控件要的形状不一样（`colors: string[]` / `options: string[]` / `{value,label}[]` / `nodes: {key,label}` / `dataSource: {key,title}`），**那些差别由编译期归一化**——否则就是在收"模型记不住哪个是哪个"的税。
+
+### 判据是运行时的：值能不能经 JSON 往返
+
+`ice-web-components` 有 84 个 UI 组件，但不是每个都能当字段。判据不是"有没有 `value` 构造参数"，也不是"有没有 `getFormValue`"（那是 `ICEWidget` **基类**给的，人人都有），而是 **`setFormValue(v)` 之后 `getFormValue()` 还回不回得出同一个东西**。
+
+证据在 `tests/field-values.test.ts`（构造出来真调一遍），`tools/probe-field-values.mjs` 是同一件事的交互版。`ICERadioButton` / `ICEUpload` 因此**不在**类型表里——不是漏了，是判过不能用。
+
+## 一处声明、两处生效
+
+```json
+{
+  "name": "age",
+  "type": "number",
+  "label": "年龄",
+  "min": 18,
+  "max": 65
+}
+```
+
+`min` / `max` 会**同时**：
+
+1. 传给 `ICEInputNumber`，约束步进按钮的夹取范围；
+2. 生成 `ICEFormRule`，拦住用户手输的越界值。
+
+原生路径这两件事是分开的：`new ICEInputNumber({ min: 18 })` 只影响步进按钮，**手输 `10` 不会报错**，除非你再写一条 `rules: [{ min: 18 }]`。模型只会写其中一个。
+
+## 相关链接
+
+- GitHub：[ice-web-components-dsl](https://github.com/ice-render/ice-web-components-dsl)
+- npm：[ice-web-components-dsl](https://www.npmjs.com/package/ice-web-components-dsl)
+- 组件库本家：[ice-web-components](/docs/ice-web-components)

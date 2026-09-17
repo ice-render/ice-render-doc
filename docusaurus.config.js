@@ -201,6 +201,10 @@ const config = {
                 href: 'https://www.npmjs.com/package/ice-web-components',
               },
               {
+                label: 'ice-web-components-dsl（表单 DSL）',
+                href: 'https://www.npmjs.com/package/ice-web-components-dsl',
+              },
+              {
                 label: 'ice-smart-water（智慧水务，演示型）',
                 href: 'https://github.com/ice-render/ice-smart-water',
               },

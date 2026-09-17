@@ -199,8 +199,8 @@ panel.addChild(button);
 ice.addChild(panel);
 ```
 
-:::caution 没有 DSL 兄弟包
-与 ice-render / ice-entity-designer / ice-chart 不同，**ice-web-components 目前没有配套的 JSON-first DSL**——它走的是命令式组件 API（`new ICEButton(...)` / `new ICEPanel(...)` 这种），AI Agent 需要直接拼装组件树，而非产出一份纯 JSON 文档。如果你的场景想用 DSL 驱动 UI，目前需要在 Agent 侧把「意图 → 组件树」这层自己写掉。
+:::info 表单有配套的 JSON-first DSL
+与 ice-render / ice-entity-designer / ice-chart 不同，ice-web-components 的**组件 API 本身是命令式**的（`new ICEButton(...)` / `new ICEPanel(...)` 这类）——AI Agent 要直接拼装组件树。但**表单场景**已经有配套的 JSON-first DSL：[ice-web-components-dsl](/docs/ice-web-components-dsl) 用一份扁平 `fields[]` 编译出 `ICEForm` / `ICEFormItem` / 控件，约束（夹取 + 校验）与结构化诊断都由它兜底，Agent 不必手写三层构造。如果你的场景想用 DSL 驱动 UI、又不在表单范畴，仍需要在 Agent 侧把「意图 → 组件树」这层自己写掉。
 :::
 
 ## 相关链接
