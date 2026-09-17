@@ -1,7 +1,13 @@
 ---
 sidebar_position: 9
+description: "ICE Render DSL 指南：面向 AI Agent 的 JSON-first 领域特定语言，用声明式 JSON 描述场景，降低代码生成与自动化接入成本。"
+keywords:
+  - "JSON-first DSL"
+  - "AI Agent"
+  - "声明式"
+  - "场景描述"
+  - "代码生成"
 ---
-
 import DSLCanvas from '@site/src/components/DSLCanvas';
 
 # DSL 与 AI Agent 接入

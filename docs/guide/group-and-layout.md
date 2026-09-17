@@ -1,7 +1,13 @@
 ---
 sidebar_position: 5
+description: "ICE Render 分组与布局：嵌套坐标系下的容器、自动布局与相对定位，组织复杂图形的层级与排布。"
+keywords:
+  - "分组"
+  - "自动布局"
+  - "嵌套坐标系"
+  - "容器"
+  - "相对定位"
 ---
-
 # 分组与布局
 
 `ICEGroup` 是容器组件，配合**布局管理器**（设计思想来自 Java Swing 的 `LayoutManager`，策略模式）

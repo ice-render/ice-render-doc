@@ -45,6 +45,16 @@ const config = {
   gtag('js', new Date());
   gtag('config', 'G-X4GCPSJRMH');`,
     },
+    // Open Graph 社交分享卡片（og:title/description/url/type/locale 由 Docusaurus 自动注入；
+    // twitter:card 在已配置 og:image 时会被 Docusaurus 自动设为 summary_large_image，无需手动补）
+    {
+      tagName: 'meta',
+      attributes: { property: 'og:image', content: 'https://ice-render.github.io/ice-render-doc/img/logo.svg' },
+    },
+    {
+      tagName: 'meta',
+      attributes: { property: 'og:site_name', content: 'ICE Render' },
+    },
   ],
 
   markdown: {

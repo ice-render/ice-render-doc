@@ -1,3 +1,13 @@
+---
+description: "ICE Render 安装指南：通过 npm 安装 ice-render 包，提供 ESM / CJS / UMD 三种产物格式，支持现代浏览器与微信小程序，运行时零依赖。"
+keywords:
+  - "ICE Render 安装"
+  - "npm ice-render"
+  - "UMD"
+  - "ESM"
+  - "Canvas 引擎集成"
+---
+
 # 安装
 
 ICERender 发布为 npm 包 `ice-render`，提供 **ESM / CJS / UMD** 三种格式产物，运行时零依赖。

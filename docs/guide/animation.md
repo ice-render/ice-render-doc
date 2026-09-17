@@ -1,7 +1,13 @@
 ---
 sidebar_position: 9
+description: "ICE Render 动画系统：时间轴、缓动、属性通道与动画调度，用声明式方式为图形与连接线添加高性能动画。"
+keywords:
+  - "Canvas 动画"
+  - "缓动"
+  - "时间轴"
+  - "动画调度"
+  - "ICE Render"
 ---
-
 # 动画
 
 动画通过组件的 `props.animations` 声明式配置，由 `ice.animationManager`（每实例一个）驱动补间。

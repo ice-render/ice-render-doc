@@ -1,7 +1,13 @@
 ---
 sidebar_position: 4
+description: "ICE Render 文本：文本测量、自动换行、对齐与富文本，在 Canvas 上渲染可控的高质量文字。"
+keywords:
+  - "文本渲染"
+  - "自动换行"
+  - "文本测量"
+  - "富文本"
+  - "Canvas 文字"
 ---
-
 # 文本
 
 `ICEText` 负责文本渲染，支持自动换行、省略号、行数限制与编辑态。

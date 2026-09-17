@@ -1,7 +1,13 @@
 ---
 sidebar_position: 8
+description: "ICE Render 主题与样式：颜色、字体与样式变量的集中管理，配合深色模式统一全站视觉风格。"
+keywords:
+  - "主题"
+  - "样式"
+  - "深色模式"
+  - "样式变量"
+  - "视觉风格"
 ---
-
 import IceCanvas from '@site/src/components/IceCanvas';
 
 # 主题与样式机制
