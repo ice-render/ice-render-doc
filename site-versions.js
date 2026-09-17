@@ -14,6 +14,7 @@ module.exports = {
   iceChartDsl: '0.2.9',
   entityDesignerDsl: '0.0.29',
   iceRenderDsl: '0.1.7',
+  iceWebComponentsDsl: '0.3.2',
   // 应用层新成员（演示型产品，private 未发 npm）
   iceSmartWater: '0.1.0',
   iceGame: '0.1.0',
