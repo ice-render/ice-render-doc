@@ -100,8 +100,43 @@ ice.fromJSONString(json);
 ice.setTheme('dark'); // 内置 light/dark 语义主题，可热切换
 ```
 
+## 写一个「页面」（这一步别跳）
+
+上面这些例子都是**引擎原语**：`ice.addChild(new ICERect(...))` 画单块图形、写单文件 demo 很顺手。
+但一个应用里真正要交付的是**页面**：若干控件、数据由宿主推给你、切换 / 刷新时只改值不重建结构。
+那种情况下别继续往 `ice.addChild(...)` 上堆，家族统一的写法是**一页一个类**——
+继承组件库的 `ICEContainer`，构造期把树建好，`onUpdate()` 是**唯一**的改值入口：
+
+```ts
+import { ICEContainer, ICELabel, ICETable } from 'ice-web-components';
+
+class DataPage extends ICEContainer {
+  private readonly table: ICETable;                 // ① 构造期建树，树只建一次
+
+  constructor(ctx: { width: number; height: number }) {
+    super({ left: 0, top: 0, width: ctx.width, height: ctx.height });
+    this.addChild(new ICELabel({ left: 16, top: 12, text: '运行数据' }));
+    this.table = new ICETable({ left: 16, top: 48, width: ctx.width - 32 });
+    this.addChild(this.table);
+  }
+
+  /** ② 唯一改值入口：宿主在"数据换成新的"之后调它 */
+  onUpdate(snapshot: { rows: any[] }): void {
+    this.table.setData(snapshot.rows);
+  }
+}
+```
+
+三条判据说明"什么时候该从脚本升级成页面"：**有第二个页面**、**数据由宿主推给你**、
+**同一块结构要反复改值**。升级之后不要再堆 `ice.addChild`（`DataPage` 挂一次就够）。
+
+完整的契约在 [应用层：一个页面怎么写](../conventions/app-pages)：
+宿主在什么时机调 `onUpdate()`、四个入口怎么选（叶子控件 / 页面 / 设计器 / DSL）、
+稳定结构与可变内容的边界、验收清单（棘轮 + 真机 e2e）以及我们踩过的坑。
+
 ## 接下来
 
 - [核心概念](../guide/core-concepts.md)：组件模型、props/state、场景树
+- [应用层：一个页面怎么写](../conventions/app-pages)：一页一个类、`onUpdate()` 的时机、入口决策表
 - [图元手册](../guide/shapes.md)：全部内置图形
 - [API 参考](../api/ice.md)
