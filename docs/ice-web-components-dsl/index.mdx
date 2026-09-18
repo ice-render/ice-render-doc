@@ -10,9 +10,9 @@ keywords:
 ---
 import LiveExample from '@site/src/components/LiveExample';
 
-# ice-web-components-dsl · 表单 JSON DSL（当前 v0.3.2）
+# ice-web-components-dsl · 表单 JSON DSL（当前 v0.4.0）
 
-:::info 🔌 DSL 层 · 应用级 · 让 AI Agent 用一份扁平 `fields[]` 编译出 ICE 表单（当前 v0.3.2）
+:::info 🔌 DSL 层 · 应用级 · 让 AI Agent 用一份扁平 `fields[]` 编译出 ICE 表单（当前 v0.4.0）
 本页属于 ice-render 家族的**应用层**：它是组件库 `ice-web-components` 之上的一层「意图翻译器」，只负责把一份 JSON 表单意图翻译成 `ICEForm` / `ICEFormItem` / 控件树，渲染与交互依旧交给组件层与引擎内核。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
 
 它补的是一份手写三层表单不做、而模型最容易写错的三件事：
@@ -23,7 +23,7 @@ import LiveExample from '@site/src/components/LiveExample';
 **编译产物就是普通的 `ICEPanel` + `ICEForm` + `ICEFormItem` + 控件**——命中测试、键盘导航、无障碍镜像、主题、序列化全部照旧。
 :::
 
-**ice-web-components-dsl 是 `ice-web-components` 的 agent 友好表单层（当前 `ice-web-components-dsl` v0.3.2）。** 它守住三条明确的增量，而不是「把 `new ICEForm(...)` 换个写法」：
+**ice-web-components-dsl 是 `ice-web-components` 的 agent 友好表单层（当前 `ice-web-components-dsl` v0.4.0）。** 它守住三条明确的增量，而不是「把 `new ICEForm(...)` 换个写法」：
 
 于是 **AI Agent 不必背诵三层构造与 `name`/`label`/`control`/`rules` 的摆放**，只需产出一份扁平 `fields[]`，约束与诊断交给这一层兜底。它被 `ice-agent-console` 用作事件流驱动表单的落地机制。
 
