@@ -105,7 +105,7 @@ ice.findComponent('rect-1');    // 按 id 递归查找
 
 ## 事件模型
 
-组件与全局事件总线（`ice.evtBus`）共用 `ICEEventTarget` API：`on / off / once / trigger`，并支持 `addEventListener` 等 W3C 别名。详见[事件系统](events.md)。
+组件与全局事件总线（`ice.evtBus`）共用 `ICEEventTarget` API：`on / off / once / trigger`，并支持 `addEventListener` 等 W3C 别名。详见[事件系统](events)。
 
 ## 工具层与交互开关
 
