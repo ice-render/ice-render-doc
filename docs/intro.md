@@ -11,7 +11,7 @@ keywords:
   - "零依赖"
   - "ICE Render"
 ---
-# ICE Render · 雪花渲染器（当前 v2.16.0）
+# ICE Render · 雪花渲染器（当前 v2.19.0）
 
 **ICERender** 是一个用纯 TypeScript 编写的 Canvas 2D 交互图形渲染引擎，面向 ER 图、流程图、拓扑图等图编辑场景。它借鉴了 React 的组件模型与 W3C 的事件模型，提供嵌套坐标系、序列化、动画与 Visio 风格连接线，运行时零依赖（gl-matrix 在构建期内联）。
 
@@ -110,11 +110,11 @@ ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应
 
 | 层级 | 项目 | 说明 |
 |---|---|---|
-| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v2.16.0**） |
+| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v2.19.0**） |
 | 引擎（DSL） | [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **引擎级** JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎 |
 | 应用 | [ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) | 基于引擎的交互式图表库（折线 / 饼 / 雷达 / K 线 / 桑基 / 关系图等），命中测试与交互全部由引擎承担 |
 | 应用（DSL） | [ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl) | 图表 DSL：一张表 + `encoding` 编译成 `ChartOption`，带结构化诊断 |
-| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.6.0**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
+| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.9.0**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
 | 应用（DSL） | [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
 | 应用 | [ice-web-components](https://www.npmjs.com/package/ice-web-components) | 仿 Swing 风格的 Canvas 原生 UI 组件库（86 个组件，Bootstrap 5 令牌主题）；**暂无配套 DSL，走命令式组件 API** |
 | 应用 | [ice-smart-water](https://github.com/ice-render/ice-smart-water) | 智慧水务运行控制台（当前 **v0.1.0**）：工艺设计 + 运行监视；演示型「应用层样板」，渲染 / 图表 / 控件 / 设计器全取自家族「四件套」 |
