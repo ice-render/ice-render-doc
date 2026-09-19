@@ -62,11 +62,35 @@ rect.purgeEvents();     // 清空该目标上的全部监听
 原生 DOM 事件（指针 / 键盘 / 滚轮）由 `DOMEventDispatcher` 归一化成一个 `ICEEvent`，
 然后沿**组件树**冒泡，最后**总线一定再收一次**：
 
+### 事件的来源：`evt.source`
+
+原始输入监听挂在 `window` 上（拖拽移出画布也要跟手），所以**画布之外**的输入（工具栏按钮、页面空白）
+也会被转发到总线。为了让你不必靠 `instanceof` 猜"这到底是不是组件"，每个事件都带上了来源：
+
+| `evt.source` | 什么时候是它 | `evt.target` |
+|---|---|---|
+| `'canvas'` | 原始输入发生在**画布内**（指针 / 鼠标 / 触摸 / 滚轮 / 键盘） | 命中的组件；点在画布空白处为 `null`（事件照旧上总线） |
+| `'window'` | 原始输入发生在**画布之外**（工具栏按钮 / 页面空白） | `null`（那个 DOM 元素在 `evt.originalEvent.target`） |
+| `'engine'` | 代码创建：`trigger()` / `dispatchEvent()` / 引擎内部派发 | `null`（用 `evt.currentTarget` 看谁在派发） |
+
+只关心画布内交互时，一句过滤就够了：
+
+```js
+ice.evtBus.on('click', (evt) => {
+  if (evt.source !== 'canvas') return; // 画布外的点击（工具栏按钮 / 页面空白）
+  select(evt.target);
+});
+```
+
+### 三段传播
+
 | 段 | `eventPhase` | 谁在处理 | `evt.target` | `evt.currentTarget` |
 |---|---|---|---|---|
 | 命中组件 | `2`（`AT_TARGET`） | 被点到的那个组件 | 命中组件 | 命中组件 |
 | 各级父容器 | `3`（`BUBBLING_PHASE`） | 从内到外的每个 `parentNode` | **恒为命中组件** | 正在处理的组件 |
-| 全局总线 | `0`（传播已结束） | `ice.evtBus` | 命中组件（画布外输入时是原始 DOM 元素，见 FAQ） | `EventBus` |
+| 全局总线 | `0`（传播终点，恒为 `0`） | `ice.evtBus` | 命中组件；画布外输入为 `null` | `EventBus` |
+
+`evt.target` 的约定：**要么是命中的组件、要么是 `null`，永远不是 DOM 元素**。
 
 <LiveExample
   html="/ice-render/examples/event-bubbling.html"
@@ -155,6 +179,9 @@ type MyEventOf<K extends MyEvents> = ICEEventOf<K>;
 事件名拼错在**运行时**不会报错（字符串就是字符串）——所以引擎事件名请用
 `ICE_EVENT_NAME_CONSTS`，自定义事件名请收进一个常量对象，别在代码里散落字符串。
 
+事件对象上的来源字段也有类型：`import type { ICEEventSource } from 'ice-render'`
+（`'canvas' | 'window' | 'engine'`，见第 2 节）。
+
 ## 8. 常见困惑（现象 → 原因 → 正确写法）
 
 | 现象 | 原因 | 正确写法 |
@@ -162,7 +189,8 @@ type MyEventOf<K extends MyEvents> = ICEEventOf<K>;
 | 子在画布上，父容器收不到 `click` | 父子关系来自 `addChild()`；命中的组件还必须 `interactive !== false` | `parent.addChild(child)`；派生部件默认 `interactive: false`，别指望它们派发 |
 | 点子组件时，父容器的 `click` 也跑了 | 冒泡是设计（容器型组件的统一入口） | 只想认自己：`if (evt.target !== this) return;` |
 | `stopPropagation()` 之后总线还是收到了 | **总线是引擎内部通道，必达** | 在总线监听里判断 `evt.param.component`（命中的组件）或直接不监听 |
-| 总线收到"画布外点按钮"的事件，`evt.target` 是 `HTMLButtonElement` | 原始输入监听挂在 **window** 上（拖拽移出画布也要跟手） | `if (!(evt.target instanceof ICEComponent)) return;` |
+| 总线收到"画布外点按钮"的事件 | 原始输入监听挂在 **window** 上（拖拽移出画布也要跟手），画布外的输入也会到总线 | `if (evt.source !== 'canvas') return;` —— 那类事件的 `evt.target` 是 `null`，DOM 元素在 `evt.originalEvent.target` |
+| 点工具栏按钮，画布里的元素却被选中了 | **已知行为**：画布外输入仍会按画布矩形换算坐标做命中测试，坐标可能恰好落在画布内 | 用 `evt.source !== 'canvas'` 过滤（引擎侧"画布外输入要不要干脆不做命中"是语义级决策，尚未改） |
 | `off('click', handler)` 没生效 | 传的是新的匿名函数；或 `on` 用了 `scope` 而 `off` 没带 | 保存函数引用；`on`/`off` 的 `scope` 成对出现（`addEventListener` 忽略 scope） |
 | `once` 注册的监听 `off` 摘不掉 | 旧版 `once` 是自摘包装函数（两套身份） | 2.18 起用**同一个函数引用**即可摘；老版本请在回调里别依赖 `off` |
 | `passive` 监听里 `preventDefault()` 没效果 | W3C 语义；引擎会提醒一次 | 去掉 `passive`，或把"阻止默认"移到非 passive 的监听里 |

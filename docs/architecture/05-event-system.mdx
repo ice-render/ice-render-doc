@@ -54,6 +54,27 @@ graph TD
 
 ## DOM 事件桥接
 
+### 事件来源与 `target` 契约（引擎 2.20 起）
+
+| 字段 | 取值 | 含义 |
+|---|---|---|
+| `evt.source` | `'canvas'` | 原始输入发生在**画布内**（指针 / 鼠标 / 触摸 / 滚轮 / 键盘）。有命中组件时 `target` 是它；点画布空白处 `target` 为 `null`，事件照旧到总线 |
+| | `'window'` | 原始输入发生在**画布之外**（工具栏按钮 / 页面空白）—— 原始输入监听挂在 `window` 上（拖拽移出画布也要跟手），这些事件同样会到总线 |
+| | `'engine'` | 代码创建：`trigger()` / `dispatchEvent()` / 引擎内部派发 |
+| `evt.target` | 组件 \| `null` | **永远不是 DOM 元素**；原始 DOM 元素在 `evt.originalEvent.target` |
+| `evt.eventPhase` | `2` / `3` / `0` | 命中段 / 祖先段 / 传播结束（**总线那一段恒为 `0`** —— 总线是传播终点） |
+
+两条实现约束：① `ICEEvent` 构造函数只挡 `currentTarget` / `eventPhase` / `source`
+（`target` 仍可显式传 —— `new ICEEvent({ target })` 是 `ICELinkHook` 的合法用法，
+一刀切禁掉会让连线端点拖拽 `null.getMaxBoundingBox`）；DOM 事件的泄漏在**包装入口**
+（`ICEEventTarget.trigger` 的 `originalEvent` 分支）统一消毒。② 总线段触发前必须把相位归零
+（`DOMEventDispatcher.__dispatch`），否则"没有命中组件"的事件会沿用 DOM 的 `BUBBLING_PHASE(3)`。
+
+⚠️ **已知行为**：画布外的输入仍会做命中测试（坐标按画布矩形换算，可能落到画布内并命中组件）——
+应用用 `evt.source !== 'canvas'` 过滤；是否改成"不做命中"待单独评估。
+用户向口径见 [事件系统](../guide/events)，回归 `tests/event/event-source.test.ts`（引擎仓）。
+
+
 原生 DOM 事件 → 引擎内部事件的链路：
 
 ```mermaid
