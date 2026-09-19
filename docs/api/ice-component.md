@@ -114,5 +114,5 @@ sidebar_position: 2
 
 | 方法 | 说明 |
 |---|---|
-| `on / off / once / trigger` | 事件订阅（详见[事件系统](../guide/events.md)） |
+| `on / off / once / trigger` | 事件订阅（详见[事件系统](../guide/events)） |
 | `destroy()` | 销毁组件 |

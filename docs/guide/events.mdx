@@ -1,0 +1,229 @@
+---
+sidebar_position: 7
+description: "ICE Render 事件系统：组件与总线用 on/off/once、DOM 元素用 addEventListener；含三段派发路径（命中组件 → 各级父容器 → 全局总线）、target/currentTarget、stopPropagation 与 preventDefault 的真实语义、常见困惑排查表与 2.18 升级清单。"
+keywords:
+  - "Canvas 事件"
+  - "事件冒泡"
+  - "事件总线"
+  - "stopPropagation"
+  - "preventDefault"
+  - "addEventListener"
+  - "ICE Render"
+---
+
+import LiveExample from '@site/src/components/LiveExample';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+# 事件系统
+
+**一句话选型**：**组件与全局总线（`ice.evtBus`）用 `on` / `off` / `once`；DOM 元素用 `addEventListener`。**
+
+组件上的这两套**是同一个实现、两种参数形状**（`addEventListener` / `removeEventListener` / `dispatchEvent`
+是 `on` / `off` / `trigger` 的别名，共用同一份注册与摘除逻辑）——不存在"哪套更强"，只存在"哪种参数形状更顺手"。
+引擎家族内部（`ice-web-components` / `ice-chart` / `ice-entity-designer`）的约定是**组件一律用 `on` 系列**，
+`addEventListener` 只出现在 DOM 元素上（图片 `load`、隐藏 input、hover 用的 DOM 节点）。
+
+:::info 版本提示
+**事件沿组件树冒泡**、**`ICEEvent` 的 W3C 方法真实现**、**两套 API 收口到同一实现**，
+都是 **2.18.0（2026-09-19）** 起的语义。从 2.17 及更早升级，直接看文末「从 2.17 升级到 2.18+」。
+:::
+
+## 1. 订阅 / 取消 / 一次性
+
+```js
+const handler = (evt) => console.log(evt.type, evt.target);
+
+rect.on('click', handler);        // 订阅
+rect.off('click', handler);       // 取消：必须是**同一个函数引用**
+rect.once('click', handler);      // 只触发一次（监听记录上的标记，不是包装函数）
+
+rect.trigger('my-event', null, { source: 'demo' }); // 手动触发：第三个参数是 param
+```
+
+三条细节值得先记住：
+
+| 事项 | 规则 |
+|---|---|
+| `off` 的身份 | `on(name, fn, scope)` 按 **`(fn, scope)` 精确匹配**；`addEventListener(type, fn, capture)` 是 W3C 身份 **`(type, fn, capture)`，忽略 scope** |
+| `once` 的身份 | 2.18 起 `once` 只是监听记录上的标记 → `off` / `removeEventListener` **用同一个函数引用就能摘掉**（旧版是"自摘包装函数"，两套身份摘不干净） |
+| `off(name)` | 不传回调时清空该事件名下的**全部**监听 |
+
+组件上还有个常用的"静音开关"（不移除监听器，只是暂时不派发）：
+
+```js
+rect.suspend('click');  // 暂停
+rect.resume('click');   // 恢复
+rect.hasListener('click');
+rect.purgeEvents();     // 清空该目标上的全部监听
+```
+
+## 2. 派发路径：命中组件 → 各级父容器 → 全局总线
+
+原生 DOM 事件（指针 / 键盘 / 滚轮）由 `DOMEventDispatcher` 归一化成一个 `ICEEvent`，
+然后沿**组件树**冒泡，最后**总线一定再收一次**：
+
+| 段 | `eventPhase` | 谁在处理 | `evt.target` | `evt.currentTarget` |
+|---|---|---|---|---|
+| 命中组件 | `2`（`AT_TARGET`） | 被点到的那个组件 | 命中组件 | 命中组件 |
+| 各级父容器 | `3`（`BUBBLING_PHASE`） | 从内到外的每个 `parentNode` | **恒为命中组件** | 正在处理的组件 |
+| 全局总线 | `0`（传播已结束） | `ice.evtBus` | 命中组件（画布外输入时是原始 DOM 元素，见 FAQ） | `EventBus` |
+
+<LiveExample
+  html="/ice-render/examples/event-bubbling.html"
+  height={520}
+  note="点蓝色方块 / 橙色圆：日志里能看到 AT_TARGET 段、父容器的 BUBBLING 段、总线那一次；两个开关分别验证 stopPropagation() 与 evt.target === this 守卫"
+/>
+
+## 3. 只想认「点在自己身上」：`evt.target === this`
+
+冒泡意味着**父容器的 `click` 在点子组件时也会触发**——绝大多数时候这正是你要的（面板 / 卡片 / 抽屉的
+统一处理入口）。但如果你只想认"点在容器自己的空白处"，加一行守卫：
+
+```js
+panel.on('click', (evt) => {
+  if (evt.target !== panel) return; // 点在子组件上 → 交给子组件自己的处理
+  closePanel();
+});
+```
+
+这条写法在**新旧引擎上都成立**，是跨版本安全的；旧引擎里用 `stopPropagation()` 反而会抛异常。
+
+## 4. `stopPropagation()` 的真实语义：祖先停，总线必达
+
+```js
+child.on('click', (evt) => {
+  evt.stopPropagation(); // 祖先不再收到；**总线仍然收到一次**
+});
+```
+
+为什么总线拦不住：总线是引擎的**内部通道**（控制面板选中、连线插槽、悬停、键盘作用域都挂在它上面），
+让组件里一次 `stopPropagation()` 把整条总线掐掉，就变成"看着只是阻止冒泡、实际引擎失灵"。
+`stopImmediatePropagation()` 同理，只影响当前目标的其余监听器。
+
+要"总线那一次也别处理"，就在总线监听里自己判断（见下一节 FAQ 的 `evt.param.component`）。
+
+## 5. `preventDefault()` / `passive` / `cancelable`
+
+* **2.18 起 `preventDefault()` 是真实现**：只有 `evt.cancelable === true` 时生效，置 `defaultPrevented`，
+  并顺手调用原始 DOM 事件的 `preventDefault()`。旧版它是 `throw new Error('Method not implemented.')`，
+  一调用就把派发链打断。
+* **`{ passive: true }` 的监听器里调用无效**（与 W3C 一致）：`evt.defaultPrevented` 保持 `false`，
+  引擎会按事件名在控制台**提醒一次**（不静默失败）。
+* 引擎自造事件的 `timeStamp` 用**单调时钟**（`performance.now()` 时间原点），不随系统改时间跳变。
+
+## 6. options 与对象监听器
+
+```js
+// 一次性（两种写法等价）
+rect.once('ready', onReady);
+rect.addEventListener('ready', onReady, { once: true });
+
+// { signal }：abort 之后自动摘除
+const controller = new AbortController();
+rect.addEventListener('drag', onDrag, { signal: controller.signal });
+controller.abort();
+
+// 监听器可以是对象：只要带 handleEvent
+rect.on('tick', { handleEvent(evt) { console.log(evt.type); } });
+
+// dispatchEvent 按 W3C 返回 !defaultPrevented
+const proceeded = rect.dispatchEvent(new ICE.ICEEvent({ type: 'go', bubbles: true, cancelable: true }));
+```
+
+<LiveExample
+  html="/ice-render/examples/event-api.html"
+  height={560}
+  note="逐个按钮点一遍：on / addEventListener 互换注册与摘除、once 撞两次只响一次、signal abort、{handleEvent} 对象、passive 里 preventDefault 不生效、dispatchEvent 返回值"
+/>
+
+## 7. 事件名有类型（TypeScript）
+
+引擎事件名是常量表 + 类型映射，`on` / `once` / `trigger` 会据此推断 `evt` 的载荷形状：
+
+```ts
+import { ICE_EVENT_NAME_CONSTS, type ICEEventName, type ICEEventOf } from 'ice-render';
+
+ice.evtBus.on(ICE_EVENT_NAME_CONSTS.AFTER_RENDER, (evt) => {
+  // evt.type 是字面量类型；引擎事件名的 param 形状见 ICEEventParamMap
+});
+
+// 自定义事件名要拿到类型推断，就自己声明一个字面量联合 + 载荷映射
+type MyEvents = 'order:submitted' | 'order:cancelled';
+type MyEventOf<K extends MyEvents> = ICEEventOf<K>;
+```
+
+事件名拼错在**运行时**不会报错（字符串就是字符串）——所以引擎事件名请用
+`ICE_EVENT_NAME_CONSTS`，自定义事件名请收进一个常量对象，别在代码里散落字符串。
+
+## 8. 常见困惑（现象 → 原因 → 正确写法）
+
+| 现象 | 原因 | 正确写法 |
+|---|---|---|
+| 子在画布上，父容器收不到 `click` | 父子关系来自 `addChild()`；命中的组件还必须 `interactive !== false` | `parent.addChild(child)`；派生部件默认 `interactive: false`，别指望它们派发 |
+| 点子组件时，父容器的 `click` 也跑了 | 冒泡是设计（容器型组件的统一入口） | 只想认自己：`if (evt.target !== this) return;` |
+| `stopPropagation()` 之后总线还是收到了 | **总线是引擎内部通道，必达** | 在总线监听里判断 `evt.param.component`（命中的组件）或直接不监听 |
+| 总线收到"画布外点按钮"的事件，`evt.target` 是 `HTMLButtonElement` | 原始输入监听挂在 **window** 上（拖拽移出画布也要跟手） | `if (!(evt.target instanceof ICEComponent)) return;` |
+| `off('click', handler)` 没生效 | 传的是新的匿名函数；或 `on` 用了 `scope` 而 `off` 没带 | 保存函数引用；`on`/`off` 的 `scope` 成对出现（`addEventListener` 忽略 scope） |
+| `once` 注册的监听 `off` 摘不掉 | 旧版 `once` 是自摘包装函数（两套身份） | 2.18 起用**同一个函数引用**即可摘；老版本请在回调里别依赖 `off` |
+| `passive` 监听里 `preventDefault()` 没效果 | W3C 语义；引擎会提醒一次 | 去掉 `passive`，或把"阻止默认"移到非 passive 的监听里 |
+| `dispatchEvent()` 返回 `false`，是失败了吗 | 它返回的是 `!defaultPrevented`（W3C） | 有人 `preventDefault()` 就是 `false`，与"投递成功"无关 |
+| `mousemove` 里做重活，交互发涩 | 移动类事件是每帧级高频 | 记住上次命中目标，没变就 `return`（示范见 <a href={useBaseUrl('/ice-render/examples/event.html')}>事件机制示例</a>） |
+| 组件收不到键盘事件 | 键盘按**焦点**派发 | `ice.setFocusedComponent(comp)`（无障碍原语）后派发 |
+
+## 9. 从 2.17 升级到 2.18+
+
+三件事**必须**改（其余都是新增能力，不改也能跑）：
+
+**① 容器的 `click` 只想认"点在自己身上" → 加守卫**
+
+```js
+// 旧：没有冒泡，写不写都一样
+panel.on('click', () => close());
+
+// 新：子组件的点击会冒泡上来 → 加一行守卫
+panel.on('click', (evt) => {
+  if (evt.target !== panel) return;
+  close();
+});
+```
+
+**② 跨组件转发事件 → 必须改写 `evt.target`**
+
+```js
+// 旧：转发时 target 还是原来那个组件
+child.on('keydown', (evt) => panel.trigger('keydown', evt, evt.param));
+
+// 新：转给谁就把 target 设成谁（引擎组件的默认拖动 / 键盘处理带 evt.target === this 守卫，
+//     不改写会被当成"冒泡上来的祖先事件"丢掉）
+child.on('keydown', (evt) => {
+  evt.target = panel;
+  panel.trigger('keydown', evt, evt.param);
+});
+```
+
+**③ `preventDefault()` 现在真的生效**
+
+```js
+// 旧版它是 throw new Error('Method not implemented.')，
+// 凡是用 `typeof evt.preventDefault === 'function'` 绕过的地方，请复查一遍：
+evt.preventDefault(); // 现在：cancelable 时置 defaultPrevented，并阻止原始 DOM 默认行为
+```
+
+顺带两处容易忽略的行为变化：
+
+* `off(name)`（不传回调）现在清空该事件名的**全部**监听（旧实现只摘第一个）；
+* `addEventListener(type, fn, thirdArg)` 的第三参**从 `scope` 变成 `options`/`capture`**——
+  以前写 `addEventListener('x', fn, someScope)` 的代码，请改用 `on('x', fn, someScope)`。
+
+## 10. 什么时候该用总线，什么时候用组件事件
+
+| 场景 | 用哪个 | 理由 |
+|---|---|---|
+| 组件自己的交互（点击、拖动、键盘） | 组件事件 `comp.on(...)` | 带命中与冒泡，天然知道"是谁" |
+| 父容器统一处理一批子组件 | 父容器上的 `on`（靠冒泡） | 不需要逐个订阅；需要区分时看 `evt.target` |
+| 组件之间解耦通信（A 改完通知 B） | `ice.evtBus` 上的自定义事件 | 两侧互不认识；自定义事件名请常量化 |
+| 引擎生命周期（渲染完成 / 结构变更 / 选中变化） | `ice.evtBus` + `ICE_EVENT_NAME_CONSTS` | 引擎内部事件名有类型（见第 7 节） |
+| "鼠标现在悬停到谁身上" | 总线 `mousemove` + `ice.hitTest(evt.offsetX, evt.offsetY)` | 引擎**不派发** `mouseenter` / `mouseleave`（示例见 <a href={useBaseUrl('/ice-render/examples/event.html')}>事件机制</a>） |
+
+更底层的机制（`ICEEventTarget` 类关系、总线与 DOM 桥接的实现细节、相位与时间戳口径）见
+[架构 · 事件系统](../architecture/event-system)。

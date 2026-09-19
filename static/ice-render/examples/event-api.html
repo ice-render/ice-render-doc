@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>两套 API 与 options · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>两套 API 与 options：<code>on/off/once</code> 与 <code>addEventListener</code></h1>
+    <p class="lead">
+      <strong>组件上这两套是同一个实现、两种参数形状</strong>：<code>on(name, fn, scope?, options?)</code> 与
+      <code>addEventListener(type, fn, options?)</code> 共用同一份注册/摘除逻辑，<code>once</code> 是监听记录上的标记
+      （所以 <code>off</code> / <code>removeEventListener</code> 用**同一个身份**就能摘掉）。
+      下面每个按钮都会把"引擎里发生了什么"打到日志里；<code>passive</code> 那一条还会演示
+      "在 passive 监听器里调 <code>preventDefault()</code> 不生效"，并在控制台提醒一次。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="360"></canvas></div>
+      <div class="card">
+        <div class="toolbar">
+          <button class="primary" id="clear">清空日志</button>
+          <button id="trigger">trigger('my-event')</button>
+          <button id="toggle-api">用 on 注册</button>
+          <button id="fire-registered">触发已注册的监听</button>
+          <button id="remove-registered">移除（同名 API）</button>
+        </div>
+        <div class="toolbar">
+          <button id="once">once 撞两次</button>
+          <button id="signal">signal abort</button>
+          <button id="handle-event">{handleEvent} 对象监听</button>
+          <button id="passive">passive 里 preventDefault</button>
+          <button id="dispatch">dispatchEvent 返回值</button>
+        </div>
+        <div class="log" id="log">日志：</div>
+      </div>
+    </div>
+    <script src="../../ice-render.js"></script>
+    <script>
+      const { ICE, ICERect, ICECircle, ICEEvent } = window.ICE;
+      const log = document.getElementById('log');
+      const push = (m) => {
+        log.textContent += '\n' + m;
+        log.scrollTop = log.scrollHeight;
+      };
+      const ice = new ICE().init('canvas', { renderMode: 'dirty-rect' });
+
+      const rect = new ICERect({
+        left: 40,
+        top: 60,
+        width: 170,
+        height: 130,
+        radius: 12,
+        style: { fillStyle: '#3B82F6', strokeStyle: '#1D4ED8', lineWidth: 2, shadow: 'none' },
+      });
+      const circle = new ICECircle({
+        left: 330,
+        top: 130,
+        radius: 65,
+        style: { fillStyle: '#F97316', strokeStyle: '#C2410C', lineWidth: 2, shadow: 'none' },
+      });
+      ice.addChild(rect);
+      ice.addChild(circle);
+
+      /* ---- ① 同一个处理器，两种注册方式互换 ---- */
+      const API_EVENT = 'api-parity';
+      const sameHandler = (evt) => push(`   ↳ 同一个 handler 被调用（evt.type=${evt.type}）`);
+      let useW3C = false; // false = 用 on，true = 用 addEventListener
+      let registered = false;
+      const apiName = () => (useW3C ? 'addEventListener' : 'on');
+
+      document.getElementById('toggle-api').onclick = (e) => {
+        if (registered) {
+          push('先"移除"再切换注册方式，否则会重复注册');
+          return;
+        }
+        useW3C = !useW3C;
+        e.target.textContent = `用 ${apiName()} 注册`;
+        push(`注册方式已切到 ${apiName()}()`);
+      };
+      document.getElementById('fire-registered').onclick = () => {
+        if (!registered) {
+          // 这里演示"两套 API 等价"：on 与 addEventListener 收同一个函数，行为一致
+          if (useW3C) {
+            rect.addEventListener(API_EVENT, sameHandler);
+          } else {
+            rect.on(API_EVENT, sameHandler);
+          }
+          registered = true;
+          push(`用 ${apiName()}('${API_EVENT}', sameHandler) 注册了`);
+        }
+        rect.trigger(API_EVENT);
+      };
+      document.getElementById('remove-registered').onclick = () => {
+        if (!registered) {
+          push('还没注册');
+          return;
+        }
+        // 关键：用**另一套 API** 也能摘掉 —— 因为身份是 (type, listener)，不是"哪套 API 注册的"
+        if (useW3C) {
+          rect.off(API_EVENT, sameHandler);
+        } else {
+          rect.removeEventListener(API_EVENT, sameHandler);
+        }
+        registered = false;
+        push(`用${useW3C ? ' off()' : ' removeEventListener()'}（与注册时不同的那套）摘掉了 —— 再触发不会有输出`);
+        rect.trigger(API_EVENT);
+      };
+
+      /* ---- ② trigger：自定义事件名 + 载荷 param ---- */
+      let triggerCount = 0;
+      const paramListener = (evt) => push(`   ↳ param=${JSON.stringify(evt.param)}（第 ${++triggerCount} 次）`);
+      rect.on('my-event', paramListener);
+      document.getElementById('trigger').onclick = () => {
+        rect.trigger('my-event', null, { at: new Date().toLocaleTimeString() });
+      };
+
+      /* ---- ③ once：连撞两次只响一次 ---- */
+      document.getElementById('once').onclick = () => {
+        const name = `once-${Date.now()}`;
+        rect.once(name, () => push('   ↳ once() 监听：第一次响应'));
+        rect.addEventListener(name, () => push('   ↳ addEventListener({once:true})：第一次响应'), { once: true });
+        push(`trigger('${name}') × 2：`);
+        rect.trigger(name);
+        rect.trigger(name);
+      };
+
+      /* ---- ④ signal：abort 自动摘除 ---- */
+      document.getElementById('signal').onclick = () => {
+        const name = `signal-${Date.now()}`;
+        const controller = new AbortController();
+        rect.addEventListener(name, () => push('   ↳ signal 监听：还没 abort，正常收到'), { signal: controller.signal });
+        push('abort 之前 trigger：');
+        rect.trigger(name);
+        controller.abort();
+        push('abort 之后再 trigger（不应有输出）：');
+        rect.trigger(name);
+      };
+
+      /* ---- ⑤ {handleEvent} 对象监听器 ---- */
+      document.getElementById('handle-event').onclick = () => {
+        const name = `obj-${Date.now()}`;
+        rect.on(name, {
+          handleEvent(evt) {
+            push(`   ↳ {handleEvent} 对象收到 ${evt.type}`);
+          },
+        });
+        rect.trigger(name);
+      };
+
+      /* ---- ⑥ passive：preventDefault 不生效（引擎按事件名提醒一次） ---- */
+      document.getElementById('passive').onclick = () => {
+        const name = `passive-${Date.now()}`;
+        rect.addEventListener(
+          name,
+          (evt) => {
+            evt.preventDefault();
+            push(`   ↳ passive 监听里调了 preventDefault()，evt.defaultPrevented=${evt.defaultPrevented}（应为 false）`);
+          },
+          { passive: true }
+        );
+        rect.trigger(name);
+      };
+
+      /* ---- ⑦ dispatchEvent：按 W3C 返回 !defaultPrevented ---- */
+      document.getElementById('dispatch').onclick = () => {
+        const first = new ICEEvent({ type: 'custom-dispatch', bubbles: true, cancelable: true }, { note: '没有监听器' });
+        // W3C 口径：dispatchEvent 返回 `!defaultPrevented` —— 没人取消默认行为就是 true
+        push(`没有监听器时 dispatchEvent 返回 ${rect.dispatchEvent(first)}（未被 preventDefault → true）`);
+
+        const name = `cancel-${Date.now()}`;
+        rect.addEventListener(name, (evt) => {
+          evt.preventDefault();
+          push('   ↳ 监听器里预置了默认行为取消（cancelable=true）');
+        });
+        const second = new ICEEvent({ type: name, bubbles: true, cancelable: true });
+        push(`监听器里 preventDefault() 后 dispatchEvent 返回 ${rect.dispatchEvent(second)}（应为 false）`);
+      };
+
+      document.getElementById('clear').onclick = () => {
+        log.textContent = '日志：';
+      };
+      push('提示：也可以直接点画布上的方块 / 圆 —— 它们的 click 会走 DOM 桥接那一路');
+      rect.on('click', () => push('   ↳ 方块上的 click（DOM 事件桥接进来的 ICEEvent）'));
+    </script>
+  </body>
+</html>

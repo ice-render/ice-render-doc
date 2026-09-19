@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>事件冒泡 · Live Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>事件冒泡：子组件 → 各级父容器 → 全局总线</h1>
+    <p class="lead">
+      派发路径固定三段：<strong>命中组件（<code>AT_TARGET</code>）→ 各级父容器（<code>BUBBLING_PHASE</code>）→
+      全局总线（最后收一次）</strong>。<code>evt.target</code> 恒为命中的那个组件，
+      <code>evt.currentTarget</code> 随"正在处理它的组件"走。
+      点左上角蓝色方块或橙色圆：会依次打印它自己的段、父容器的冒泡段、总线那一次。
+      两个开关现场验两件事：① 命中组件里 <code>stopPropagation()</code> —— 祖先不再收到，但<strong>总线仍然收到一次</strong>；
+      ② 父容器只想认「点在自己身上」时，用 <code>evt.target === this</code> 守卫。
+    </p>
+    <div class="row">
+      <div class="card"><canvas id="canvas" width="520" height="360"></canvas></div>
+      <div class="card">
+        <div class="toolbar">
+          <button class="primary" id="clear">清空日志</button>
+          <button id="toggle-stop">命中组件：不停冒泡</button>
+          <button id="toggle-guard">父容器：不设守卫</button>
+        </div>
+        <div class="log" id="log">点画布里的蓝色方块 / 橙色圆，也可以点父容器自己的浅蓝底：</div>
+      </div>
+    </div>
+    <script src="../../ice-render.js"></script>
+    <script>
+      const { ICE, ICEComponent, ICEGroup, ICERect, ICECircle } = window.ICE;
+      const log = document.getElementById('log');
+      const push = (m) => {
+        log.textContent += '\n' + m;
+        log.scrollTop = log.scrollHeight;
+      };
+      const ice = new ICE().init('canvas', { renderMode: 'dirty-rect' });
+
+      let stopInChild = false;
+      let guardInParent = false;
+
+      // 父容器（一个透明的分组盒）：它是"祖先"这一段的代表
+      const parent = new ICEGroup({
+        left: 30,
+        top: 30,
+        width: 460,
+        height: 300,
+        radius: 14,
+        style: { fillStyle: '#EFF6FF', strokeStyle: '#93C5FD', lineWidth: 2, shadow: 'none' },
+      });
+      // 两个真实子节点：坐标以**父容器左上角为原点**
+      const rect = new ICERect({
+        left: 40,
+        top: 60,
+        width: 150,
+        height: 120,
+        radius: 10,
+        style: { fillStyle: '#3B82F6', strokeStyle: '#1D4ED8', lineWidth: 2, shadow: 'none' },
+      });
+      const circle = new ICECircle({
+        left: 300,
+        top: 130,
+        radius: 60,
+        style: { fillStyle: '#F97316', strokeStyle: '#C2410C', lineWidth: 2, shadow: 'none' },
+      });
+      parent.addChild(rect);
+      parent.addChild(circle);
+      ice.addChild(parent);
+
+      const phaseName = (phase) => (phase === 2 ? 'AT_TARGET ' : phase === 3 ? 'BUBBLING  ' : `PHASE(${phase})`);
+      const who = (component) =>
+        component === parent ? '父容器' : component === rect ? '方块' : component === circle ? '圆' : '其它';
+
+      [rect, circle].forEach((child) => {
+        child.on('click', (evt) => {
+          push(
+            `[组件链] ${phaseName(evt.eventPhase)} target=${who(evt.target)}  currentTarget=${who(child)}  ← 命中组件自己的监听`
+          );
+          if (stopInChild) {
+            evt.stopPropagation();
+            push('         ↳ 这里调了 stopPropagation()：祖先不再收到，但总线**仍然收到一次**（见下一行）');
+          }
+        });
+      });
+
+      parent.on('click', (evt) => {
+        if (guardInParent && evt.target !== parent) {
+          push(`[组件链] ${phaseName(evt.eventPhase)} 祖先段：evt.target(${who(evt.target)}) !== this → 守卫拦下`);
+          return;
+        }
+        push(
+          `[组件链] ${phaseName(evt.eventPhase)} target=${who(evt.target)}  currentTarget=父容器  ← 祖先冒泡段`
+        );
+      });
+
+      // 总线：组件树上没人能"拦住"它 —— 引擎的内部通道（选中 / 插槽 / 悬停 / 键盘作用域）都挂在它上面。
+      //
+      // ⚠️ 注意这里为什么要先过滤 `evt.target`：引擎的原始输入监听挂在 **window** 上
+      //（拖拽移出画布也要跟手，见 DOMEventDispatcher 的说明），所以**点画布外的按钮 / 空白**
+      // 也会往总线发一次 click —— 那一次的 `evt.target` 是**原始 DOM 元素**（按钮 / body），
+      // 不是组件。判据：`evt.target instanceof ICEComponent`（或看 `evt.param.component`）。
+      ice.evtBus.on('click', (evt) => {
+        if (!(evt.target instanceof ICEComponent)) return; // 画布外的点击：没有命中组件，忽略
+        push(`[总线]   target=${who(evt.target)}  currentTarget=EventBus  ← 总线最后收一次`);
+      });
+
+      document.getElementById('clear').onclick = () => {
+        log.textContent = '点画布里的蓝色方块 / 橙色圆，也可以点父容器自己的浅蓝底：';
+      };
+      const stopBtn = document.getElementById('toggle-stop');
+      stopBtn.onclick = () => {
+        stopInChild = !stopInChild;
+        stopBtn.textContent = stopInChild ? '命中组件：stopPropagation()' : '命中组件：不停冒泡';
+      };
+      const guardBtn = document.getElementById('toggle-guard');
+      guardBtn.onclick = () => {
+        guardInParent = !guardInParent;
+        guardBtn.textContent = guardInParent ? '父容器：evt.target === this 守卫' : '父容器：不设守卫';
+      };
+
+      // 给自动化探针 / 控制台调试留个把手（也方便读者在 DevTools 里直接试）
+      window.__demo = { ice, parent, rect, circle };
+    </script>
+  </body>
+</html>

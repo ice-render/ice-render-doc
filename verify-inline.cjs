@@ -2,6 +2,8 @@ const { chromium } = require('playwright');
 
 const BASE = process.env.BASE || 'http://127.0.0.1:3100';
 const PAGES = [
+  // 用户向正文里的 LiveExample 也要真机验：事件系统那页有两个示例（冒泡 / 两套 API）
+  { path: '/docs/guide/events', name: 'guide-events' },
   { path: '/docs/ice-web-components', name: 'ice-web-components' },
   { path: '/docs/ice-chart', name: 'ice-chart' },
   { path: '/docs/entity-designer', name: 'entity-designer' },

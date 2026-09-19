@@ -81,7 +81,7 @@ rect.on('click', (evt) => {
 });
 ```
 
-引擎还内置了大量生命周期事件（`BEFORE_MOVE` / `AFTER_RESIZE` / `AFTER_ROTATE` 等），详见[事件系统](../guide/events.md)。
+引擎还内置了大量生命周期事件（`BEFORE_MOVE` / `AFTER_RESIZE` / `AFTER_ROTATE` 等），详见[事件系统](../guide/events)。
 
 ## 序列化与还原
 
