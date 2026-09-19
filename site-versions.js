@@ -5,7 +5,7 @@
 // 版本值取自 2026-09-19 家族版本现状盘点；若某包已发新版本，在此处 bump 即可。
 module.exports = {
   // 渲染引擎内核（本站核心，也是所有应用层的地基）
-  iceRender: '2.19.0',
+  iceRender: '2.20.0',
   // 应用层产品
   entityDesigner: '0.9.0',
   iceChart: '0.27.1',
