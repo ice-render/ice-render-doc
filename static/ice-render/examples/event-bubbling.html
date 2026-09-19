@@ -28,7 +28,7 @@
     </div>
     <script src="../../ice-render.js"></script>
     <script>
-      const { ICE, ICEComponent, ICEGroup, ICERect, ICECircle } = window.ICE;
+      const { ICE, ICEGroup, ICERect, ICECircle } = window.ICE;
       const log = document.getElementById('log');
       const push = (m) => {
         log.textContent += '\n' + m;
@@ -95,12 +95,12 @@
 
       // 总线：组件树上没人能"拦住"它 —— 引擎的内部通道（选中 / 插槽 / 悬停 / 键盘作用域）都挂在它上面。
       //
-      // ⚠️ 注意这里为什么要先过滤 `evt.target`：引擎的原始输入监听挂在 **window** 上
-      //（拖拽移出画布也要跟手，见 DOMEventDispatcher 的说明），所以**点画布外的按钮 / 空白**
-      // 也会往总线发一次 click —— 那一次的 `evt.target` 是**原始 DOM 元素**（按钮 / body），
-      // 不是组件。判据：`evt.target instanceof ICEComponent`（或看 `evt.param.component`）。
+      // ⚠️ 注意这里为什么要先过滤：引擎的原始输入监听挂在 **window** 上（拖拽移出画布也要跟手，
+      // 见 DOMEventDispatcher 的说明），所以**点画布外的按钮 / 空白**也会往总线发一次 click。
+      // 引擎 2.20 起这类事件的 `evt.source === 'window'`（`evt.target` 为 null，
+      // 原始的 DOM 元素在 `evt.originalEvent.target`），一句过滤就够。
       ice.evtBus.on('click', (evt) => {
-        if (!(evt.target instanceof ICEComponent)) return; // 画布外的点击：没有命中组件，忽略
+        if (evt.source !== 'canvas') return; // 画布外的点击：忽略
         push(`[总线]   target=${who(evt.target)}  currentTarget=EventBus  ← 总线最后收一次`);
       });
 
