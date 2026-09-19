@@ -56,5 +56,11 @@ ICE 家族的文档站（Docusaurus，部署在 GitHub Pages：`https://ice-rend
   `ice-chart/vendor/*.umd.js`、`ied/index.umd.js`（与各仓 `dist/index.umd.js` 同源）。
 - `site-versions.js`（顶部导航 / 左侧菜单 / 产品页版本号的**单一来源**），
   以及四个落地页 H1 与 info 块里硬编码的版本号（`docs/intro.md`、`docs/{ice-chart,ice-web-components,entity-designer}/index.mdx`）。
+- **引擎语义变了，用户向那页要跟着改**：使用者读到的是**文档站的正文**，不是引擎仓的架构文档。
+  目前最容易漂的是 `docs/guide/events.mdx`（事件系统）——2.18.0 起才有"沿组件树冒泡 /
+  `ICEEvent` 的 W3C 方法真实现 / 两套 API 收口"，页内两个 LiveExample
+  （`static/ice-render/examples/event-{bubbling,api}.html`）与「常见困惑」「升级清单」两节
+  必须跟着 `ice-render/AGENTS.md` 的事件系统铁律改；架构页 `docs/architecture/*` 与
+  `ice-render/docs/architecture/*` 是近镜像关系（多一段 LiveExample），引擎改了也要来回对一遍。
 - 改完用真实浏览器按 **baseUrl 路径**验一遍（`http-server` 起一个带 `/ice-render-doc/` 前缀的根目录），
   别只在根路径下自测 —— 那正是当初漏掉 404 的原因。
