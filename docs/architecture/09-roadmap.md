@@ -61,7 +61,7 @@ ice-entity-designer（应用）= 用原语「拼装」编辑器 UX
 | 无障碍 | `getAccessibilityTree()` 可访问节点快照 + `setFocusedComponent()` 键盘焦点回传。**引擎不自建 DOM 镜像层**（见 [14](accessibility)） |
 | 多运行时 | `root.createPath2D()`（原生 `Path2D` + 命令流）、离屏 canvas、图片、像素比都有适配；`requestFrame` 无 rAF 时定时器兜底（Node / headless 也能启动）。⚠️ 小程序支持已于 2026-09-20 移除 |
 | 脏矩形 | 局部重绘支持缩放/平移/`dpr>1`/多块裁剪；门控按「相交」判定；**离屏缓存与直接落墨逐像素一致**（位图栅格对齐设备像素，零重采样）；连线可缓存；脏盒合并带「划算护栏」，细长盒不会被串成整屏大盒。应用层实测：拖动实体时局部重绘 0 → 20 次、渲染 −31%/帧、局部 ≡ 全量 0 差异 |
-| 导出与无头 | **SVG 矢量导出**：`ice.toSvg()` / `exportSvg()` 与画布**共用同一套绘制命令流**，渐变、虚线、阴影、子树透明度、裁剪、连线标签、实心端点箭头都进产物（路径命令流底座见 `src/graphic/path`）；**无头实例** `ICE.headless()` 让 Node / 服务端建树出图不依赖 DOM 与 rAF（导出时先刷新派生几何）；`examples/node/export.mjs` 演示落盘 SVG、装了 `@resvg/resvg-js` 时再转 2× PNG |
+| 导出与无头 | **SVG 矢量导出**：`ice.toSvg()` / `exportSvg()` 与画布**共用同一套绘制命令流**，渐变、虚线、阴影、子树透明度、裁剪、连线标签、实心端点箭头都进产物（路径命令流底座见 `src/cross-platform/Path2DRecorder.ts`）；**无头实例** `ICE.headless()` 让 Node / 服务端建树出图不依赖 DOM 与 rAF（导出时先刷新派生几何）；`examples/node/export.mjs` 演示落盘 SVG、装了 `@resvg/resvg-js` 时再转 2× PNG |
 | 工程化 | 134 个测试套件 / 1121 个用例 + 覆盖率棘轮门槛、Playwright 可视化与像素一致性回归（100 条，含**离屏缓存保真**专项与 92 个示例页冒烟）、`publint` + `attw` 发布包门禁、lockfile 入库 + CI 用 `npm ci`、CHANGELOG |
 
 ### 仍未做（引擎侧）
