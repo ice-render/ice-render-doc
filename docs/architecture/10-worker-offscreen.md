@@ -11,7 +11,8 @@
 >   `examples/worker/mirror-render.html` + `mirror-worker.js`，回归 `e2e/visual/worker-mirror.spec.ts`
 >   （状态增量 / 结构重同步之后，worker 画面与主线程参考**逐像素 0 差异**）。
 >   **协议现状（v2）**：状态与结构**都走增量**（`state` / `add` / `remove`），全量 `scene` 只作兜底与自愈。
->   v1 的"结构变更走全量重同步"已作废：实测加一个节点从 **485 924 B** 降到 **1 037 B**（≈470×）。
+>   v1 的"结构变更走全量重同步"已作废：实测加一个节点从 **485 924 B** 降到 **1 037 B**（≈470×），
+>   并省掉 worker 侧一次整树重建 + 冷启动全量重绘（那一帧 130~161ms）。
 > - **阶段二第二块** = 让真实应用能接上：**输入永远在主线程**（DOM 事件、命中检测、拖拽都不跨线程），
 >   主线程改走"几何通道"（跑渲染管线但不产出像素）以维持命中检测依赖的世界盒；
 >   工具层按**选择**镜像 —— worker 用**自己的**控制面板画手柄。参考宿主 `MirrorHost`，
@@ -24,14 +25,14 @@
 >   引擎的**默认**渲染仍是主线程；worker 渲染要宿主显式接线。
 > 小程序支持已移除（2026-09-20），worker 化不再需要为它留后门。
 
-## 目标与边界
+## 1. 目标与边界
 
 - **目标**：把「CanvasRenderer + 图元 doRender + 真实光栅化」搬到 Web Worker（`OffscreenCanvas`），
   释放主线程帧预算，让交互（命中检测、DOM 事件、面板）与渲染并行。
 - **边界（明确不做）**：不在 worker 内做文本 IME/字体/图片解码；
   不迁移完整组件树双端同步（v0 原型直接 worker 内建静态场景）。
 
-## 现引擎中依赖 DOM/主线程的 API 清单（worker 化需要桥接或禁用）
+## 2. 现引擎中依赖 DOM/主线程的 API 清单（worker 化需要桥接或禁用）
 
 | 依赖点 | 位置 | worker 化方案 |
 |---|---|---|
@@ -47,7 +48,7 @@
 | 字体 | `ICE.loadFont()`（`FontFace` + `document.fonts`） | ✅ **已下发**：宿主在主线程把字体字节取好（`MirrorHost` 的 `fonts` 选项），`fonts` 消息推给 worker，worker 用自己的 `FontFace` + `self.fonts` 注册；运行时不支持时如实报 `fontErrors`、不抛 |
 | 图片 | `ImageCache` 的 `Image` + `onload` | ✅ **已下发**：worker 里没有 `Image` 构造器（带图片的树以前会整棵退回主线程 —— 实测加一个 `ICEImage` 就 `hostActive: false`）。链路：主线程渲染发现用图 → 宿主 `fetch` + `createImageBitmap` **解码两份**（一份注册给本页所有 ICE、一份随 transfer 给 worker）→ worker 直接用；同一 URL 只处理一次，未到达时返回"未加载"**不抛**。⚠️ 曾经的边界（缩放绘制时 `Image` 与 `ImageBitmap` 重采样不同）**已消除**：两边画的都是解码好的位图（两次 `createImageBitmap` 实测逐点一致），且位图在路上时主线程**不先退回 `Image`**（避免到达那一帧像素跳变）
 
-## 架构分层
+## 3. 架构分层
 
 ```
 主线程 RendererHost                          Worker WorkerRenderer
@@ -60,7 +61,7 @@
   主线程 ImageBitmapRenderingContext 展示
 ```
 
-### 输入留在主线程（阶段二第二块）
+### 3.1 输入留在主线程（阶段二第二块）
 
 **没有任何"输入消息"** —— 这是设计而不是省事：DOM 事件、命中检测、拖拽、控制面板的交互本来就
 只在主线程发生，跨线程转发一份坐标只会引入两套换算。真正的坑在别处：
@@ -93,14 +94,17 @@
    不需要把派生结果跨线程搬运。
 7. **结构变更也走增量**（协议 v2）：`add` / `remove` / `move` 各一条 op（`move` = 换父级，`adoptChild`
    的镜像语义：不销毁组件、坐标不换算；只报 `add` 的话镜像里旧父那份还在 —— 同一棵树两个同 id 实例） —— `add` 带一棵**子树文档**
-（`Serializer.encodeSubtree()` 的产物），`remove` 只带 id；worker 侧用 `Deserializer.decodeInto()`
-挂上去并维护 id 索引。实测（IED 200 节点 / 800+ 组件）"新建一个节点"：**1 037 B、0 次全量重同步、
-worker 那一帧 6.3ms**，对比老口径的 **485 924 B（474KB）、1 次重同步、161ms**。全量 `scene` 退化为
-**兜底与自愈**（拿不到可寻址 id / 编码失败 / worker 报 `missing` / 宿主显式要求）。
-⚠️ 结构 op 与状态补丁是**同一条有序队列**，因此 `addChild` 的镜像钩子必须排在会写 state 的调用
-（`__reapplyPreset` / `doLayout`）之前 —— 顺序反了就是"未知 id 的补丁" → `missing` → 全量重同步。
-
-**文本与图片的口径都必须跟着走**：`lang`/`dir`（汉字简/繁/日字形）、**字体字节**、**图片位图**
+   （`Serializer.encodeSubtree()` 的产物，与整份文档同一条编码路径），`remove` 只带 id；
+   worker 侧用 `Deserializer.decodeInto()` 挂上去、并维护 id 索引（`appliedAdds/appliedRemoves`）。
+   实测（IED 200 节点 / 800+ 组件）"新建一个节点"：**1037 B、0 次全量重同步、worker 那一帧 6.3ms**，
+   对比老口径的 **485 924 B（474KB）、1 次全量重同步、worker 那一帧 125ms**；端到端 166ms → 10ms。
+   全量 `scene` 退化为**兜底与自愈**：拿不到可寻址的 id / 父容器不可寻址 / 子树编码失败 /
+   worker 报 `missing` / 宿主显式要求（`resyncOnStructureChange: true`）。
+   ⚠️ 结构 op 与状态补丁是**同一条有序队列**，因此 `addChild` 的镜像钩子必须排在
+   `__reapplyPreset()`（会顺手写 `style`）与 `doLayout()`（会写 `left/top`）**之前** ——
+   顺序反了就是"worker 收到未知 id 的补丁" → `missing` → 全量重同步，结构增量白做
+   （2026-09-20 由 IED 的真实操作抓到，单测已钉住）。
+8. **文本与图片的口径都必须跟着走**：`lang`/`dir`（汉字简/繁/日字形）、**字体字节**、**图片位图**
 都随协议下发 —— 宿主从主画布读语言、把字体取成字节、把图片解码成 `ImageBitmap`，
 worker 用自己的 `ctx` / `FontFace` / 图片注册表落地。少了任何一样，"缓存 / 静态层与主画布
 逐像素一致"这条承诺都会破（图片那条以前更严重：worker 里没有 `Image` 构造器，整棵镜像会退回主线程）。
@@ -115,18 +119,18 @@ worker（worker 直接往它上面画、不再回传位图），代价是主线�
    （补的是最新状态）。宿主判断"静止态"用 `MirrorHost.renderedSeq` 与
    `MirrorBridge.lastFrameSeq` 这组水印，而不是"又收到一张位图"（位图是背压的，会落后）。
 
-## 双 buffer 方案对比
+## 4. 双 buffer 方案对比
 
 | 方案 | 说明 | 结论 |
 |---|---|---|
 | `transferControlToOffscreen`（**已落地，opt-in**） | 主线程把 canvas 控制权交给 worker；主线程失去这块画布的 2D ctx | 用 `MirrorHost({ transferCanvas: true })` 开启：省掉每帧"位图回传 + 主线程合成"。两条前置：① 那块**显示画布必须还没有 2d 上下文**（`getContext` 调过一次就转移不出去）——所以引擎要 init 在**另一块**"输入/量测层"上（参考宿主 `?direct=1` 的双画布布局）；② 开启后主线程读不到像素（截图要用页面级）。与位图模式**逐字节同画面**（e2e 用 PNG 比对） |
 | **`transferToImageBitmap` + `ImageBitmapRenderingContext`（推荐初版）** | worker 每帧 OffscreenCanvas → 位图 → 主线程 `transferFromImageBitmap` 展示 | 主线程保 ctx；位图传输开销小；实现简单 |
 
-消息协议（draft）：
+消息协议（v2；`frame` 带 `seq`，见 §5 与 `MirrorHost.renderedSeq`）：
 ```
-主线程 → worker: { t:'scene', v, seq, doc, dropped? }      // 全量（首次 / 结构变更后）
-                | { t:'ops',   v, seq, ops:[['state', id, patch]] }   // 状态增量
-                | { t:'frame', v, time }                    // 节拍（用主线程的时间戳）
+主线程 → worker: { t:'scene', v, seq, doc, dropped? }      // 全量（首次 / 兜底 / 自愈）
+                | { t:'ops',   v, seq, ops:[...] }           // 增量：['state',id,patch] | ['add',parentId,子树文档] | ['remove',id]
+                | { t:'frame', v, seq, time }                // 节拍（用主线程的时间戳）
                 | { t:'resize', v, width, height }
 worker  → 主线程: { t:'ready',   v, caps }
                 | { t:'rendered', v, seq, stats }           // 位图走 transfer（宿主自己收）
@@ -144,7 +148,7 @@ worker  → 主线程: { t:'ready',   v, caps }
 3. 采集中在引擎内部四处（`setState` / `addChild` / `removeChild`，`ICE` 与 `ICEGroup` 各一份），
    没装桥时只有一次属性读 —— 见 `src/worker/mirror-hooks.ts`。
 
-## 一致性要点
+## 5. 一致性要点
 
 - 命中检测与状态同步留在主线程 → 不破坏现有「命中检测铁律」与事件语义。
 - 动画时钟单一化：worker 收到主线程 `frame` 命令的时间戳做补间，避免双时钟漂移。
@@ -161,7 +165,7 @@ worker  → 主线程: { t:'ready',   v, caps }
 主线程选中与拖拽位移精确（+60/+40），worker 画面里的手柄随之出现/移动/消失，
 每一步与参考渲染**逐像素 0 差异**。
 
-## 开关策略（web-only）
+## 6. 开关策略（web-only）
 
 worker 化天然是 **web-only**，所以"起不来怎么办"必须是机制的一部分、而不是交给应用去猜。
 引擎**不做全局开关**（`ICE.init(..., { renderInWorker })` 那种"引擎自己切渲染后端"仍是未来设计）：
@@ -203,9 +207,9 @@ worker 化天然是 **web-only**，所以"起不来怎么办"必须是机制的�
 - **2026-09-20 更新**：小程序已不再支持，本节原先那条"小程序线程模型不同 → 收益不成立"的
   排除理由随之消失（见 `08-compatibility.md` 的「已移除的能力」）。
 
-## 最小可行性原型（本轮交付）
+## 7. 最小可行性原型（本轮交付）
 
-### 真实应用验证：ice-entity-designer 的流程图（2026-09-20）
+### 7.0 真实应用验证：ice-entity-designer 的流程图（2026-09-20）
 
 把镜像接上 IED 的流程图（**200 节点 / 799 组件 / 画布 900×620**，含节点标题与连线标签）实测：
 
@@ -241,7 +245,7 @@ worker 化天然是 **web-only**，所以"起不来怎么办"必须是机制的�
 ① 几何通道漏登记 `fillText`/`strokeText` → 真实文字一画就抛；
 ② `ICEGroup.setState` 是完全覆盖、不经过镜像钩子 → **容器型组件（FlowNode）的状态全进不了镜像**；
 ③ 协议没有视口消息、且新起的镜像不对齐"当前视口/选择"；
-④ `MirrorHost` 的 2d 合成没复位主画布上下文（残留 CTM 让位图整体错位）；
+④ `MirrorHost` 的 2d 合成没复位主画布上下文（残留 CTM 让位图整体错位）。
 ⑤ 应用层位置/尺寸补丁直接写 `setState`，不走引擎的 `setPosition()` → **程序化移动节点时连线不跟随**
    （镜像侧反而因为重建而"对"，两边几何分叉）；
 ⑥ 镜像侧只落 `setState`，不重放应用层的 `applyPatch` → 派生部件（标题 / 形状 / 连线走线）停在旧值；
@@ -272,7 +276,7 @@ worker 化天然是 **web-only**，所以"起不来怎么办"必须是机制的�
 - **注意**：`renderInWorker` 作为引擎级开关仍是**未来设计**（见 §1/§6），本轮未进引擎核心；
   以上兼容处理发生在宿主页/集成层，引擎本身仍以主线程为目标、跨端安全。
 
-## 验收指标与不做清单（M2 范围）
+## 8. 验收指标与不做清单（M2 范围）
 
 - 指标：worker 内单帧渲染 p50（static/anim 对照主线程同场景数值）、帧位图传输可用、`__workerBenchResult` 可达。
 - 不做：树/事件双端同步、文本/图片/字体/控制面板在 worker 内。

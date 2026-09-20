@@ -45,7 +45,7 @@ button.on('click', () => form.submit());         // 校验不过不会回调
 | `minLength` / `maxLength` | 字符串或数组长度 |
 | `pattern` | 正则 |
 | `validator(value, values)` | 自定义同步校验：返回文案表示失败 |
-| `asyncValidator(value, values)` | 异步校验：返回 `Promise<string ｜ null>` |
+| `asyncValidator(value, values)` | 异步校验：返回 `Promise<string \| null>` |
 | `message` | 自定义错误文案（不传用默认文案） |
 
 一条规则失败即停止（取第一条错误文案）。

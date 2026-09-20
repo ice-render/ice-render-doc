@@ -73,7 +73,7 @@ const picker = new ICEDatePicker({ /* … */ });
 它已经接进 `npm run verify:full` —— 这条是 2026-09-15 补的：此前 `qa:*` 不在任何门禁里，
 `ICEList.getRowNode` 删除之后 `qa-workbench` / `qa-admin` **一直是失败的**（脚本先崩、
 后面几十项根本没跑）却没人发现，而 `npm run verify` 全绿。教训见
-[行绘制迁移](row-painter-migration)。
+[行绘制迁移](row-painter-migration#后续画家化之后漏掉的一条2026-09-15-第二轮审计)。
 
 ```bash
 npm run qa:all                    # 八套全跑（verify:full 里也是这一条）
