@@ -53,7 +53,6 @@ const sidebars = {
             { type: 'doc', id: 'guide/events', label: '1.3.7 事件系统' },
             { type: 'doc', id: 'guide/group-and-layout', label: '1.3.8 分组与布局' },
             { type: 'doc', id: 'guide/line-and-link', label: '1.3.9 连线' },
-            { type: 'doc', id: 'guide/mini-program', label: '1.3.10 小程序与跨平台' },
             { type: 'doc', id: 'guide/plugin', label: '1.3.11 插件' },
             { type: 'doc', id: 'guide/serialization', label: '1.3.12 序列化' },
             { type: 'doc', id: 'guide/shapes', label: '1.3.13 图元手册' },
