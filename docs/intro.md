@@ -69,12 +69,15 @@ ICE 系列原生对接 **AG-UI** 协议：Agent 的事件流（`run started` / `
 - 组件级离屏缓存、渲染队列缓存、矩阵零分配
 - 2026-09-11 实测约 2.2ms/帧（5000 图元场景）
 
-### 小程序是一等公民
+### 浏览器与 Node 双运行时
 
-- `cross-platform/root` 适配层收敛全局对象
-- 无 `Path2D` 的运行时自动降级（`PolyfillPath2D`），渲染结果逐像素一致
-- 字体 / 图片 / 离屏画布 / dpr 全适配
-- `ICE.init(ctx)` 可直接传入上下文，绕开 DOM
+- `cross-platform/root` 适配层收敛全局对象（浏览器 `window` / Node `global`）
+- 路径对象一律走 `Path2DRecorder`：一边转发原生 `Path2D`、一边记录命令流，于是同一份场景既能上屏、也能导出 SVG 与断言形状
+- 字体 / 图片 / 离屏画布 / dpr 都有适配；无 rAF 时用定时器兜底（Node / headless 也能启动）
+- `ICE.init(ctx)` 可直接传入上下文，绕开 DOM（测试 / headless 场景）
+
+> ⚠️ 2026-09-20 起**不再支持小程序**：`wx.*` 适配、无 `Path2D` 时的命令重放、
+> 「小程序形状运行时」回归夹具与该示例都已移除。
 
 ## 核心特性一览
 

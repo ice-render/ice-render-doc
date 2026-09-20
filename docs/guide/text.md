@@ -131,7 +131,7 @@ text.setSelection(text.getCaretIndexAt(local[0], local[1]));
 ```
 
 - **多行编辑**（`multiline: true`，或文本里已经有 `\n`）：回车换行而不是提交，输入法（IME）由浏览器接管；
-- **选区**：DOM 编辑态由浏览器的 input / textarea 自己画；无 DOM 运行时（小程序 / Node）由引擎自绘；
+- **选区**：DOM 编辑态由浏览器的 input / textarea 自己画；无 DOM 运行时（Node / headless）由引擎自绘；
 - **命中**：编辑态下 `containsLocalPoint` 按**文本行**判定（点在 padding、盒子空白处不算命中），
   非编辑态仍是整个盒子 —— 拖动、框选、双击进入编辑这些交互不受影响。
 
@@ -155,7 +155,7 @@ t.setState({ width: 200 });   // setState 给尺寸同样算「显式」，此�
 ```
 
 - 量测优先用 **canvas 真实字形边界**，无 ctx 时退化到隐藏 `div`（`textContent`，不做 HTML 注入）；
-  两者都不可用时（Node / 小程序首帧）先停在默认 `10×10`，首帧渲染时由 `calcComponentParams` 重算。
+  两者都不可用时（Node / headless 首帧）先停在默认 `10×10`，首帧渲染时由 `calcComponentParams` 重算。
 - **自定义字体加载完成后要重测**：`await ice.loadFont(family, source)` 的 promise resolve 时，引擎会自动
   重新量测已挂载的文本（`ice.remeasureTexts()`）；也可以手动调 `text.remeasureText()`（只标脏，
   真正的重算发生在下一帧渲染）。

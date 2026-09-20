@@ -231,7 +231,7 @@ ice.addChild(img);
 - `ICEDotPath`：点序列路径
 
 :::info
-在小程序等无 `Path2D` 的运行时，引擎自动降级为 `PolyfillPath2D`（记录路径命令、渲染时重放），渲染结果与原生逐像素一致，业务代码无感知。
+路径对象一律走 `Path2DRecorder`（转发原生 `Path2D` + 记录命令流）：命令流用于 SVG 导出与形状断言，业务代码无感知。
 :::
 
 ## 样式速查

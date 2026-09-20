@@ -1,5 +1,5 @@
 ---
-description: "ICE Render 安装指南：通过 npm 安装 ice-render 包，提供 ESM / CJS / UMD 三种产物格式，支持现代浏览器与微信小程序，运行时零依赖。"
+description: "ICE Render 安装指南：通过 npm 安装 ice-render 包，提供 ESM / CJS / UMD 三种产物格式，运行在现代浏览器与 Node/headless，运行时零依赖。"
 keywords:
   - "ICE Render 安装"
   - "npm ice-render"
@@ -14,7 +14,7 @@ ICERender 发布为 npm 包 `ice-render`，提供 **ESM / CJS / UMD** 三种格�
 
 ## 环境要求
 
-- 现代浏览器（Chrome / Firefox / Safari / Edge），或任何提供 Canvas 2D 上下文的环境（如微信小程序）
+- 现代浏览器（Chrome / Firefox / Safari / Edge），或 Node/headless（服务端出图、单测；需要自备 Canvas 2D 上下文）
 - 若通过 npm 集成，建议 Node.js ≥ 16
 
 ## npm 安装
@@ -51,7 +51,7 @@ ice.addChild(new ICERect({ left: 100, top: 100, width: 160, height: 90 }));
 
 - canvas 元素的 **id 字符串**
 - canvas **元素** 本身
-- Canvas 2D **上下文**（`CanvasRenderingContext2D`）——小程序等非 DOM 环境用这种方式绕开 DOM
+- Canvas 2D **上下文**（`CanvasRenderingContext2D`）——测试 / headless 等非 DOM 环境用这种方式绕开 DOM
 
 第二个参数 `options`：
 

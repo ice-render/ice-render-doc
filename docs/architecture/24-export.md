@@ -24,7 +24,7 @@ graph TD
 
 ## 使用约束
 
-- 导出在浏览器环境最完整（依赖 DOM / `XMLSerializer`）；小程序 / Node 运行时需 polyfill 对应 API（见 [08 · 多运行时兼容](compatibility)）。
+- 导出在浏览器环境最完整（依赖 DOM / `XMLSerializer`）；Node / headless 运行时需自备等价物（见 [08 · 多运行时兼容](compatibility)）。
 - 半透明 / 阴影 / 全局合成等效果在 SVG 里通过 `<filter>` / `opacity` 近似；与 Canvas 像素级一致是目标但非硬性保证，复杂混合建议同时保留位图截图通道。
 
 ## 扩展点
