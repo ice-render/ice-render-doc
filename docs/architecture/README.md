@@ -46,6 +46,8 @@ ICERender 是一款 **Canvas 2D 交互图形渲染引擎**（MIT 协议，作者
 | 布局机制 | `ICELayoutManager` 策略 + **7 种具体布局**（流式 / 网格 / 五区 / 单轴 / 卡片 / 叠加 / 图分层） | [23 · 布局机制](layout) | — |
 | 视口缩放 | `getRenderViewport` · 视口矩阵 | [11 · 视口缩放](viewport-zoom) | — |
 | 对齐吸附 | `AlignmentGuideManager` | [12 · 对齐吸附](alignment-guide) | — |
+| 脏区空间索引评估 | `dirty-rect-util` · 均匀网格原型 | [25 · 脏区空间索引评估](dirty-rect-spatial-index-evaluation) | — |
+| 引擎升版验证清单 | 应用侧门禁 / 像素对照口径 | [26 · 引擎升版后的应用侧验证清单](engine-upgrade-verification) | — |
 | 无障碍原语 | `a11y/accessibility` | [14 · 无障碍原语](accessibility) | — |
 | i18n 边界 | 引擎 / 组件库 / 应用 | [17 · i18n 边界](i18n-boundary) | — |
 | 导出 | `export/SvgExporter` | [24 · 导出（SVG）](export) | — |

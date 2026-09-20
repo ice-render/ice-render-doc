@@ -47,6 +47,13 @@ ICE 家族的文档站（Docusaurus，部署在 GitHub Pages：`https://ice-rend
 | `docs/conventions/app-pages.md` | `ice-web-components/docs/guides/app-pages.md` | 同上，另加 front matter（description / keywords） |
 | `docs/conventions/member-ordering.md` | 各仓 `AGENTS.md` 里的成员顺序契约 | 归纳成一篇，跟着契约改 |
 | `docs/ice-agent-console/upstream-gaps.md`、`docs/ice-chart/annotation-design`、`docs/entity-designer/notation-*` | 对应仓的 `docs/` | 整篇搬过来 |
+| `docs/architecture/25-dirty-rect-spatial-index-evaluation.md`、`docs/architecture/26-engine-upgrade-verification.md` | `ice-render/docs/architecture/19-…` / `20-…` | 整篇搬过来（站点编号另排：站点 19~24 是自建页）；标题去掉数字、`.md` 链接换成站点 slug |
+| `docs/entity-designer/worker-mirror-rendering.md` | `ice-entity-designer/docs/worker-mirror-rendering.md` | 整篇搬过来（标题保留） |
+
+> **镜像对清单**：站点 `docs/architecture/01~18` ↔ 引擎 `docs/architecture/01~18`（同名同号）；
+> 站点 `19-theme` / `23-layout` 与引擎 `21-theme-and-style` / `22-layout` **不是**镜像（各自独立页）；
+> 站点 `20-link` / `21-control-panel` / `22-plugin` / `24-export` 是站点自建。做同步前先跑一次漂移体检
+> （比对归一化后的内容，别按文件名硬配）—— 2026-09-20 就发现「站点 12 对齐吸附比引擎新」这种**反向漂移**。
 
 ⚠️ **镜像会漂**：2026-09-17 体检时，`guides/` 里已经有 5 篇与源头不一致（`examples.md` 差 44 行、
 `custom-components.md` 差 10 行、`layout.md` / `forms.md` / `testing.md` 各差 2~4 行，多是链接与

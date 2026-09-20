@@ -90,6 +90,8 @@ const sidebars = {
             { type: 'doc', id: 'architecture/plugin', label: '1.4.22 插件机制' },
             { type: 'doc', id: 'architecture/layout', label: '1.4.23 布局机制' },
             { type: 'doc', id: 'architecture/export', label: '1.4.24 导出（SVG）' },
+            { type: 'doc', id: 'architecture/dirty-rect-spatial-index-evaluation', label: '1.4.25 脏区空间索引评估' },
+            { type: 'doc', id: 'architecture/engine-upgrade-verification', label: '1.4.26 引擎升版后的应用侧验证清单' },
           ],
         },
         {
@@ -121,6 +123,7 @@ const sidebars = {
             { type: 'doc', id: 'entity-designer/power-symbol-spec', label: '电力符号记法' },
             { type: 'doc', id: 'entity-designer/power-secondary-spec', label: '厂站二次侧记法' },
             { type: 'doc', id: 'entity-designer/water-process-spec', label: '水处理工艺记法' },
+            { type: 'doc', id: 'entity-designer/worker-mirror-rendering', label: 'Worker 镜像渲染实测' },
           ],
         },
         {
