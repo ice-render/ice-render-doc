@@ -7,6 +7,11 @@ const PAGES = [
   { path: '/docs/ice-web-components', name: 'ice-web-components' },
   { path: '/docs/ice-chart', name: 'ice-chart' },
   { path: '/docs/entity-designer', name: 'entity-designer' },
+  // 三个演示型产品（站点托管的是它们的整份构建产物）——2026-09-20 补：
+  // 这三页此前不在门禁里，站点上的 bundle 漂了也没人发现
+  { path: '/docs/ice-game', name: 'ice-game' },
+  { path: '/docs/ice-smart-water', name: 'ice-smart-water' },
+  { path: '/docs/ice-agent-console', name: 'ice-agent-console' },
 ];
 
 /**
