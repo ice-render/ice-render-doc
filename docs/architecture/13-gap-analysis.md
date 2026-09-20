@@ -10,7 +10,7 @@
 > 它回答的是「当时凭什么这样判断」，**不代表现在仍是缺口**；判断当前状态请以 §1 + §8 为准。
 > 已修的条目在其小节顶部都加了「状态」行。
 
-## 范围与边界（先读）
+## 0. 范围与边界（先读）
 
 `09-roadmap.md` 已明确划分「引擎原语 vs 应用层」：
 
@@ -22,7 +22,7 @@
 - **渲染后端不抽象**：引擎有意绑定 Canvas 2D，**不做 Renderer 抽象层**，不支持 WebGL / WebGPU / SVG 作为可替换后端。
 - 因此下文所有条目**均不含**「抽象渲染层」「为将来换后端留口」类建议；涉及 SVG/Node 出图的邻近能力，只允许以**独立 exporter / 注入外部 ctx** 的形式提出（见 §6）。
 
-## 结论速览
+## 1. 结论速览
 
 > 换个视角的证据：两个真实应用（`ice-web-components` 的六页后台与全屏 Windows XP 桌面）跑下来的
 > 复盘在 [15 · 应用驱动的引擎评估](app-driven-review) —— 那里记的是「哪里真的被卡住、归属是谁」，
@@ -44,7 +44,7 @@
 | 8 | 无 SVG / PDF 导出，无 SVG 导入 | P1 | 部分 | ✅ **SVG 导出 + 无头出图已做**（`ice.toSvg()` / `exportSvg()` 与画布共用命令流；`ICE.headless()` 让 Node 建树出图不依赖 DOM / rAF；`examples/node/export.mjs` 落盘 SVG、可选转 PNG）。**仍未做**：PDF 导出、SVG 导入、剪贴板 / 打印（见 §6 与 §8） |
 | 9 | 无障碍零实现（无 ARIA / DOM 镜像 / 键盘焦点） | P1 | 完全没做 | ✅ **已给原语**：`getAccessibilityTree()` / `setFocusedComponent()`（方案 B：DOM 镜像交应用层，见 [14](accessibility)） |
 | 10 | 无插件 / 扩展点（仅 `registerType`） | P1 | 完全没做 | ✅ **已做**：`ICE.use()` 三层注册点。仍缺「自定义命中判定」注册协议（见 [09 路线图](roadmap)） |
-| 11 | 序列化以 `constructor.name` 为类型键；映射漏项 | P1 | 隐患 | ✅ **已修**：`getTypeId()` 反查 + 补 `ICERose` + 反序列化容错 + 迁移表；**2026-09-13 进一步**把 typeId 统一为 `namespace:Type`、冲突明确抛错、且只认 canonical 一种形式。⚠️ 该缺陷**随后在下游应用层复现过一次**（引擎修了、应用层漏改），见 §8 末条 |
+| 11 | 序列化以 `constructor.name` 为类型键；映射漏项 | P1 | 隐患 | ✅ **已修**：`getTypeId()` 反查 + 补 `ICERose` + 反序列化容错 + 迁移表。⚠️ 该缺陷**随后在下游应用层复现过一次**（引擎修了、应用层漏改），见 §8 末条 |
 | 12 | 发行契约缺失；CI 不跑可视化回归 | P1 | 部分 | ✅ **已做**：`exports` / `sideEffects` / CHANGELOG / `publint`+`attw` / 覆盖率门槛 / CI 接可视化回归。**2026-09-12 复核**：GitHub Actions 上的 `ci.yml` 是真在跑的（累计 121 次运行，dev / master 最近全绿），镜像也已是同步状态；⚠️ **下游两仓（ice-entity-designer / ice-entity-designer-dsl）尚无 CI**，各自的门禁目前只靠本地 `npm run` 系列 |
 | 13 | 动画无 delay / 序列 / spring，且 `Math.floor` 掉精度 | P2 | 部分 | ✅ **已做**（另加关键帧时间轴、数组字段补间，结束判定改按时间） |
 | 14 | 布局不随增删自动重排；容器 setState 递归置脏全部后代 | P2 | 部分 | ✅ **已做**（自动重排 + 排布前 measure + `dirty`/`paramsDirty` 拆级） |
@@ -58,7 +58,7 @@
 | 22 | 几何能力（求交/采样/点在多边形）全是私有实现，未上提 | P2 | 评估时未列 | ✅ **已做**：`GeoUtil.pointInPolygon` / `distanceToSegment` / `distanceToPolyline` / `samplePolyline` / `segmentIntersect`，图元改为消费公共实现 |
 | 23 | 产物内联 gl-matrix 但**没有保留其版权声明**；`rollup` 的 `external` 是死代码 | P1 | 评估时未列 | ✅ **已修**：产出 `dist/THIRD-PARTY-NOTICES.txt`；删掉 `external` 死代码并在注释里写明「全部内联 = 零运行时依赖」的取舍 |
 
-## P0 · 决定「是否算交互图形引擎」
+## 2. P0 · 决定「是否算交互图形引擎」
 
 ### P0-1 输入模型只有鼠标 + 键盘
 
@@ -119,11 +119,15 @@
 
 **附加**：浏览器对 canvas 尺寸上限**不报错、静默失效**，大画布/导出场景需自检降级（业界有专门的 canvas 尺寸探测/降级方案）。
 
-## P1 · 能力与工程化
+## 3. P1 · 能力与工程化
 
 ### P1-1 文本：无换行、无省略、无 grapheme 感知
 
 **证据**：`graphic/text/ICEText.ts:440-465` 仅按 `\n` 拆行；`fillText(text, x, y, this.state.width)` 传入 maxWidth → 超宽时 canvas **横向压缩字形**而非换行。缺：自动折行、`maxLines` + 省略号、可配 `lineHeight`、`letterSpacing` / `wordSpacing`、RTL / `ctx.direction`、富文本（混排粗体/颜色）。
+
+> **状态（2026-09-13）**：`lineHeight` / `letterSpacing` / `textDecoration` 已按「正式配置」落地
+> （量测 / 换行 / 渲染 / SVG 导出四处同口径，解析集中在 `src/graphic/text/text-style.ts`，见 CHANGELOG 的 B 组条目）；
+> `wordSpacing` 仍缺（需要时按同一套 resolver 加即可）。
 
 **进展（2026-09-10）**：自动换行 / `maxLines` + 省略号 / grapheme 感知已落地，**默认关闭**（`wrap: false`）以保持既有行为不变：
 - `wrap: true` 按 `state.width` 贪心断行；`maxLines` 限制行数，末行逐 grapheme 回退加 `ellipsis`，保证「内容+省略号」不超宽
@@ -131,11 +135,11 @@
 - 编辑态不换行（`caretIndex` 按原始文本计，换行会错位）
 - 仍缺：`wordSpacing`、富文本（同行混排粗体 / 颜色 / 字号）
 
-> **状态（2026-09-13）**：RTL / `ctx.direction`、CJK 断行规则（标点避头尾）与无空格脚本（泰 / 老挝 / 高棉 / 缅甸）词典分词断行**已落地**（见 [17 · i18n 边界](i18n-boundary)）；`letterSpacing` / `lineHeight` / `textDecoration` 已按「正式配置」落地（量测 / 换行 / 渲染 / SVG 导出同口径）；无 DOM 运行时的编辑 / 光标 / 选区已改为 grapheme 感知并支持多行。
+> **状态（2026-09-13）**：RTL / `ctx.direction`、CJK 断行规则（标点避头尾）与无空格脚本（泰 / 老挝 / 高棉 / 缅甸）词典分词断行**已落地**（见 [17 · i18n 边界](i18n-boundary)）；`letterSpacing` / `lineHeight` / `textDecoration` 已按「正式配置」落地（量测 / 换行 / 渲染 / SVG 导出同口径）；无 DOM 运行时的编辑/光标/选区已改为 grapheme 感知并支持多行。
 
 **grapheme 问题**：`caretIndex` 按 UTF-16 码元计数（`ICEText.ts:242-273`），`ICEPolyLine.ts:787` 降级宽度估算用 `label.length * fontSize`——中文/emoji/ZWJ 序列下**光标定位与估算均不正确**。对标：主流引擎的新版本已引入 grapheme 感知布局；标准解法是 `Intl.Segmenter`（Baseline 2024）。
 
-> **状态（2026-09-13）**：断行按 grapheme 切分、无 DOM 运行时的编辑（Backspace / Delete / 方向键）与光标 / 选区定位已改为 grapheme 感知（RTL / 多行 / 对齐一并修正，并新增「按字形命中」`getCaretIndexAt()`）；`caretIndex` 仍是 UTF-16 下标（与 DOM 输入法保持一致），`ICEPolyLine` 的降级宽度估算仍按 `label.length`。
+> **状态（2026-09-13）**：断行按 grapheme 切分、无 DOM 运行时的编辑（Backspace / Delete / 方向键）与光标定位已改为 grapheme 感知（RTL / 多行 / 对齐一并修正，见 `tests/graphic/text-bugfixes.test.ts`）；`caretIndex` 仍是 UTF-16 下标（与 DOM 输入法保持一致），`ICEPolyLine` 的降级宽度估算仍按 `label.length`。
 
 ### P1-2 文本量测的 HTML 注入与非 DOM 退化（**安全缺陷**）
 
@@ -243,9 +247,9 @@
 - `package.json` 增加 `exports`（`types`/`import`/`require`/`default`）+ `sideEffects: false`，保留 `./dist/*` 子路径兼容历史直接引用；新增 `test:visual:ci` 脚本
 - CI 新增 **visual 任务**（build → Playwright chromium → examples 冒烟 + 交互 + 脏矩形像素一致性）。**刻意排除 golden 图像比对**：基线按平台命名（`*-darwin.png`），跨平台必然失败——这也说明「把 golden 纳入 CI」不只是加个步骤，还要解决基线分平台的问题。
 
-## P2 · 一致性与内部脆弱点
+## 4. P2 · 一致性与内部脆弱点
 
-### 动画（**2026-09-11 已完成**）
+### 4.1 动画（**2026-09-11 已完成**）
 - ✅ **支持点路径**：动画键现支持 `'transform.rotate'` / `'style.globalAlpha'` 这类嵌套字段。旧实现直接 `newState[key] = value`，键里的点被当作**字面量键名** → 这些动画**静默失效**（既不报错也不生效），所以此前只能动画 `left/top/width/height` 这类顶层字段。
 - ✅ **新增 `delay`**：延迟期内保持起始值，可让同一组件多属性错峰、或多组件形成序列（旧实现完全没有 delay）。
 - ✅ **取整策略**：不再无条件 `Math.floor`，默认不取整（0→1 的透明度、角度、缩放不再失真），需要整数步进时显式 `round: true`。
@@ -260,7 +264,7 @@
   并接入主题 `motion.easing` token。为此把缓动拆成两层：新增 **`EasingProgress`**（归一化进度函数，
   纯函数、不读时钟 —— 关键帧段内缓动需要在任意局部进度上求值，而 `Easing` 的「值语义 + 自读 `Date.now()`」
   签名做不到；仅在模块内导出，未加入包入口），`Easing` 保持历史签名不变（9 个既有函数体逐字未改）。`tests/animation/easing-progress.test.ts` 在 0~1 网格上锁定
-  两层等价（实测偏差 < 1e-12），防止实现漂移。
+   两层等价（实测偏差 &lt; 1e-12），防止实现漂移。
 - ✅ **数组型字段补间**（2026-09-11）：`transform.scale` / `transform.translate` / `transform.skew` 等
   按分量逐元素插值，可与关键帧、弹簧缓动组合；仅「两端长度不一致」「含非数字」被拒绝。
 - ✅ **结束判定由「值是否越过 to」改为按时间**（2026-09-11）：这是弹簧过冲能正常工作的前提
@@ -269,7 +273,7 @@
 - ✅ 未知缓动名不再抛 `TypeError`（回退 `linear` 并提示一次）；非法配置的告警由**逐帧刷屏**改为每配置只告警一次
   （`WeakSet` 记录，不往会被序列化的 `props` 上塞标记字段）。
 
-### 布局（**2026-09-11 已完成**）
+### 4.2 布局（**2026-09-11 已完成**）
 - ✅ `addChild` / `removeChild` 现在**立即重排**（旧实现只在 `setLayout()` 时排一次，之后增删都不重排 → 加进去的子组件位置全错、删掉后留下空位）。`addChildren` / `removeChildren` 批量操作只在结束后排一次，避免逐个重排的 O(n²)。
 - ✅ **新增 measure 阶段**：`ICEGroup.doLayout()` 排布前先对每个子组件调 `measure()`（`calcComponentParams()`），使文本字形量测、点集路径 `calcDots` 在布局前完成 —— 旧实现读到的全是 `0` / 文本的默认尺寸（当时 `10` 兼作「未设置」哨兵；2026-09-13 起改为按「是否显式给尺寸」判定）。
 - ✅ **新增的容器型子组件继承父层布局**（与 `setLayout()` 的传播规则一致），否则它内部的子组件不会被排布。
@@ -279,13 +283,29 @@
   - 文本本就靠离屏缓存避开了重测（实测 0 次），因此本项的真实收益集中在**点集类图元**（星形/玫瑰线/正多边形/折线）不再重跑 `calcDots()`。
 - ✅ **顺带修掉一个潜在漂移**（2026-09-11）：`ICEDotPath.calcLocalOrigin()` 会就地把 `dots` 平移到「以 origin 为原点」，旧实现**每次 compose 都无条件再平移一个 origin** —— 实测连续三次 `composeMatrix()`，`dots` 依次偏移 1/2/3 个原点。这意味着「跳过重算」根本不可能安全落地（跳过重算就会累积漂移）。现改为记录「已应用平移量」、只补差额，`composeMatrix()` 对 dots 变为**幂等**；`calcDots()` 成为重建 dots 的唯一入口（子类实现 `__calcDots()`）。这条不变量也顺带消除了 ObjectCache / `__freshBox` / `getMinBoundingBox(true)` 之间「必须严格配对调用」的隐式约束。
 
-### 主题（**2026-09-10 已修**）
+### 4.3 主题（**2026-09-10 已修**）
 - ✅ **主题改为实例级**：`ICE` 现在持有自己的 `theme`，`ice.setTheme()` 只改本实例（旧实现改的是模块级单例 → 同页面两个 ICE 实例/两套品牌互相污染）。模块级 `setTheme()` 仍作为「此后新建实例」的默认值，因此单实例场景行为不变。
 - ✅ **preset 按所属实例的主题解析**：组件构造时仍用模块级默认主题（构造函数阶段还不知道归属哪个 ICE），加入实例时由 `addChild`/`addTool` 调 `__reapplyPreset(this.theme)` 纠正 —— 用户显式传入的样式仍优先。
 - ✅ `AnimationManager` 的 motion token（`duration`/`easing` 语义名）也改用实例主题。
 - ✅ 新增 `resolveTheme()`：解析主题但不修改任何全局状态（实例级主题的基础）。
+- ✅ **主题变更通知（2026-09-14）**：`setTheme` / `setChrome` 应用完成后广播 `THEME_CHANGE`
+  （`ice.onThemeChange(fn)` 是封装，自带订阅者隔离与退订）。此前引擎换主题**不发任何信号**，
+  应用层"被动跟随"的场景（图表 `theme:'auto'`、设计器外壳派生）只能等下一次重建 ——
+  这是"引擎换了主题、上层纹丝不动"的根因。
+- ✅ **注册表护栏对齐（2026-09-14）**：`registerTheme` 以前是裸赋值（应用能把内置 `dark` 静默换掉），
+  现在与 `registerPreset` / `registerType` 一致 —— 内置名不可覆盖、重复注册抛错、要覆盖须显式 `{ overwrite: true }`。
+- ✅ **校验器认得应用词汇（2026-09-14）**：`validateTheme` 以前把所有不认识的 semantic 键都判成
+  "未知 token，引擎不会读它"（**文案本身是错的**：`token('app.highlight')` 是能解析的）。
+  现在只在疑似拼错内置名时报警告（并给候选名字），应用自带词汇降为 `info`。
 
-### 连线与工具（**2026-09-11 已完成**）
+- ✅ **家族品牌基线已定（2026-09-14，方案① Bootstrap 5）**：引擎默认语义色从 Tailwind 值
+  （`#3B82F6`）换成 Bootstrap 5 值（`#0D6EFD` 等），数据系列配色抽成唯一来源 `FAMILY_PALETTE`
+  由引擎与 `ice-chart` 共用，`DARK_THEME` 换成 Bootstrap 5.3 深色变体；设计器画布外壳不再硬编码，
+  默认从引擎主题派生。**机制与桥本来就是统一的**（见 [21 · 主题与样式机制](theme) §8.6），
+  这轮只是**改值**，没有合并 token 词汇（各应用词汇需求本就不重叠）。决策记录见
+  [09 · 路线图](roadmap) 的「家族品牌基线」。
+
+### 4.4 连线与工具（**2026-09-11 已完成**）
 - ✅ **`ICE.findComponent` 改为递归查找**（2026-09-11）：先查顶层（同 id 顶层优先，保持既有优先级），
   再深度优先递归子树；**工具层不参与查找**（工具是 UI 覆盖层，不应成为连线端点）。
   这样「连线连接嵌套子组件」在引擎侧真正生效。
@@ -310,7 +330,7 @@
 - 连接插槽为**全局共享的 5 个固定实例**（T/R/B/L/C，`graphic/link/ICELinkSlotManager.ts:204-288`），无法为多组件同时展示端口，也不支持自定义锚点。
 - `ICELinkSlot.updatePosition` 在 `AFTER_RENDER` 内 `setState`（`graphic/link/ICELinkSlot.ts:91,97`）→ 置脏 → 下帧再渲染 → 再 setState：**只要有 linkable 组件，画面永不空闲**。
 
-### 监听器与死代码（**2026-09-10 已修**）
+### 4.5 监听器与死代码（**2026-09-10 已修**）
 - ✅ `TransformControlPanel.targetComponent` 与 `ICELinkSlot.hostComponent` 的 `once(BEFORE_REMOVE, 箭头函数)` 改为**具名属性 + `on`**，切换时由 setter `off`（`on` 对 `(fn, scope)` 幂等）。旧写法因 `once` 内部再包一层，箭头回调永远无法 `off`，反复选中会持续泄漏。
 - ✅ `AFTER_REMOVE` 从死代码变为真正触发：`removeChild` / `removeTool` / `ICEGroup.removeChild` 都补上，且**必须在 `destory()` 之前**（`destory` 会 `purgeEvents`，之后触发监听者收不到）。
 - ✅ `flattenTree` 的 `_pid` 改为优先 `props.id`（旧实现取 `node.id` 恒为 `undefined`），同时兼容「普通对象 + 顶层 id」的用法。
@@ -319,7 +339,7 @@
 - ✅ **`getMinBoundingBox(refresh=true)` 的取值顺序 bug**：旧实现**先读** `state.localOrigin` **再** `composeMatrix()`，而 `localOrigin` 是 `composeMatrix()` 内部才派生的 → 首次刷新读到初始 `(0,0)`，盒子**偏一个原点**。这正是连线插槽要靠「每帧重算」掩盖首次错误的根因。已改为先 compose 再读。
 - ✅ **`findComponent` 递归查找**（2026-09-11 已完成，详见 §4.4）：本条目此前写成「未改，附原因」，与 §4.4 自相矛盾，已更正。保留一条记录是因为它的排错过程有参考价值——当时把像素差异归因为「连线端点推导 vs 局部重绘」，做完那一步后差异只从 900px 降到 489px，说明方向错了；真根因是**折线包围盒退化**（两条算盒路径不一致）。教训：出现像素差异时，先验证「包围盒 / 上屏快照是否可信」，再怀疑渲染策略。
 
-### 待复核项（**2026-09-11 已全部核实**）
+### 4.6 待复核项（**2026-09-11 已全部核实**）
 > **2026-09-11 全部核实完毕**：两条确认代码本来就对（并各补了回归测试），一条是真缺陷（已修）。
 > 修订前这三条以「未经运行时验证的疑点」口吻记着，容易被误读成「已知有三个 bug」。
 
@@ -348,7 +368,7 @@
 `composeMatrix()` 对 dots **幂等**，`calcDots()`（子类实现 `__calcDots()`）成为重建点集的唯一入口。
 详见 §4.2。这条不变量也顺带消除了 ObjectCache / `__freshBox` / `getMinBoundingBox(true)` 之间
 「必须严格配对调用」的隐式约束。
-## 明确不做（范围外）
+## 5. 明确不做（范围外）
 
 | 事项 | 理由 |
 |---|---|
@@ -356,7 +376,7 @@
 | WebGL / WebGPU 后端 | 同上；不再是「战略储备」 |
 | undo/redo、多选 UX、编组、复制粘贴 | `09-roadmap.md` 划归应用层（引擎只需保证原语够用） |
 
-## 待定（取决于产品定位）
+## 6. 待定（取决于产品定位）
 
 这两项**不需要**渲染层抽象；**2026-09-12 复核：第 1、2 项已落地**，本节保留剩余边界：
 
@@ -365,7 +385,7 @@
    - `cross-platform/root.ts:20-25`：`root.requestFrame` 在 Node 为 `undefined` → `FrameManager.start()`（`FrameManager.ts:39-42`）直接抛错；
    - 文本量测在无 DOM 环境退化（见 P1-2）。
 
-## 落地顺序回顾（原「建议落地顺序」，2026-09-11 复核）
+## 7. 落地顺序回顾（原「建议落地顺序」，2026-09-11 复核）
 > 原为 2026-09-10 拟定的「建议落地顺序（收益/成本比）」。**2026-09-11 复核：8 项里 6 项已落地、1 项部分、1 项划归应用层。**
 > 因此本节改为「回顾 + 剩余」，不再当作待办列表读。
 
@@ -439,7 +459,7 @@
 
 > 说明：竞品相关的官方文档与仓库链接按约定不在本文列出。需要对着具体实现核对时，可在内部调研记录中查阅。
 
-## 进展（滚动更新）
+## 8. 进展（滚动更新）
 
 | 日期 | 条目 | 状态 |
 |---|---|---|

@@ -66,8 +66,8 @@ class MyPainter implements ICEPainter {
 ## 一、完整示例：`ICEMetric`
 
 一个指标卡：左侧状态色条 + 标题 + 大号数值；**点击整块 +1**、**聚焦后 ↑/↓ 调值**、
-可以直接放进 `ICEForm` 参与校验。完整源码在 ``docs/examples/ICEMetric.ts``，
-在线效果在 ``examples/custom-component.html``。
+可以直接放进 `ICEForm` 参与校验。完整源码在 [`docs/examples/ICEMetric.ts`](../examples/ICEMetric.ts)，
+在线效果在 `examples/custom-component.html`。
 
 ![自定义组件示例](../images/custom-component.webp)
 
@@ -226,7 +226,7 @@ this.__handle = getICEOverlayManager(this.ice).open({
 this.__handle.close();
 ```
 
-点外关闭自己做（监听 `mousedown` 判自己的盒子与浮层盒子），细节见[浮层指南](./overlays)。
+点外关闭自己做（监听 `mousedown` 判自己的盒子与浮层盒子），细节见[浮层指南](overlays)。
 
 ## 七、用主题与状态色
 
@@ -297,6 +297,6 @@ ice.registerType('my-app:ICEMetric', ICEMetric);
 | 用 `length * k` 估算文本宽度 | 中文标签压出色块 | `estimateTextWidth()` |
 | 把组件实例塞进 props | 构造时栈溢出（引擎深拷贝递归） | 用工厂函数，或在构造前把实例从 props 剥离 |
 | 布局容器 `interactive` 没关 | 内部控件点不动 / 焦点环不出现 | 纯布局节点一律 `interactive: false` |
-| 自己画焦点框 | 鼠标点一下、拖滑块都冒蓝框 | 交给 `ICEFocusManager`，只声明 `focusRing: 'keyboard' ｜ 'always' ｜ 'never'` |
+| 自己画焦点框 | 鼠标点一下、拖滑块都冒蓝框 | 交给 `ICEFocusManager`，只声明 `focusRing: 'keyboard' \| 'always' \| 'never'` |
 
-更多细节见[架构思路](../architecture)与[测试指南](./testing)。
+更多细节见[架构思路](../architecture)与[测试指南](testing)。

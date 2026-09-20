@@ -50,11 +50,11 @@
 
 | 能力 | 状态 | 说明 / 兜底 |
 |---|---|---|
-| `Path2D.roundRect`（2021 进规范） | **已采用** | 圆角矩形从「4 次 `arcTo` 手撸」改为一次 `roundRect`：每个圆角矩形的命令流 **14 条 → 1 条**（1000 个图形 14000 → 1000 条），路径重建 **127.9µs → 88.0µs**（500 个形状）。没有原生 `roundRect` 的运行时由 `Path2DRecorder` 展开成**等价**的 `moveTo / lineTo / arcTo` 序列。归一化规则（1~4 个半径的补齐、负宽高镜像、超限半径等比缩放）只写一份，放在 `src/util/round-rect.ts`，记录器与 SVG 导出器共用。真机逐像素对照：`e2e/visual/round-rect-parity.spec.ts`（12 组边角场景 **0 差异**）。 |
+| `Path2D.roundRect`（2021 进规范） | **已采用** | 圆角矩形从「4 次 `arcTo` 手撸」改为一次 `roundRect`：每个圆角矩形的命令流 **14 条 → 1 条**（1000 个图形 14000 → 1000 条），路径重建 **127.9µs → 88.0µs**（500 个形状，实测见下）。没有原生 `roundRect` 的运行时由 `Path2DRecorder` 展开成**等价**的 `moveTo / lineTo / arcTo` 序列。归一化规则（1~4 个半径的补齐、负宽高镜像、超限半径等比缩放）只写一份，放在 `src/util/round-rect.ts`，记录器与 SVG 导出器共用。真机逐像素对照：`e2e/visual/round-rect-parity.spec.ts`（12 组边角场景 **0 差异**）。 |
 | `ctx.filter`（写在 `style.filter`） | **画布可用；SVG 未支持** | `style` 一律透传给 ctx，所以 `style.filter = 'blur(8px)'` 本来就生效；配套的三条机制缺一不可：`LEAKY_CTX_PROPS` 的 `['filter','none']`（画完复位，不漏给同帧后面的组件）、`ObjectCache.__styleKey()` 带上 `st.filter`（改了滤镜必须重建位图）、`stylePaintPad()` 的 `filterDevicePad()`（模糊/投影的墨迹会溢出几何盒，位图与脏矩形都要扩边）。导出侧的留白见下。 |
 | `createConicGradient` | **已采用** | `ice.createConicGradient()`；运行时没有它则退回中间色纯色（`ICEComponent` 的渐变分支）。 |
 | `ctx.letterSpacing` / `wordSpacing` 等文本状态 | **已采用** | 进 `LEAKY_CTX_PROPS`；量测**之前**写进 ctx（`measureText` 会把字间距算进宽度）。 |
-| `OffscreenCanvas` + Worker | **可用（阶段一 + 阶段二前两块）** | 引擎**能作为库直接跑在 worker 里**（取根 `globalThis` + `createOffscreenCanvas` 的 `OffscreenCanvas` 分支），并有**跨线程状态/命令协议**：`MirrorBridge`（主线程）/ `MirrorTarget`（worker），主线程持有状态、worker 只做镜像渲染，真机验收逐像素 0 差异；**输入留在主线程**（DOM 事件/命中/拖拽不跨线程，主线程走「几何通道」保持命中盒新鲜），工具层按选择镜像。**仍未做**：结构增量协议、字体图片下发、补间搬进 worker；默认渲染仍在主线程（worker 要宿主显式接线）。 |
+| `OffscreenCanvas` + Worker | **部分采用（阶段一）** | 引擎现在**能作为库直接跑在 worker 里**（取根 `globalThis` + `createOffscreenCanvas` 的 `OffscreenCanvas` 分支），原型不再需要宿主伪造全局，回归 `e2e/visual/worker-perf.spec.ts`。**仍未做**：场景/状态跨线程同步、输入转发、字体图片下发（即"把引擎正式移植进 worker"本身），见 `10-worker-offscreen.md`。 |
 | `ImageBitmap` / `createImageBitmap` | **未采用** | 引擎的图片链路是 `ImageCache`（`Image` + `onload`）。换成 ImageBitmap 的收益是「预解码 + 可 transfer 进 worker」；在单线程渲染路径上它只是同一份位图换个壳，等 worker 路线落地时再一起评估。 |
 | `ctx.reset()`（2023） | **未采用** | 它会连带重置变换与裁剪，而引擎逐组件 `save/restore` 状态、每帧自持变换；现有 `__resetLeakyCtxState()` 按**位掩码只复位写过的那几项**，比整体 reset 更省。换过去等于重做状态模型，收益不明。 |
 

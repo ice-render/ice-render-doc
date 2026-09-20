@@ -1,7 +1,7 @@
 # 示例与场景
 
 仓库里有六个示例页，**都是纯 HTML + 一个 UMD 包**，不用打包工具就能打开看效果。
-它们同时也是这套组件库的“验收现场”：每页都配了浏览器 QA 脚本（见[测试](./testing)）。
+它们同时也是这套组件库的“验收现场”：每页都配了浏览器 QA 脚本（见[测试](testing)）。
 
 ```bash
 npm run build          # 先产出 dist/（示例页引用 ../dist/index.umd.js）
@@ -11,16 +11,16 @@ npx serve .
 
 | 示例 | 场景 | 主要用到的东西 |
 |---|---|---|
-| ``gallery.html`` | 组件总览（一个个组件排开） | 几乎全部组件 + 引擎布局器驱动的「簇 + 货架」流式布局 |
-| ``admin.html`` | 后台管理（6 页业务闭环） | 布局外壳、表格、表单、浮层、分栏、日历、引导… |
-| ``workbench.html`` | 客服工单工作台（三栏高频操作） | `ICESplitter`、`ICEList`、`ICEComment`、`ICETimeline`… |
-| ``custom-component.html`` | 自己写组件并接进体系 | `ICEWidget` + 表单/焦点/主题约定 |
-| ``theme-scope.html`` | 局部主题作用域（浅色页面里嵌深色面板、反向同理） | `themeScope()` + `props.theme` 作用域链，painter 型组件也跟随 |
-| ``windows-xp.html`` | 全屏 Windows XP 桌面（好玩的那一个） | `ICEWindow`、`ICEIconTile` + 几乎全套组件 |
-| ``arcade.html`` | ICE Arcade 掌机（小游戏合集：俄罗斯方块 + 贪吃蛇 + 2048 + CHIP-8 虚拟机） | `ICETetrisModel` / `ICESnakeModel` / `ICE2048Model` / `ICEChip8Model`（纯逻辑）+ 自绘棋盘/HUD，键盘全接管 |
-| ``pixel-editor.html`` | 像素画板（画 / 撤销 / 导出 PNG、SVG） | `ICEPixelModel` + `ICEHistoryModel`（纯逻辑）+ 单节点自绘画布，导出走模型 |
-| ``algorithm-sandbox.html`` | 算法沙盒（排序 + 寻路可视化） | `ICETracePlayerModel` 回放 + `ICESortModel` / `ICEMazeModel` 产帧，画面是 ICETileMap |
-| ``dos-terminal.html`` | ICE-DOS 终端（能敲命令） | `ICEDosModel`（虚拟文件系统 + 命令解释器）+ `ICEScrollPane` 输出区 |
+| `gallery.html` | 组件总览（一个个组件排开） | 几乎全部组件 + 引擎布局器驱动的「簇 + 货架」流式布局 |
+| `admin.html` | 后台管理（6 页业务闭环） | 布局外壳、表格、表单、浮层、分栏、日历、引导… |
+| `workbench.html` | 客服工单工作台（三栏高频操作） | `ICESplitter`、`ICEList`、`ICEComment`、`ICETimeline`… |
+| `custom-component.html` | 自己写组件并接进体系 | `ICEWidget` + 表单/焦点/主题约定 |
+| `theme-scope.html` | 局部主题作用域（浅色页面里嵌深色面板、反向同理） | `themeScope()` + `props.theme` 作用域链，painter 型组件也跟随 |
+| `windows-xp.html` | 全屏 Windows XP 桌面（好玩的那一个） | `ICEWindow`、`ICEIconTile` + 几乎全套组件 |
+| `arcade.html` | ICE Arcade 掌机（小游戏合集：俄罗斯方块 + 贪吃蛇 + 2048 + CHIP-8 虚拟机） | `ICETetrisModel` / `ICESnakeModel` / `ICE2048Model` / `ICEChip8Model`（纯逻辑）+ 自绘棋盘/HUD，键盘全接管 |
+| `pixel-editor.html` | 像素画板（画 / 撤销 / 导出 PNG、SVG） | `ICEPixelModel` + `ICEHistoryModel`（纯逻辑）+ 单节点自绘画布，导出走模型 |
+| `algorithm-sandbox.html` | 算法沙盒（排序 + 寻路可视化） | `ICETracePlayerModel` 回放 + `ICESortModel` / `ICEMazeModel` 产帧，画面是 ICETileMap |
+| `dos-terminal.html` | ICE-DOS 终端（能敲命令） | `ICEDosModel`（虚拟文件系统 + 命令解释器）+ `ICEScrollPane` 输出区 |
 
 > **demo 套件总览**：九套示例页按场景类别分组的导航图。
 
@@ -49,7 +49,7 @@ flowchart LR
 
 * 布局是 **cluster + 货架**（每个簇是一个容器节点，簇内保持局部坐标、整体平移），
   排布交给引擎：簇区 `ICEFlowLayout({ pack: 'first-fit' })`、版块与整页 `ICEBoxLayout(axis:'y')`。
-  思路与代码骨架见[画布内布局](./layout)；
+  思路与代码骨架见[画布内布局](layout#三簇-货架流式布局引擎布局器版)；
 * 加新组件时：在对应 `sections` 里加一项、给它一个 `id`，然后在
   `scripts/qa-gallery.mjs` 里补一条断言即可。
 
@@ -127,7 +127,7 @@ flowchart LR
 
 一个手写的 `ICEMetric` 指标卡（点击 +1、聚焦后 ↑/↓ 调值、能进 `ICEForm` 校验），
 把「接入 ICE 体系」的每个接入点都标了序号。完整讲解见
-[写一个自己的组件](./custom-components)。
+[写一个自己的组件](custom-components)。
 
 ## 五、`windows-xp.html`：全屏 Windows XP 桌面
 
@@ -267,7 +267,7 @@ Windows 里的「IE」是真会抓网页的（下图是它 `fetch()` 本目录 `
 ### 扫雷：一个「游戏级」的例子
 
 扫雷的规则有整整一套，所以逻辑单独抽成了模型 `ICEMinesweeperModel`
-（在[模型 API](../api/models) 里，14 条单测覆盖全部规则），
+（在[模型 API](../api/models#iceminesweepermodel) 里，14 条单测覆盖全部规则），
 UI 只负责把模型画出来：
 
 ```ts
@@ -391,7 +391,7 @@ setInterval(() => model.tick(), 1000);      // 计时（只有 playing 会累加
 ### 第 0 弹：BIOS（自检 + 启动菜单）
 
 掌机的引导层也是一个**纯逻辑模型**：`ICEBiosModel`
-（[模型 API](../api/models)，17 条单测）。页面只做三件事：
+（[模型 API](../api/models#icebiosmodel)，17 条单测）。页面只做三件事：
 把模型画成屏幕上的文字、把按键喂给模型、执行模型返回的动作。
 
 ```ts
@@ -423,7 +423,7 @@ bios.confirm();                // 只返回动作 { type: 'boot' | 'settings' | 
 
 ### 卡带 1：俄罗斯方块
 
-规则全部落在纯逻辑模型里（[模型 API](../api/models)，
+规则全部落在纯逻辑模型里（[模型 API](../api/models#icetetrismodel)，
 16 条单测覆盖 7-bag 随机、移动与踢墙旋转、软/硬降、消行计分与升级、暂停与重置）：
 
 ```ts
@@ -444,7 +444,7 @@ model.pause();     model.resume();          // P
 * **不启动 `ICEFocusManager`**：它用 Enter/Space 激活「有焦点的按钮」，会和空格硬降打架。
   游戏页把键盘完全留给自己，鼠标 hover 仍然由 `ICEHoverManager` 接管；
 * **换方块时把重力计时归零**：否则新方块可能「一出生就掉一格」（这条是 QA 抓出来的，
-  见[测试](./testing)）；
+  见[测试](testing)）；
 * **只对变化的格子 `setState`**：200 个格子上缓存一个「填充/描边」签名，签名没变就跳过，
   移动方块时每帧只碰几个节点；
 * **消行闪屏**用棋盘上方一层半透明遮罩 + 帧循环里的衰减值驱动，`ICE_TETRIS_LINE_SCORES`
@@ -452,7 +452,7 @@ model.pause();     model.resume();          // P
 
 ### 卡带 2：贪吃蛇
 
-第二个模型 `ICESnakeModel`（[模型 API](../api/models)，18 条单测）：
+第二个模型 `ICESnakeModel`（[模型 API](../api/models#icesnakemodel)，18 条单测）：
 
 ```ts
 import { ICESnakeModel } from 'ice-web-components';
@@ -473,7 +473,7 @@ model.getBody();              // [[row, col], …]，头在最前；getFood() �
 
 ### 卡带 3：2048
 
-第三个模型 `ICE2048Model`（[模型 API](../api/models)，19 条单测）：
+第三个模型 `ICE2048Model`（[模型 API](../api/models#ice2048model)，19 条单测）：
 
 ```ts
 import { ICE2048Model } from 'ice-web-components';
@@ -501,7 +501,7 @@ model.pause(); model.resume(); // 和其它卡带共用同一套暂停契约
 ### 卡带 4：CHIP-8（真的模拟器，不是规则模型）
 
 前三块卡带都是「某款游戏的规则」，第四块换了物种：`ICEChip8Model`
-（[模型 API](../api/models)，19 条单测）是一台**真的虚拟机** ——
+（[模型 API](../api/models#icechip8model)，19 条单测）是一台**真的虚拟机** ——
 4KB 内存、`V0`–`VF` 十六个 8 位寄存器、16 位地址寄存器 `I`、64×32 单色显存、
 两个 60Hz 定时器、16 键键盘，实现了 35 条指令（`00E0` / `1NNN` / `2NNN` / `DXYN` /
 `EX9E` / `FX0A` / `FX29` / `FX33` / `FX55` / `FX65` …）：
@@ -567,7 +567,7 @@ model.pause(); model.resume();         // 与其它三块卡带共用同一套�
 
 ![ICE Pixel Studio](../images/pixel-editor.webp)
 
-模型有两个，都是纯逻辑（[模型 API](../api/models)）：
+模型有两个，都是纯逻辑（[模型 API](../api/models#icepixelmodel)）：
 
 ```ts
 import { ICEPixelModel, ICEHistoryModel } from 'ice-web-components';
@@ -676,9 +676,9 @@ dos.historyPrev();               // ↑ 历史
 1. **先定场景，再选组件**：把业务动作列成表（谁在什么界面做什么），再往里填组件 ——
    `admin.html` 的六个页面就是这么拆出来的；
 2. **外壳先搭**：顶栏/侧边栏/内容区用的 `ICEPanel` 要**先创建**，内容晚于它创建
-   （引擎按创建顺序定 zIndex，反了会被底色盖住，见[画布内布局](./layout)）；
+   （引擎按创建顺序定 zIndex，反了会被底色盖住，见[画布内布局](layout#二zindex-与创建顺序最常见的坑)）；
 3. **内容区用 `ICEScrollPane`**：页面比视口高时的标准做法，顺便能挂 `ICEBackTop`；
 4. **纯布局容器一律 `interactive: false`**：否则它会挡住内部控件的命中检测
    （`ICEFormItem` / `ICESpace` / `ICEGrid` / `ICESplitter` 都是这么处理的）；
-5. **弹层走 `ICEOverlayManager`**，别自己算定位（见[浮层指南](./overlays)）；
+5. **弹层走 `ICEOverlayManager`**，别自己算定位（见[浮层指南](overlays)）；
 6. **给关键交互配 QA**：在 `scripts/qa-*.mjs` 里加断言，`npm run qa:xxx` 会真开浏览器点一遍。

@@ -3,7 +3,7 @@
 > 状态：**引擎只提供原语，DOM 镜像层由应用层实现**。本文说明为什么这样切、原语契约是什么、
 > 以及如果将来要在引擎内建镜像层应该长什么样。
 
-## 问题：canvas 内容对辅助技术不可见
+## 1. 问题：canvas 内容对辅助技术不可见
 
 `<canvas>` 只是一张位图，不向辅助技术暴露任何绘制对象（MDN 在 `<canvas>` 词条中明确说明，
 并建议在无障碍站点避免使用 canvas，或至少提供 fallback 文本）。W3C 更把 canvas 的
@@ -13,7 +13,7 @@
 **隐藏 DOM 镜像**：与画布内容一一对应的真实 DOM 元素（`<button>` / `role="img"` 等），
 由 DOM 承担语义、焦点与播报，由 canvas 承担绘制。
 
-## 边界：为什么引擎不自建镜像层
+## 2. 边界：为什么引擎不自建镜像层
 
 镜像层的三个关键决策高度依赖具体产品语义，写在引擎里既做不对也难维护：
 
@@ -27,9 +27,9 @@
 
 所以引擎负责**可访问信息的提取**与**焦点回传**，应用负责**渲染镜像**。
 
-## 原语契约
+## 3. 原语契约
 
-### 可访问节点快照
+### 3.1 可访问节点快照
 
 ```js
 const nodes = ice.getAccessibilityTree(options);
@@ -61,7 +61,7 @@ const nodes = ice.getAccessibilityTree(options);
   `state.dots`，反复调用会累积漂移（见 [13 · 能力缺口分析](gap-analysis) §4.6）。
 - 应用层拿到的是**快照**，不是活动视图：需要刷新时重新调用即可（示例中挂在 `ROUND_FINISH` 后同步）。
 
-### 键盘焦点
+### 3.2 键盘焦点
 
 ```js
 ice.setFocusedComponent(componentOrId); // 传 id 字符串或组件实例；传 null 清除
@@ -73,7 +73,7 @@ ice.getFocusedComponent();
   `focus` 事件映射到 `setFocusedComponent()`，画布内的组件就能收到键盘操作。
 - id 不存在时清空焦点，不抛错。
 
-## 应用层要做什么（参考实现）
+## 4. 应用层要做什么（参考实现）
 
 完整可运行示例见 [`examples/a11y/a11y-mirror.html`](https://github.com/ice-render/ice-render/blob/master/examples/a11y/a11y-mirror.html)：
 
@@ -84,7 +84,7 @@ ice.getFocusedComponent();
 4. 组件被拖动/缩放/视口变化后重新取快照（或直接挂在 `ROUND_FINISH` 上做增量同步）。
 5. 焦点环、快捷键、`aria-live` 状态播报由应用层按产品规范实现（引擎不参与）。
 
-## 如果将来要在引擎内建镜像层（方案 A）
+## 5. 如果将来要在引擎内建镜像层（方案 A）
 
 需要一并解决这些问题，否则不该进引擎：
 
@@ -99,7 +99,7 @@ ice.getFocusedComponent();
 
 在需求明确之前，这些都属于「应用层实现更合适」的范畴。
 
-## 相关资源
+## 6. 相关资源
 
 - MDN `<canvas>`：[https://developer.mozilla.org/en-US/docs/Web/HTML/Element/canvas](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/canvas)
 - W3C Canvas 无障碍用例：[https://www.w3.org/WAI/PF/HTML/wiki/Canvas_Accessibility_Use_Cases](https://www.w3.org/WAI/PF/HTML/wiki/Canvas_Accessibility_Use_Cases)

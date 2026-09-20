@@ -25,7 +25,7 @@ panel.setLayout(new ICEBoxLayout({ axis: 'y', gap: 12, align: 'stretch' })); // 
 
 | 组件 | 用的布局 | 组件自己保留的策略 |
 |---|---|---|
-| `ICELayout`（顶栏/侧栏/内容/页脚） | `ICEBorderLayout`（north / west｜east / center / south） | 区高/区宽声明；侧栏收起 = `display:false` |
+| `ICELayout`（顶栏/侧栏/内容/页脚） | `ICEBorderLayout`（north / west\|east / center / south） | 区高/区宽声明；侧栏收起 = `display:false` |
 | `ICEForm` | `ICEBoxLayout({ axis: 'y', align: 'stretch' })` | 高度 = 内容高度 |
 | `ICESpace` | 横向 → `ICEBoxLayout`；换行 → `ICEFlowLayout`；纵向 → `ICEBoxLayout` | 没给宽/高的那一轴按内容自适应 |
 | `ICESegmented` | `block` → `ICEGridLayout({ cellSizing: 'equal' })`；否则 `ICEBoxLayout(axis x)` | 段宽（非 block 时按文字估算）；内缩由 `padding` 承担 |
@@ -33,6 +33,15 @@ panel.setLayout(new ICEBoxLayout({ axis: 'y', gap: 12, align: 'stretch' })); // 
 | `ICETabs` | 自持 `ICETabsLayout`（Swing `JTabbedPane` 位） | 页签有哪些 / 要不要溢出 / 滚到哪 |
 | `ICEPagination` | `ICEBoxLayout(axis x)` | 页码窗口、高度（含 8px 下边距） |
 | `ICEFormItem`（复合叶子） | 自持 `ICEFormItemLayout` | 形态（水平/垂直）、标签宽、行高与间距 |
+
+⚠️ **`stretch` 拉的是"子项"，不是"子项里的控件"**（2026-09-18 补）：`ICEForm` 的
+`stretch` 把每个 `ICEFormItem` 撑到表单宽度，但控件的位置与尺寸由 `ICEFormItem`
+按 `control.state.width` 摆（缺省 200）—— 父布局只摆位置、不缩放子组件（引擎的既有契约，
+与 Swing 的 `Container.setLayout` 一致）。所以只写 `stretch` 时，同一张表单里的控件
+宽度仍会各不相同（`ICETextField` 200 / `ICEInputNumber` 140 / `ICEButton` 112），
+症状是"画出来了、但右边空掉一大截"，**不报错**。
+要让控件跟着容器变宽，显式给控件宽度，或在宿主层于容器尺寸变化时整棵树重新对齐
+（`ice-web-components-dsl` 的 `setWidth()` 就是这个角色，见其 README §8.1）。
 
 其余三个**组件级**排布工具仍是各自的语义（引擎布局器没有对应能力）：
 
@@ -81,7 +90,7 @@ const splitter = new ICESplitter({ width: 900, height: 460, size: 300, first: qu
 * **装装饰**（组件自己画的造型）→ 布局会把装饰也当成内容排一遍。
 
 装饰一律交给 `painter`（Swing 的 `ComponentUI` 位，见
-[写一个自己的组件](./custom-components)）：
+[写一个自己的组件](custom-components#内部装饰不要做成子节点用-painter)）：
 `ICEAvatar` 的圆底与首字、`ICESkeleton` 的占位条已经迁过去，它们的 `childNodes` 现在是空的，
 怎么挂布局都不会碰到装饰。
 
@@ -305,6 +314,10 @@ pane.setScroll(0, 40); pane.scrollBy(0, 20);  // 程序式滚动（滚轮也支�
 可见性，容器通过 `onShow` / `onHide` 收到通知。库里没有页面类型、没有路由、没有“激活”，
 这些都属于宿主策略 —— 契约定在 `ICEContainer` 上是为了让应用层有唯一入口，而不是为了把
 导航语义塞进组件库。
+
+> **应用页面怎么写**（一页一类、`onUpdate()` 由谁在什么时候调、入口决策表、验收清单）见
+> [应用层：一个页面怎么写](../../conventions/app-pages) —— 那层约定是应用侧的自律条款，写在这里容易和
+> 库的能力混起来。
 
 ### 嵌套是能力，不是义务
 

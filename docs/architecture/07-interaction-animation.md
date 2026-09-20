@@ -2,6 +2,29 @@
 
 ## 交互层：控制面板
 
+### 手柄尺寸可配（`ICE.init` 的 `controlPanel` 选项）
+
+变换手柄与连线端点手柄的尺寸不是写死的，宿主可以在初始化时传：
+
+```js
+const ice = new ICE().init(canvas, {
+  controlPanel: {
+    resizeControlSize: 20, // 8 个缩放控点的边长（默认 16）
+    rotateControlSize: 12, // 旋转手柄半径（默认 8）
+    rotateControlOffsetY: 80, // 旋转手柄离包围盒顶边的距离（默认 60）
+    lineControlSize: 24, // 连线端点手柄 ICELinkHook 的边长（默认 16）
+  },
+});
+```
+
+- 四个值**全部可选**，缺省即历史行为；触摸端通常调大、密集图纸可以调小；
+- **非法值（0 / 负数 / NaN / 非数字）一律退回默认** —— 配错的症状会是"手柄看不见也点不中"，
+  那比"配不上"难查得多；
+- 它们是**构造期**参数（手柄在面板构造时就按这些尺寸建出来了）；运行期要改就重建面板。
+
+回归：`tests/control-panel/control-panel-options.test.ts`（默认值 / 构造可配 / `ICE.init` 透传 /
+非法值退回，且都验到"手柄真的按配置建出来"，不只是字段被赋值）。
+
 `ICEControlPanelManager` 负责管理**选中与变换工具**（纯逻辑组件，无外观）：
 
 ```mermaid
@@ -32,6 +55,28 @@ graph TD
 - 连线交互：拖动连线端点（`ICELinkHook`）→ `HOOK_MOUSEMOVE` 阶段用**包围盒相交检测**（`getMaxBoundingBox().isIntersect()`）找碰撞的 `linkable` 组件与插槽 → `HOOK_MOUSEUP` 建立或断开 `links` 关系。
 - 连线关系记录在 `ICEPolyLine.state.links`（`{ [端点位置]: { id, position } }`）。
 
+### 正交路由怎么算（`ICEVisioLink.interpolate()`）
+
+1. **候选**：以两端点与各自插槽的**逃逸点**为基础，先生成 s0（直连）、s1（一个拐点）、
+   s2（六种绕行：先横后竖 / 先竖后横 / 往东、北、西、南逃逸），再补**避障候选**
+   （绕到走廊里每个图元的外侧）；
+2. **三道过滤**：① 每段都水平或垂直（正交）；② 不倒着走；③ 不与**两端自身**的包围盒相交；
+3. **避障**（2.16.0）：把走廊（两端点围成的矩形外扩 28px）里的其他图元当障碍 ——
+   **只认图元本体**：`hasDerivedChildren()` 声明的内部零件（位号、名称、装饰）不算，
+   否则一条走廊里 24 个"障碍"有 20 个是文字盒，真挡路的图元反被数量上限挤掉；
+   取「穿越最少」的一档，一条都绕不开时按**挡路图元的并集**再补一轮候选
+   （一条线要横穿一整排时，人也是绕那一排，而不是绕某一个方块）；
+   障碍盒各向内缩 1px —— 贴边走、擦角过**不算**穿越，否则"零穿越"这个判据几乎无法满足；
+4. **打分**：先取点数最少的那一档，再按 `scorePath()`（转角少者优）。
+
+实测（ice-agent-console 的给排水案例，78 图元 / 37 条管线）：改前 **24 处**穿线 → 改后 **0**。
+
+⚠️ 两个坑写在代码注释里：`getMinBoundingBox()` **没渲染过时读的是空矩阵**，
+算出来的盒子全是 NaN（必须 `refresh = true`）；障碍清单不去掉内部零件的话，
+避障会"看着在跑、实际一个都没绕开"。
+
+回归：`tests/link/visio-link-obstacle.test.ts`（最小三盒子场景 + 线段相交口径逐条 + 贴边容忍）。
+
 ## 动画
 
 `AnimationManager` 订阅 `ICE_FRAME_EVENT`，对 `animationMap` 里的组件做补间：
@@ -53,27 +98,6 @@ graph TD
 |---|---|---|
 | 单段 | `{ from, to, duration, easing? }` | 在两个值之间补间 |
 | 关键帧 | `{ keyframes: [{ offset, value, easing? }], duration }` | `offset` 为 0~1 时间占比，缺省按顺序均分、超出会被夹紧、乱序自动排序；`easing` 写在**段起始帧**上，只作用于「该帧 → 下一帧」这一段（未写则回落到动画级 `easing`）；时间轴之外的取值保持首/末帧值，不外推 |
-
-```mermaid
-flowchart TD
-  V["取值形态"] --> V1["单段 {from, to, duration}"]
-  V --> V2["关键帧 {keyframes[], duration}"]
-  V1 --> I["interpolators 统一求值"]
-  V2 --> I
-  I --> T["取值类型"]
-  T --> T1["数值 / 等长数字数组"]
-  T --> T2["颜色 #rgb / rgb()（sRGB 空间）"]
-  T --> T3["带单位数字串 '12px'"]
-  I --> E["缓动 Easing"]
-  E --> E1["EasingProgress（归一化,纯函数）"]
-  E --> E2["Easing（值语义,读时钟）"]
-  E --> E3["spring / springSoft（过冲 >1）"]
-  E --> F{"elapsed >= duration?"}
-  F -->|否| P["推进帧（fps 降频）"]
-  F -->|是| Dn["精确落终点值"]
-  Dn --> L["生命周期回调 onStart/onUpdate/onRepeat/onComplete"]
-  L --> TL["时间轴编排 timeline().add / stagger / play"]
-```
 
 - 取值可为**数值**或**等长的数字数组**（`transform.scale` / `transform.translate` / `transform.skew`
   等按分量逐元素补间）。两端长度不一致或含非数字会被拒绝，并只 `console.warn` 一次
