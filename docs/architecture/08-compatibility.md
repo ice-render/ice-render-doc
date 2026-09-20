@@ -54,7 +54,7 @@
 | `ctx.filter`（写在 `style.filter`） | **画布可用；SVG 未支持** | `style` 一律透传给 ctx，所以 `style.filter = 'blur(8px)'` 本来就生效；配套的三条机制缺一不可：`LEAKY_CTX_PROPS` 的 `['filter','none']`（画完复位，不漏给同帧后面的组件）、`ObjectCache.__styleKey()` 带上 `st.filter`（改了滤镜必须重建位图）、`stylePaintPad()` 的 `filterDevicePad()`（模糊/投影的墨迹会溢出几何盒，位图与脏矩形都要扩边）。导出侧的留白见下。 |
 | `createConicGradient` | **已采用** | `ice.createConicGradient()`；运行时没有它则退回中间色纯色（`ICEComponent` 的渐变分支）。 |
 | `ctx.letterSpacing` / `wordSpacing` 等文本状态 | **已采用** | 进 `LEAKY_CTX_PROPS`；量测**之前**写进 ctx（`measureText` 会把字间距算进宽度）。 |
-| `OffscreenCanvas` + Worker | **可用（阶段一 + 阶段二第一块）** | 引擎**能作为库直接跑在 worker 里**（取根 `globalThis` + `createOffscreenCanvas` 的 `OffscreenCanvas` 分支），并有**跨线程状态/命令协议**：`MirrorBridge`（主线程）/ `MirrorTarget`（worker），主线程持有状态、worker 只做镜像渲染，真机验收逐像素 0 差异。**仍未做**：结构增量协议、输入转发、字体图片下发；默认渲染仍在主线程（worker 要宿主显式接线）。 |
+| `OffscreenCanvas` + Worker | **可用（阶段一 + 阶段二前两块）** | 引擎**能作为库直接跑在 worker 里**（取根 `globalThis` + `createOffscreenCanvas` 的 `OffscreenCanvas` 分支），并有**跨线程状态/命令协议**：`MirrorBridge`（主线程）/ `MirrorTarget`（worker），主线程持有状态、worker 只做镜像渲染，真机验收逐像素 0 差异；**输入留在主线程**（DOM 事件/命中/拖拽不跨线程，主线程走「几何通道」保持命中盒新鲜），工具层按选择镜像。**仍未做**：结构增量协议、字体图片下发、补间搬进 worker；默认渲染仍在主线程（worker 要宿主显式接线）。 |
 | `ImageBitmap` / `createImageBitmap` | **未采用** | 引擎的图片链路是 `ImageCache`（`Image` + `onload`）。换成 ImageBitmap 的收益是「预解码 + 可 transfer 进 worker」；在单线程渲染路径上它只是同一份位图换个壳，等 worker 路线落地时再一起评估。 |
 | `ctx.reset()`（2023） | **未采用** | 它会连带重置变换与裁剪，而引擎逐组件 `save/restore` 状态、每帧自持变换；现有 `__resetLeakyCtxState()` 按**位掩码只复位写过的那几项**，比整体 reset 更省。换过去等于重做状态模型，收益不明。 |
 
