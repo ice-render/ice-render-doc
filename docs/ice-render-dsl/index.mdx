@@ -10,13 +10,13 @@ keywords:
 ---
 import LiveExample from '@site/src/components/LiveExample';
 
-# ice-render-dsl · 引擎级 JSON DSL（当前 v0.4.0）
+# ice-render-dsl · 引擎级 JSON DSL（当前 v0.4.1）
 
-:::info 🔌 DSL 层 · 引擎级 · 让 AI Agent 直接驱动 ice-render 内核（当前 v0.4.0）
+:::info 🔌 DSL 层 · 引擎级 · 让 AI Agent 直接驱动 ice-render 内核（当前 v0.4.1）
 本页属于 ice-render 家族的**引擎级** DSL：Agent 产出一份结构化 JSON（`nodes` / `edges` / `options`，或直接声明 `schemaVersion`），引擎内核就把这份数据渲染成图元 + 连线 + 交互，**全程不调用任何命令式 API**（`ICE.ICERect` / `ICE.ICECircle` 这类都碰不到）。想看家族里更高层的封装，见左侧的图表库、ER 设计器等「应用层」分组。
 :::
 
-**ice-render-dsl 是 ice-render 家族里唯一「引擎级」的 JSON-first DSL（当前 `ice-render-dsl` v0.4.0）。** 一句话讲清它的定位：AI Agent 不需要知道引擎内部有多少种图元类、连线族怎么建、端口怎么算——它只管产出一份描述「有哪些节点、节点之间怎么连、整张图怎么渲染与编排」的 JSON，剩下的交给 ice-render 内核。命中测试、事件派发、序列化、撤销重做、脏矩形局部重绘这些内核能力，因为本就是引擎自己的，DSL 渲染出来的图天然全都带着。
+**ice-render-dsl 是 ice-render 家族里唯一「引擎级」的 JSON-first DSL（当前 `ice-render-dsl` v0.4.1）。** 一句话讲清它的定位：AI Agent 不需要知道引擎内部有多少种图元类、连线族怎么建、端口怎么算——它只管产出一份描述「有哪些节点、节点之间怎么连、整张图怎么渲染与编排」的 JSON，剩下的交给 ice-render 内核。命中测试、事件派发、序列化、撤销重做、脏矩形局部重绘这些内核能力，因为本就是引擎自己的，DSL 渲染出来的图天然全都带着。
 
 MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
