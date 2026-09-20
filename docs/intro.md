@@ -11,7 +11,7 @@ keywords:
   - "零依赖"
   - "ICE Render"
 ---
-# ICE Render · 雪花渲染器（当前 v3.0.0）
+# ICE Render · 雪花渲染器（当前 v4.0.0）
 
 **ICERender** 是一个用纯 TypeScript 编写的 Canvas 2D 交互图形渲染引擎，面向 ER 图、流程图、拓扑图等图编辑场景。它借鉴了 React 的组件模型与 W3C 的事件模型，提供嵌套坐标系、序列化、动画与 Visio 风格连接线，运行时零依赖（gl-matrix 在构建期内联）。
 
@@ -88,7 +88,22 @@ ICE 系列原生对接 **AG-UI** 协议：Agent 的事件流（`run started` / `
 - **序列化与动画**：稳定 typeId（`namespace:Type`，如 `ice-render:Rect`，重复注册明确抛错）、keyframes 关键帧动画、弹簧缓动（spring 三档）
 - **子树不透明度**：`state.opacity ∈ [0,1]` 作用于组件自身及所有后代，淡入淡出 Modal / Drawer / Message 整棵子树生效（`opacity≠1` 自动走非不透明落墨，不进离屏缓存）
 - **生命周期**：`ICE.destroy()` 与幂等 `init()`（可直接传 `HTMLCanvasElement` / `CanvasRenderingContext2D`），适配 React StrictMode 双挂载与 SPA 卸载重挂，销毁后可重新 init
-- **工程化**：134 个测试套件、1100+ 个用例、Playwright 视觉回归（100 条）、publint + attw 发布门禁
+- **工程化**：161 个测试套件、1363 个用例、Playwright 视觉回归（110 条）、四套性能/内存微基准、publint + attw 发布门禁
+
+## 4.0.0 新特性速览（Worker 镜像渲染 + 兼容保护）
+
+4.0.0 把「把光栅化搬到 Web Worker」从原型推到可用：主线程持有组件树与状态（唯一真相，命中检测也在主线程），worker 持有一棵**镜像树**只负责画，位图用 `transferToImageBitmap` 回传。
+
+- **接入方式**：`new ICE.MirrorHost({ canvas, ice, workerUrl })` 一行把落墨通道交给 worker；worker 侧用 `new ICE.MirrorTarget(ice)` 接协议。应用自定义图元要在 worker 那台 ICE 上**显式注册**（漏了不报错、只会静默丢内容）。
+- **输入留在主线程**：DOM 事件、命中检测、拖拽、控制面板交互都不跨线程；主线程改走「几何通道」——跑渲染管线、算世界盒，但不产出像素。
+- **实测**（`ice-entity-designer` 流程图，200 节点 / 799 组件）：缩放平移每帧主线程 **1.90ms → 1.20ms（省 37%）**；worker 内渲染 3.8ms（不占帧预算）；端到端约 7ms；静止态**几何 399/399 逐项相等、像素 0 差异**（含节点标题与连线标签）。
+- **派生更新可镜像**：worker 收到状态补丁后按应用层入口 `applyPatch()` 重放，改名 / 改类型 / 改位置都**不需要重发整份文档**（此前每改一次节点要重发 473KB）。
+- **兼容保护（起不来就回退）**：`ICE.MirrorHost.detect({ canvas })` 启动前探测（`Worker` / `OffscreenCanvas`+`transferToImageBitmap` / `ImageBitmap`）、`new Worker` 兜底、`ready` 握手、运行期看门狗；任一失败都还原落墨通道并**立刻用主线程重绘一帧**，同时回调 `onFallback` —— 不支持的浏览器上，页面与「从没接过 worker」完全一致。
+- **帧节拍背压**：宿主至多一帧在途 + `frame.seq` 水印，镜像的滞后上界是**一次往返**，不会随交互累积。
+
+> ⚠️ **破坏性**：路径命令流新增 `roundRect` —— 读 `component.path2D._commands` 自行重放 / 翻译的第三方代码要认识这个新命令（引擎自带的 SVG 导出器已支持）。
+
+实现细节、边界与"什么场景值得上 worker"的实测拆解见 [10 · Worker / OffscreenCanvas 渲染](architecture/10-worker-offscreen)。完整清单见引擎仓库 `CHANGELOG.md`。
 
 ## 2.3.0 新特性速览（动画全链 + 连线端点手柄 + 性能）
 
@@ -113,11 +128,11 @@ ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应
 
 | 层级 | 项目 | 说明 |
 |---|---|---|
-| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v3.0.0**） |
+| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v4.0.0**） |
 | 引擎（DSL） | [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **引擎级** JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎 |
 | 应用 | [ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) | 基于引擎的交互式图表库（折线 / 饼 / 雷达 / K 线 / 桑基 / 关系图等），命中测试与交互全部由引擎承担 |
 | 应用（DSL） | [ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl) | 图表 DSL：一张表 + `encoding` 编译成 `ChartOption`，带结构化诊断 |
-| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.9.1**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
+| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.10.0**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
 | 应用（DSL） | [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
 | 应用 | [ice-web-components](https://www.npmjs.com/package/ice-web-components) | 仿 Swing 风格的 Canvas 原生 UI 组件库（86 个组件，Bootstrap 5 令牌主题）；**暂无配套 DSL，走命令式组件 API** |
 | 应用 | [ice-smart-water](https://github.com/ice-render/ice-smart-water) | 智慧水务运行控制台（当前 **v0.1.0**）：工艺设计 + 运行监视；演示型「应用层样板」，渲染 / 图表 / 控件 / 设计器全取自家族「四件套」 |
