@@ -11,7 +11,7 @@ keywords:
   - "零依赖"
   - "ICE Render"
 ---
-# ICE Render · 雪花渲染器（当前 v4.0.0）
+# ICE Render · 雪花渲染器（当前 v4.1.0）
 
 **ICERender** 是一个用纯 TypeScript 编写的 Canvas 2D 交互图形渲染引擎，面向 ER 图、流程图、拓扑图等图编辑场景。它借鉴了 React 的组件模型与 W3C 的事件模型，提供嵌套坐标系、序列化、动画与 Visio 风格连接线，运行时零依赖（gl-matrix 在构建期内联）。
 
@@ -88,7 +88,30 @@ ICE 系列原生对接 **AG-UI** 协议：Agent 的事件流（`run started` / `
 - **序列化与动画**：稳定 typeId（`namespace:Type`，如 `ice-render:Rect`，重复注册明确抛错）、keyframes 关键帧动画、弹簧缓动（spring 三档）
 - **子树不透明度**：`state.opacity ∈ [0,1]` 作用于组件自身及所有后代，淡入淡出 Modal / Drawer / Message 整棵子树生效（`opacity≠1` 自动走非不透明落墨，不进离屏缓存）
 - **生命周期**：`ICE.destroy()` 与幂等 `init()`（可直接传 `HTMLCanvasElement` / `CanvasRenderingContext2D`），适配 React StrictMode 双挂载与 SPA 卸载重挂，销毁后可重新 init
-- **工程化**：161 个测试套件、1363 个用例、Playwright 视觉回归（110 条）、四套性能/内存微基准、publint + attw 发布门禁
+- **工程化**：164 个测试套件、1392 个用例、Playwright 视觉回归（111 条）、四套性能/内存微基准、publint + attw 发布门禁
+
+## 4.1.0 新特性速览（Worker 镜像阶段二收口）
+
+4.1.0 把 4.0.0 那条 worker 通道**从"能用"推到"能上真实应用"**：结构、状态、文本、图片四条线全部收口，
+每一步都有实测数字与回归钉住。
+
+- **结构变更走增量（协议 v2）**：增删图元不再重发整份文档 —— 新建一个节点实测 **485 924 B → 1 037 B（≈470×）**，
+  且不再触发 worker 侧整树重建（那一帧 125~160ms → 3~6ms）。
+- **换父级（`adoptChild`）走单条 `move` op**：只报"新增"会让镜像里旧父那份留着、同一棵树出现两个同 id 实例
+  （双重绘制）。现在协议多一种 `['move', id, 新父 id]`，一次换父级的线上字节 **753 B → 94 B**（带内部结构的节点 3725 B → 94 B）。
+- **文本口径下发**：宿主把画布的 `lang` / `dir` 与字体推给 worker，汉字字形不再与主线程分叉（组件缓存 /
+  静态层的每张离屏画布也继承同一口径）；**直绘模式**（`MirrorHost({ transferCanvas: true })`）把显示画布直接
+  交给 worker，省掉每帧位图回传，与位图模式**逐字节一致**。
+- **图片下发与口径对齐**：worker 里没有 `Image` 构造器（此前带图片的树会让整个镜像退回主线程）。
+  现在宿主解码两份（两次 `createImageBitmap` 实测逐点一致），主线程与 worker 画同一份像素 ——
+  **缩放绘制也逐像素 0 差异**（此前差 770 像素 / 最大 93）。
+- **收益上界是"落墨占比"**：把主线程直绘 / 几何通道（删掉落墨）/ worker 镜像三档放在同一条曲线上量，
+  实测（IED 200 节点 / 799 组件）缩放平移每帧 **1.90ms → 1.20ms（省 37%）**，且镜像已等于"几何通道"地板；
+  拖拽类负载不省（瓶颈在命中检测，不在落墨）。
+
+规模边界（真机 Chrome 153 / M4 / 1600×1000 实测）：**每帧全量重光栅** 5 千图元 78fps、1 万 41fps、2 万 19fps；
+**常规动画（位图复用路径）** 1 万 73fps、2 万 36fps；**静态大图 + 局部编辑** 到 10 万仍可用（拖动 49fps）；
+命中检测 10 万时约 7.6ms/次；内存 **2.37KB/图元**（100 万 ≈ 2.3GB）是硬天花板。
 
 ## 4.0.0 新特性速览（Worker 镜像渲染 + 兼容保护）
 
@@ -103,7 +126,7 @@ ICE 系列原生对接 **AG-UI** 协议：Agent 的事件流（`run started` / `
 
 > ⚠️ **破坏性**：路径命令流新增 `roundRect` —— 读 `component.path2D._commands` 自行重放 / 翻译的第三方代码要认识这个新命令（引擎自带的 SVG 导出器已支持）。
 
-实现细节、边界与"什么场景值得上 worker"的实测拆解见 [10 · Worker / OffscreenCanvas 渲染](architecture/10-worker-offscreen)。完整清单见引擎仓库 `CHANGELOG.md`。
+实现细节、边界与"什么场景值得上 worker"的实测拆解见 [10 · Worker / OffscreenCanvas 渲染](architecture/worker-offscreen)。完整清单见引擎仓库 `CHANGELOG.md`。
 
 ## 2.3.0 新特性速览（动画全链 + 连线端点手柄 + 性能）
 
@@ -128,11 +151,11 @@ ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应
 
 | 层级 | 项目 | 说明 |
 |---|---|---|
-| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v4.0.0**） |
+| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v4.1.0**） |
 | 引擎（DSL） | [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **引擎级** JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎 |
 | 应用 | [ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) | 基于引擎的交互式图表库（折线 / 饼 / 雷达 / K 线 / 桑基 / 关系图等），命中测试与交互全部由引擎承担 |
 | 应用（DSL） | [ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl) | 图表 DSL：一张表 + `encoding` 编译成 `ChartOption`，带结构化诊断 |
-| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.10.0**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
+| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.11.0**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
 | 应用（DSL） | [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
 | 应用 | [ice-web-components](https://www.npmjs.com/package/ice-web-components) | 仿 Swing 风格的 Canvas 原生 UI 组件库（86 个组件，Bootstrap 5 令牌主题）；**暂无配套 DSL，走命令式组件 API** |
 | 应用 | [ice-smart-water](https://github.com/ice-render/ice-smart-water) | 智慧水务运行控制台（当前 **v0.1.0**）：工艺设计 + 运行监视；演示型「应用层样板」，渲染 / 图表 / 控件 / 设计器全取自家族「四件套」 |
