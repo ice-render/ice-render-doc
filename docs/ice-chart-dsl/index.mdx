@@ -10,9 +10,9 @@ keywords:
 ---
 import LiveExample from '@site/src/components/LiveExample';
 
-# ice-chart-dsl · 图表 JSON DSL（当前 v0.5.5）
+# ice-chart-dsl · 图表 JSON DSL（当前 v0.6.0）
 
-:::info 🔌 DSL 层 · 应用级 · 让 AI Agent 用「一张表 + encoding」编译出 ChartOption（当前 v0.5.5）
+:::info 🔌 DSL 层 · 应用级 · 让 AI Agent 用「一张表 + encoding」编译出 ChartOption（当前 v0.6.0）
 本页属于 ice-render 家族的**应用层**：它是图表库 `ice-chart` 之上的一层「意图翻译器」，只负责把一份 JSON 意图翻译成 `ChartOption`，渲染与交互依旧交给图表层与引擎内核。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
 
 它补的是一份手写 `ChartOption` 不做、而模型最容易写错的三件事：
@@ -23,7 +23,17 @@ import LiveExample from '@site/src/components/LiveExample';
 **编译产物就是一份普通的 `ChartOption`**——悬停、缩放、框选、序列化、跨图联动全部照旧。
 :::
 
-**ice-chart-dsl 是 `ice-chart` 图表库的 agent 友好层（当前 `@damoqiongqiu/ice-chart-dsl` v0.5.5）。** 它守住三条明确的增量，而不是「把 option 换个写法」：
+**ice-chart-dsl 是 `ice-chart` 图表库的 agent 友好层（当前 `@damoqiongqiu/ice-chart-dsl` v0.6.0）。** 它守住三条明确的增量，而不是「把 option 换个写法」：
+
+:::warning 0.6.0 是破坏性版本：`kind: 'candlestick'` 已移除
+金融交易类图表不再由 `ice-chart` 承载（上游 `ice-chart@0.28.0` 已删掉内置的 `candlestick` 系列与
+OHLC 数据模型），本 DSL 同步把 K 线整体摘掉：`kind: 'candlestick'` 不再合法（校验会按"不支持的 kind"
+明确报错并列出可用类型），四列 OHLC 的语义校验与 `ohlc-needs-four-columns` 诊断一并删除。
+需要 K 线请改用同族的 **`ice-trading-chart`**（配套的 K 线 DSL 待发布）。
+
+> 版本号说明：这一批内容原本以 `0.5.5` 发出去过（版本号错配），现已把 `0.5.5` 标记为 deprecated，
+> 请升级到 **0.6.0**；两个版本的包内容一致，只是版本号终于对上了破坏性语义。
+:::
 
 1. **数据绑定**：一张表（`columns` + `rows`）加一份 `encoding`，编译出 `series`；
 2. **意图级默认**：轴类型、图例显隐、提示框触发方式按类型保守推断；

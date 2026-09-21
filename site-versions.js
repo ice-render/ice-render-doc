@@ -11,7 +11,7 @@ module.exports = {
   iceChart: '0.28.0',
   iceWebComponents: '1.22.4',
   // DSL 兄弟包（ice-chart / ice-entity-designer 落地页与生态表引用）
-  iceChartDsl: '0.5.5',
+  iceChartDsl: '0.6.0',
   entityDesignerDsl: '0.0.37',
   iceRenderDsl: '0.4.4',
   iceWebComponentsDsl: '0.6.4',
