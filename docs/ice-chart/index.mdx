@@ -22,12 +22,12 @@ import LiveExample from '@site/src/components/LiveExample';
 
 MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
-## 一个完整的实时大屏例子（就是仓库里的 `examples/dashboard-market.html`）
+## 一个完整的实时大屏例子（就是仓库里的 `examples/dashboard.html`）
 
-下面这个例子**直接由文档静态托管的 ice-render + ice-chart UMD 运行时在文档页里画出**（无需联网）：行情监控大屏（K 线、深度、资金流、板块、委托队列等一整屏图表），所有交互（悬停十字准星、框选缩放、图例联动、键盘导航）都由引擎内建。
+下面这个例子**直接由文档静态托管的 ice-render + ice-chart UMD 运行时在文档页里画出**（无需联网）：运营监控大屏（流量、延迟、水位、拓扑、桑基、热力等一整屏图表），所有交互（悬停十字准星、框选缩放、图例联动、键盘导航）都由引擎内建。
 
 <LiveExample
-  html="/ice-chart/dashboard-market.html"
+  html="/ice-chart/dashboard.html"
   bundles={[
     '/ice-chart/vendor/ice-render.umd.js',
     '/ice-chart/vendor/ice-chart.umd.js',
@@ -44,7 +44,7 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 
 | 能力 | 说明 |
 | --- | --- |
-| 图表类型 | 折线 / 面积 / 柱状 / 堆叠柱 / 饼 / 玫瑰 / 雷达 / 仪表盘 / 漏斗 / 水位球 / 散点 / 气泡 / 箱线 / 桑基 / 关系图 / 树图 / 热力 / K 线 / 时序等，均基于 ice-render 图元 |
+| 图表类型 | 折线 / 面积 / 柱状 / 堆叠柱 / 饼 / 玫瑰 / 雷达 / 仪表盘 / 漏斗 / 水位球 / 散点 / 气泡 / 箱线 / 桑基 / 关系图 / 树图 / 热力 / 时序等，均基于 ice-render 图元 |
 | 内建交互 | 悬停高亮 + 压暗其它系列、点击下钻、框选缩放、滚轮缩放、拖拽平移、图例联动、跨图联动、键盘导航——命中由引擎承担，0 插件成本 |
 | 设计语言 | 直接采用 Bootstrap 5 调色板与令牌（`--bs-border-radius`、`--bs-body-font-family` 等）；**数据系列配色与引擎共用一份**（`CHART_PALETTE` 直接 import 引擎的 `FAMILY_PALETTE`），换肤只需覆盖 `theme.colorPalette` 或派生 `BOOTSTRAP_TOKENS` |
 | 大屏脚手架 | `dash-kit` 1~12 列栅格 + 一套空间利用率审计（墨迹横向占宽 / 图形直径占分配直径门禁），避免「右侧浪费太多」 |
@@ -245,10 +245,6 @@ if (diagnostics.length === 0) {
 ### 桑基图
 
 <LiveExample html="/ice-chart/sankey.html" height={500} note="流量编排、节点拖拽" />
-
-### K 线（金融）
-
-<LiveExample html="/ice-chart/finance.html" height={460} note="蜡烛 + 成交量、十字光标、框选缩放" />
 
 ### 时序图
 
