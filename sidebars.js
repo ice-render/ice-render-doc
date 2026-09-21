@@ -92,6 +92,7 @@ const sidebars = {
             { type: 'doc', id: 'architecture/export', label: '1.4.24 导出（SVG）' },
             { type: 'doc', id: 'architecture/dirty-rect-spatial-index-evaluation', label: '1.4.25 脏区空间索引评估' },
             { type: 'doc', id: 'architecture/engine-upgrade-verification', label: '1.4.26 引擎升版后的应用侧验证清单' },
+            { type: 'doc', id: 'architecture/memory-and-virtualization', label: '1.4.27 内存与虚拟化（决策记录）' },
           ],
         },
         {
