@@ -66,7 +66,6 @@
           <button data-preset="function">表达式</button>
           <button data-preset="radar">雷达</button>
           <button data-preset="heatmap">热力图</button>
-          <button data-preset="candlestick">K 线</button>
           <button data-preset="waterfall">瀑布</button>
           <button data-preset="sankey">桑基</button>
           <button data-preset="annotation">标注（目标线 / 达标区）</button>
@@ -86,8 +85,14 @@
     <script src="../ice-chart/vendor/ice-chart.umd.js"></script>
     <script src="./ice-chart-dsl.umd.js"></script>
     <script>
-      const $ = (id) => document.getElementById(id);
-      const PRESETS = {
+      /**
+       * 图表 DSL 渲染示例页。
+       *
+       * 页面写法与家族其它示例一致：**一页 = 一个类**，构造期把 DOM 引用、事件与首次渲染一次做完。
+       * 这页的"变化"是**用户驱动**的（改 JSON / 换预设后点渲染），不是宿主推数据，所以刷新入口就是 `onUpdate()`（按钮点它重渲）。
+       */
+      class ChartDslPage {
+        static PRESETS = {
         line: {
           schemaVersion: 1,
           kind: 'line',
@@ -177,23 +182,6 @@
           },
           encoding: { x: '时段', y: '区域', value: '负载' },
         },
-        candlestick: {
-          schemaVersion: 1,
-          kind: 'candlestick',
-          title: '近 6 日行情',
-          data: {
-            columns: ['日期', '开', '收', '低', '高'],
-            rows: [
-              ['1日', 32.1, 33.4, 31.8, 33.9],
-              ['2日', 33.4, 32.6, 32.2, 34.1],
-              ['3日', 32.6, 34.8, 32.5, 35.2],
-              ['4日', 34.8, 36.2, 34.4, 36.7],
-              ['5日', 36.2, 35.1, 34.7, 36.4],
-              ['6日', 35.1, 37.4, 35.0, 37.8],
-            ],
-          },
-          encoding: { x: '日期', y: ['开', '收', '低', '高'] },
-        },
         waterfall: {
           schemaVersion: 1,
           kind: 'waterfall',
@@ -262,14 +250,22 @@
         },
       };
 
-      let chart = null;
-      function render() {
+        constructor() {
+          this.$ = (id) => document.getElementById(id);
+          /** 当前图表实例（重渲染前要先 destroy） */
+          this.chart = null;
+
+          this.__wireToolbar();
+          this.loadPreset('line');
+        }
+
+        onUpdate() {
         let dsl;
         try {
-          dsl = JSON.parse($('dsl').value);
+          dsl = JSON.parse(this.$('dsl').value);
         } catch (err) {
-          $('diagnostics').innerHTML = '<span class="error">[错误] JSON 解析失败：' + err.message + '</span>';
-          $('meta').textContent = '—';
+          this.$('diagnostics').innerHTML = '<span class="error">[错误] JSON 解析失败：' + err.message + '</span>';
+          this.$('meta').textContent = '—';
           return;
         }
         const result = ICEChartDSL.validateChartDsl(dsl);
@@ -278,32 +274,37 @@
           const tag = item.severity === 'error' ? '[错误]' : '[警告]';
           return '<span class="' + cls + '">' + tag + '</span> ' + item.message + (item.path ? '（' + item.path + '）' : '');
         });
-        $('diagnostics').innerHTML = lines.length ? lines.join('\n') : '<span class="ok">✓ 校验通过</span>';
+        this.$('diagnostics').innerHTML = lines.length ? lines.join('\n') : '<span class="ok">✓ 校验通过</span>';
         if (!result.valid) {
-          $('meta').textContent = '校验不通过：' + result.errors.length + ' 个错误';
+          this.$('meta').textContent = '校验不通过：' + result.errors.length + ' 个错误';
           return;
         }
         try {
           const option = ICEChartDSL.compileChartDsl(dsl);
-          if (chart) chart.destroy();
-          chart = ICEChart.createChart('chart', option);
-          const json = chart.toJSONString();
-          $('meta').textContent =
+          if (this.chart) this.chart.destroy();
+          this.chart = ICEChart.createChart('chart', option);
+          const json = this.chart.toJSONString();
+          this.$('meta').textContent =
             '编译产物：' + option.series.length + ' 个系列 · ' + Math.round(json.length / 1024 * 10) / 10 + ' KB JSON（chart.toJSONString()）';
         } catch (err) {
-          $('diagnostics').innerHTML = '<span class="error">[错误] ' + err.message + '</span>';
+          this.$('diagnostics').innerHTML = '<span class="error">[错误] ' + err.message + '</span>';
+        }
+        }
+
+        loadPreset(name) {
+          this.$('dsl').value = JSON.stringify(ChartDslPage.PRESETS[name], null, 2);
+          this.onUpdate();
+        }
+
+        __wireToolbar() {
+          document.querySelectorAll('[data-preset]').forEach((button) => {
+            button.addEventListener('click', () => this.loadPreset(button.dataset.preset));
+          });
+          this.$('btn-render').addEventListener('click', () => this.onUpdate());
         }
       }
 
-      function loadPreset(name) {
-        $('dsl').value = JSON.stringify(PRESETS[name], null, 2);
-        render();
-      }
-      document.querySelectorAll('[data-preset]').forEach((button) => {
-        button.addEventListener('click', () => loadPreset(button.dataset.preset));
-      });
-      $('btn-render').addEventListener('click', render);
-      loadPreset('line');
+      new ChartDslPage();
     </script>
   </body>
 </html>
