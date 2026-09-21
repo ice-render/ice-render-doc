@@ -8,13 +8,13 @@ module.exports = {
   iceRender: '4.2.0',
   // 应用层产品
   entityDesigner: '0.12.0',
-  iceChart: '0.27.4',
-  iceWebComponents: '1.22.3',
+  iceChart: '0.28.0',
+  iceWebComponents: '1.22.4',
   // DSL 兄弟包（ice-chart / ice-entity-designer 落地页与生态表引用）
-  iceChartDsl: '0.5.4',
-  entityDesignerDsl: '0.0.36',
-  iceRenderDsl: '0.4.3',
-  iceWebComponentsDsl: '0.6.3',
+  iceChartDsl: '0.5.5',
+  entityDesignerDsl: '0.0.37',
+  iceRenderDsl: '0.4.4',
+  iceWebComponentsDsl: '0.6.4',
   // 应用层新成员（演示型产品，private 未发 npm）
   iceSmartWater: '0.1.0',
   iceGame: '0.1.0',

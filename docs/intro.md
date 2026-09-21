@@ -11,7 +11,7 @@ keywords:
   - "零依赖"
   - "ICE Render"
 ---
-# ICE Render · 雪花渲染器（当前 v4.1.0）
+# ICE Render · 雪花渲染器（当前 v4.2.0）
 
 **ICERender** 是一个用纯 TypeScript 编写的 Canvas 2D 交互图形渲染引擎，面向 ER 图、流程图、拓扑图等图编辑场景。它借鉴了 React 的组件模型与 W3C 的事件模型，提供嵌套坐标系、序列化、动画与 Visio 风格连接线，运行时零依赖（gl-matrix 在构建期内联）。
 
@@ -88,7 +88,41 @@ ICE 系列原生对接 **AG-UI** 协议：Agent 的事件流（`run started` / `
 - **序列化与动画**：稳定 typeId（`namespace:Type`，如 `ice-render:Rect`，重复注册明确抛错）、keyframes 关键帧动画、弹簧缓动（spring 三档）
 - **子树不透明度**：`state.opacity ∈ [0,1]` 作用于组件自身及所有后代，淡入淡出 Modal / Drawer / Message 整棵子树生效（`opacity≠1` 自动走非不透明落墨，不进离屏缓存）
 - **生命周期**：`ICE.destroy()` 与幂等 `init()`（可直接传 `HTMLCanvasElement` / `CanvasRenderingContext2D`），适配 React StrictMode 双挂载与 SPA 卸载重挂，销毁后可重新 init
-- **工程化**：164 个测试套件、1392 个用例、Playwright 视觉回归（111 条）、四套性能/内存微基准、publint + attw 发布门禁
+- **工程化**：174 个测试套件、1461 个用例、Playwright 视觉回归（111 条）、四套性能/内存微基准、publint + attw 发布门禁
+
+## 4.2.0 新特性速览（内存与虚拟化）
+
+> **主题：内存与虚拟化。** 10 万图元的内存从 648.5 MB 压到 **171.3 MB**（累计 −73.6%），
+> 官方 `setViewport` 平移 **9.9 → 116.6 fps**（长任务 28 → 0）；并新增**虚拟子源**这一档能力 ——
+> 让看不见的图元根本不存在：IED 的真实水务图 **235.3 MB → 7.4 MB（−96.9%）**。
+
+- **视口平移不再当结构变更**：`setViewport()` 此前走"结构变更"路径（重建渲染队列、清空上屏快照、丢静态层），
+  而视口是**视图**状态 —— 队列成员与次序没变、快照存的是世界坐标盒、静态层自带栅格对齐校验。
+  真机 Chrome + CDP（10 万图元、每帧平移 3px、3 秒真实 rAF）：**9.9 → 116.6 fps**（p50 103.4ms → 8.4ms）、
+  长任务 **28 → 0**。
+- **内存三刀**（10 万图元，堆快照口径）：几何签名从每图元常驻数组改成**双 32 位哈希**、
+  引擎默认事件监听改**类级声明 + 派发时解析**、上屏快照盒** arena 化**（10 万个 `Float64Array` → 分块连续存储）。
+  全堆自有大小 **234.6 → 171.3 MB（−27.0%）**、堆节点 **681.5 万 → 454.9 万**；
+  拖动 53.8 → **95.8~108.7 fps**、平移 77.7 → **105~112 fps**。
+- **虚拟子源**（`ICEVirtualLayer` + `VirtualChildSource`，"文档大、屏幕小"的通用解）：容器按**可见窗口**
+  向文档要批量落墨；点到某个批量图元时，引擎按 `hitTest` 把它**物化成真组件**并把 `evt.target` 重定向过去 ——
+  选中、控制面板、拖动、对齐参考线**零改动**可用，应用不再自己接鼠标事件。
+  10 万图元实测：堆 **5.8 MB**、单帧 0.3ms、平移 **121 fps**、命中 **0.15 µs**、按需新建一个图元 0.3ms；
+  100 万图元 **35.9 MB**；与对象树**像素一致**（160 万像素差 3 个）。
+- **导出 / 序列化 / 文档补丁契约**：`paintToSvg` 全量导出（"少数 `<defs>` + 每个实例一条 `<use>`"）、
+  `virtual` + `virtualIndex` 序列化契约（配 `registerVirtualSource` 重建）、`applyPatch` 与
+  `onChildPatched` 把"文档是唯一真相"落到代码上（undo/redo 因此可以记**文档补丁**）、
+  `syncVirtualWindow` 把物化 / 回收循环收进引擎、`diagnoseVirtualSource` 自检"跨度超过文档"的异常盒子。
+- **LOD 与遮挡剔除（先量后做）**：`renderer.setLodMinDeviceArea(px²)` 默认 `0`（关闭），
+  阈值 4px² 时 0.1× 缩略视图 **237.5 → 107.3ms（−54.8%）**，1× 场景零影响；
+  **遮挡剔除实测后决定不做** —— 三个真实场景里"被覆盖"只值 **1.6%** 的收益，而"逐像素安全"的可剔图元为 0，
+  真正的杠杆是**图元总数**（虚拟化 / 按需物化）。
+- **业务实证**（ice-entity-designer 水务图）：2,000 符号虚拟文档 **7.4 MB vs 对象树 235.3 MB（−96.9%）**；
+  导出 SVG 从"窗口那点"变成整份文档（7.46 MB）；编辑器历史 **932.8 MB → 58.5 MB**、
+  建 2,020 个符号 **58.5s → 14.4s**。
+
+每一刀的 A/B 数字、被**否决**的方案与复现口径见 [23 · 内存与虚拟化](architecture/memory-and-virtualization)；
+完整清单见引擎仓库 `CHANGELOG.md`。
 
 ## 4.1.0 新特性速览（Worker 镜像阶段二收口）
 
@@ -151,11 +185,11 @@ ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应
 
 | 层级 | 项目 | 说明 |
 |---|---|---|
-| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v4.1.0**） |
+| 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v4.2.0**） |
 | 引擎（DSL） | [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **引擎级** JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎 |
 | 应用 | [ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) | 基于引擎的交互式图表库（折线 / 饼 / 雷达 / 桑基 / 关系图等），命中测试与交互全部由引擎承担 |
 | 应用（DSL） | [ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl) | 图表 DSL：一张表 + `encoding` 编译成 `ChartOption`，带结构化诊断 |
-| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.11.0**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
+| 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.12.0**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
 | 应用（DSL） | [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
 | 应用 | [ice-web-components](https://www.npmjs.com/package/ice-web-components) | 仿 Swing 风格的 Canvas 原生 UI 组件库（86 个组件，Bootstrap 5 令牌主题）；**暂无配套 DSL，走命令式组件 API** |
 | 应用 | [ice-smart-water](https://github.com/ice-render/ice-smart-water) | 智慧水务运行控制台（当前 **v0.1.0**）：工艺设计 + 运行监视；演示型「应用层样板」，渲染 / 图表 / 控件 / 设计器全取自家族「四件套」 |
