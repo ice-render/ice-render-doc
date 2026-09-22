@@ -2,17 +2,18 @@
 // 改版本只改这里：docusaurus.config.js（顶部导航）、sidebars.js（左侧菜单）、
 // 各产品落地页的 H1 / 应用层徽标都会自动同步，避免版本号在多处散落、对不齐。
 //
-// 版本值取自 2026-09-20 家族版本现状盘点；若某包已发新版本，在此处 bump 即可。
+// 版本值取自 2026-09-22 家族版本现状盘点；若某包已发新版本，在此处 bump 即可。
 module.exports = {
   // 渲染引擎内核（本站核心，也是所有应用层的地基）
   iceRender: '4.3.0',
   // 应用层产品
   entityDesigner: '0.12.2',
-  iceChart: '0.28.0',
+  iceChart: '0.30.1',
+  iceTradingChart: '0.3.1',
   iceWebComponents: '1.22.4',
   // DSL 兄弟包（ice-chart / ice-entity-designer 落地页与生态表引用）
-  iceChartDsl: '0.6.0',
-  entityDesignerDsl: '0.0.37',
+  iceChartDsl: '0.6.2',
+  entityDesignerDsl: '0.0.38',
   iceRenderDsl: '0.4.4',
   iceWebComponentsDsl: '0.6.4',
   // 应用层新成员（演示型产品，private 未发 npm）
