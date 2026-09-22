@@ -135,16 +135,17 @@ const sidebars = {
             { type: 'doc', id: 'ice-chart/annotation-design', label: '标注能力设计' },
           ],
         },
+        { type: 'doc', id: 'ice-trading-chart/index', label: `2.3 ice-trading-chart v${V.iceTradingChart}` },
         {
           type: 'category',
-          label: `2.3 ice-web-components v${V.iceWebComponents}`,
+          label: `2.4 ice-web-components v${V.iceWebComponents}`,
           items: [
-            { type: 'doc', id: 'ice-web-components/index', label: '2.3.0 概览' },
-            { type: 'doc', id: 'ice-web-components/architecture', label: '2.3.1 架构思路' },
-            { type: 'doc', id: 'ice-web-components/components', label: '2.3.2 组件速查' },
+            { type: 'doc', id: 'ice-web-components/index', label: '2.4.0 概览' },
+            { type: 'doc', id: 'ice-web-components/architecture', label: '2.4.1 架构思路' },
+            { type: 'doc', id: 'ice-web-components/components', label: '2.4.2 组件速查' },
             {
               type: 'category',
-              label: '2.3.3 API 参考',
+              label: '2.4.3 API 参考',
               items: [
                 { type: 'doc', id: 'ice-web-components/api/README', label: 'API 总览' },
                 { type: 'doc', id: 'ice-web-components/api/basic', label: '基础组件' },
@@ -160,7 +161,7 @@ const sidebars = {
             },
             {
               type: 'category',
-              label: '2.3.4 指南',
+              label: '2.4.4 指南',
               items: [
                 { type: 'doc', id: 'ice-web-components/guides/examples', label: '示例与场景' },
                 { type: 'doc', id: 'ice-web-components/guides/custom-components', label: '写一个自己的组件' },
@@ -175,11 +176,11 @@ const sidebars = {
             },
           ],
         },
-        { type: 'doc', id: 'ice-smart-water/index', label: `2.4 ice-smart-water v${V.iceSmartWater}` },
-        { type: 'doc', id: 'ice-game/index', label: `2.5 ice-game v${V.iceGame}` },
+        { type: 'doc', id: 'ice-smart-water/index', label: `2.5 ice-smart-water v${V.iceSmartWater}` },
+        { type: 'doc', id: 'ice-game/index', label: `2.6 ice-game v${V.iceGame}` },
         {
           type: 'category',
-          label: `2.6 ice-agent-console v${V.iceAgentConsole}`,
+          label: `2.7 ice-agent-console v${V.iceAgentConsole}`,
           items: [
             { type: 'doc', id: 'ice-agent-console/index', label: '概览' },
             { type: 'doc', id: 'ice-agent-console/upstream-gaps', label: '上游差距盘点' },
@@ -187,12 +188,12 @@ const sidebars = {
         },
         {
           type: 'category',
-          label: '2.7 DSL 层',
+          label: '2.8 DSL 层',
           items: [
-            { type: 'doc', id: 'ice-render-dsl/index', label: `2.7.1 ice-render-dsl v${V.iceRenderDsl}` },
-            { type: 'doc', id: 'ice-chart-dsl/index', label: `2.7.2 ice-chart-dsl v${V.iceChartDsl}` },
-            { type: 'doc', id: 'ice-entity-designer-dsl/index', label: `2.7.3 ice-entity-designer-dsl v${V.entityDesignerDsl}` },
-            { type: 'doc', id: 'ice-web-components-dsl/index', label: `2.7.4 ice-web-components-dsl v${V.iceWebComponentsDsl}` },
+            { type: 'doc', id: 'ice-render-dsl/index', label: `2.8.1 ice-render-dsl v${V.iceRenderDsl}` },
+            { type: 'doc', id: 'ice-chart-dsl/index', label: `2.8.2 ice-chart-dsl v${V.iceChartDsl}` },
+            { type: 'doc', id: 'ice-entity-designer-dsl/index', label: `2.8.3 ice-entity-designer-dsl v${V.entityDesignerDsl}` },
+            { type: 'doc', id: 'ice-web-components-dsl/index', label: `2.8.4 ice-web-components-dsl v${V.iceWebComponentsDsl}` },
           ],
         },
       ],

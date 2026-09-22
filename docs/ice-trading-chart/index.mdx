@@ -1,0 +1,208 @@
+---
+sidebar_position: 1
+description: "ice-trading-chart（交易图表库）：构建在 ice-chart 之上的 K 线 / 盘口 / 画线 / 实时行情层，列存与环形缓冲支撑十万根窗口的实时追加。"
+keywords:
+  - "ice-trading-chart"
+  - "K 线"
+  - "K线图"
+  - "交易图表"
+  - "盘口"
+  - "实时行情"
+  - "Canvas"
+---
+import LiveExample from '@site/src/components/LiveExample';
+
+# ice-trading-chart · 交易图表库（当前 v0.3.1）
+
+:::info 🧩 应用层 · 基于 ice-chart v0.30.1 + ice-render 引擎 v4.3.0 封装（当前 v0.3.1）
+本页属于 ice-render 家族的**应用层**产品，而且是家族里少见的「**同层再封装**」：`ice-trading-chart → ice-chart → ice-render` 是**单向**依赖，图表库不知道「交易」这件事存在。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
+:::
+
+**ice-trading-chart 是构建在 `ice-chart` 之上的交易语义层（当前 `ice-trading-chart` v0.3.1）。** 命中测试、事件派发、缩放平移、跨图联动、序列化全部沿用 `ice-chart` / `ice-render`；本包只加交易这一层：K 线（蜡烛 + 影线）的解析与命中、OHLC 提示框、**含影线**的价格轴量程、成交量副图、真副图栈与指标、盘口、画线工具、实时行情编排。
+
+它为什么值得单独一个包：**通用图表库不该认识盘口**。把「交易」的语义（四价、影线、量、档位、主题色、文案）收敛在这一层之后，`ice-chart` 里既没有「涨跌色」也没有「买卖十档」，而交易应用拿到的又是一个**标准的 `ICEChart` 实例** —— `chart.on(…)` / `chart.setData(…)` / `chart.toJSON()` 的用法与直接用 `ice-chart` 完全一致。
+
+```
+ice-trading-chart   →   ice-chart   →   ice-render
+   交易语义              图表语义         渲染内核
+```
+
+MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
+
+## 一个完整的合约终端（就是仓库里的 `examples/terminal.html`）
+
+下面这个例子**由文档静态托管的 ice-render + ice-chart + ice-trading-chart UMD 运行时在文档页里画出**（无需联网）：K 线主图 + 成交量 + MACD 副图栈、盘口十档、最新成交、仓位、画线工具、右上角价格标尺（双击自适应 / 滚轮缩放 / 上下拖缩放）、键盘 ←→ 平移 —— 全部是真实运行的代码，不是截图。
+
+<LiveExample
+  html="/ice-trading-chart/terminal.html"
+  height={820}
+  background="#0b0e11"
+  note="拖动 / 滚轮 / 框选 / 双击右侧标尺，都是引擎内建的手势；主题（深色终端配色）是一套 token 同时驱动图表、盘口与页面外壳。"
+/>
+
+> 这就是本包的定位：**交易语义写一层，渲染与交互一行都不重写。** 盘口的深度条是 DOM、画线是 SVG 覆盖层、K 线是 canvas —— 三种技术栈共用同一份数据坐标，缩放平移后一起走。
+
+## 核心能力
+
+| 能力 | 说明 |
+| --- | --- |
+| K 线系列 | `type: 'candlestick'`：蜡烛 + 影线，逐项按 `close ≥ open` 上色；命中测试落在**实体或影线**上都算命中该根 |
+| 数据契约 | 对象 `{ x, o, c, l, h }` 或数组 `[开, 收, 低, 高]` 都认，字段名可用 `openField` / `closeField` / `lowField` / `highField` 覆盖（中文表头 `开 / 收 / 低 / 高` 也行）；**读不出的数据项不画**，绝不当成 0 |
+| 价格轴量程 | 默认按全量数据的「最低价的低点 → 最高价的高点」钉 `yAxis.min` / `yAxis.max`（含 6% 留白），**影线不会被裁掉**；窗口式数据源用 `extras.priceRange` 显式给量程 |
+| 成交量副图 | 数据项带 `v` 就自动出现：钉在**第二个 y 轴**、轴域 `[0, ratio × 最大量]`（`ratio` 默认 5，即占绘图区底部 20%）、隐藏刻度，柱宽与蜡烛对齐 |
+| 提示框 | 默认装 OHLC formatter（开盘 / 收盘 / 最低 / 最高，可换文案）；自己写 `tooltip.formatter` 就不覆盖 |
+| 真副图与指标 | `createPaneStack`：多实例 + `linkCharts` 联动 + **横向对齐**（等宽字体 + 定宽刻度标签）；指标 `sma` / `ema` / `bollinger` / `macd` / `rsi` 是纯函数，另有叠加与副图 option 构造器 |
+| 画线工具 | 水平线 / 垂直线 / 趋势线 / 区间矩形，**按数据坐标**存储与持久化（`dump()` / `load()`），缩放平移后按当前比例尺重投影 |
+| 盘口 | `createOrderBook`：买卖十档独立组件，结构只建一次、`update()` 只改数值与深度条宽度（数据没变时一次 DOM 都不写），自带样式与终端主题 |
+| 实时行情 | `createRealtimeHub` + topic 工厂：断线重连（退避 + 抖动）、**重连自动重放订阅**、**按帧合并**、深度增量 `seq` 对账（跳号报 `resync`） |
+| 终端主题 | `DARK_TERMINAL_THEME` / `LIGHT_TERMINAL_THEME`：一套 token 同时驱动图表、盘口与页面外壳的 CSS 变量 |
+| 大窗口实时流 | K 线默认走上游**列存**（`virtual: true`），实时追加走**环形缓冲**（`appendData` + `maxPoints`）：不 concat、不重建数据点，见下一节 |
+
+## 大窗口实时流：列存 + 环形缓冲
+
+交易大屏真正难的不是「画出 K 线」，而是**十万根窗口里每 tick 追加一根**。本包在这条路上做了三件事（0.3.0 / 0.3.1）：
+
+1. **K 线默认开上游列存**（`toTradingOption` 补 `virtual: true`，用户显式 `false` 时不覆盖）：不建「每根一个 `DataPoint`」，原始数据仍按引用保留（提示框 `params.data`、字段解析照旧）。实测 10 万根：**堆 24.8MB → 18.9MB**。
+2. **实时追加走环形缓冲**：窗口满了覆盖最老的一根，每次追加是「写一个槽位 + 挪一次起点」。列存按系列增量维护（环滑动 `copyWithin` + 只解析新进来的，类目索引表存相对偏移），**追加是 O(1)**，而不是每 tick 重扫整个窗口。
+3. **派生的成交量系列也开列存**：1 万根省 ~0.6MB、100 万根省 ~60MB，量柱渲染与量程不变。
+
+配套的上游修复（`ice-chart` 0.29.1 / 0.30.1）：类目轴 `Axis.tickEntries()` 的 `O(n²)` 让 10 万类目时**一次轴渲染要 3716ms**，修完是 **0ms**、首帧 **3737ms → 17ms**；0.30.1 又把滚动窗口的追加从 `O(n)/tick` 降到 `O(1)`。所以本包的 peer 下限是 `^0.30.1` —— 退回 0.30 以下会把这些一起丢掉。
+
+下面这个页面可以直接切换「环形追加」与「全量 `setOption`」两条路，实时对比每 tick 的成本与堆占用：
+
+<LiveExample
+  html="/ice-trading-chart/streaming-candles.html"
+  height={640}
+  background="#f8fafc"
+  note="窗口 1 万根；「数据路径」是存储成本（环形 O(1) vs 全量 concat + 重建 1 万个点），「视窗推进」是重排版 / 轴 / 重绘 —— 后者是图表流水线的地板，两条路都要付。"
+/>
+
+10 万根窗口的真机实测（Chromium，配套 `ice-chart` 0.30.1）：
+
+| 口径 | 环形追加 | 全量 setOption |
+| --- | --- | --- |
+| 数据路径（追加 + 域） | **0.13ms/tick** | ~1.4ms/tick（含物化 1 万个点） |
+| 端到端每 tick（含流水线） | **1.7ms** | 同量级 |
+| 堆 | **5.9MB** | 9.1MB |
+
+> **诚实标注地板在哪**：数据一变就要重跑归一化 + 布局（~1.6ms/次），与数据怎么存无关。要再往下压，得让上游支持增量归一化 / 布局 —— 这条已记录在 `ice-chart` 的施工图里，**未开工**。
+
+## 快速开始
+
+```bash
+npm install ice-trading-chart @damoqiongqiu/ice-chart ice-render
+```
+
+```ts
+import { createTradingChart } from 'ice-trading-chart';
+
+const chart = createTradingChart('canvas-id', {
+  title: { text: '近 5 日行情' },
+  xAxis: { type: 'category' },
+  yAxis: { name: '价格' },
+  series: [
+    {
+      id: 'k',
+      type: 'candlestick',
+      name: '日 K',
+      data: [
+        { x: '周一', o: 100, c: 110, l: 95, h: 115 },
+        { x: '周二', o: 110, c: 105, l: 100, h: 118 },
+        { x: '周三', o: 105, c: 120, l: 102, h: 125 },
+      ],
+    },
+  ],
+});
+
+chart.on('item:click', (params) => console.log(params.xValue, params.data));
+```
+
+### 成交量副图
+
+数据项带 `v` 就**自动**出现（读不出量就什么都不加，不影响 K 线）：
+
+```ts
+createTradingChart('canvas-id', {
+  xAxis: { type: 'category' },
+  yAxis: { position: 'right' },
+  volume: { field: 'v', ratio: 5 },   // 不写也自动；写 false 明确不要
+  series: [{ id: 'k', type: 'candlestick', data: [{ x: '09:30', o, c, l, h, v }] }],
+});
+```
+
+### 价格轴：缩放时要不要跟着可见窗口走
+
+默认按**全量数据**的极值钉量程（影线完整），缩放时价格轴不自适应。要做「随可见区间自适应」，关掉自动量程，监听 `zoom:change` / `pan:change`（载荷 `ZoomRange.x` 就是可见窗口），重算 `computePriceRange` 后 `setOption`：
+
+```ts
+createTradingChart('canvas-id', option, { autoPriceRange: false });
+```
+
+### 实时追加（环形窗口）
+
+```ts
+const chart = createTradingChart('canvas-id', option, {
+  priceRange: [40000, 45000],   // 环形形态下 series.data 会被摘掉，量程由应用给
+});
+
+// 每 tick 一根：写一个槽位 + 挪一次起点，不 concat、不重建数据点
+chart.appendData('k', [nextBar], { maxPoints: 10000 });
+```
+
+### 实时行情中枢（WebSocket）
+
+应用只给**协议**（订阅报文 / 报文解析）和**画法**，重连、订阅记账、按帧合并、快照对账都由中枢兜住：
+
+```ts
+import { createRealtimeHub, createCandleTopic, createDepthTopic } from 'ice-trading-chart';
+
+const hub = createRealtimeHub({
+  clientOptions: {
+    url: 'wss://example.com/ws',
+    heartbeat: { payload: { op: 'ping' }, intervalMs: 15000 },
+    reconnect: { minDelayMs: 500, maxDelayMs: 15000, factor: 1.8, jitter: 0.2 },
+  },
+  topics: [
+    createCandleTopic({ subscribe: (p) => ({ op: 'sub', ch: `kline.${p.interval}` }), decode: (m) => (/* … */ null) }),
+    createDepthTopic({ subscribe: (p) => ({ op: 'sub', ch: 'depth' }), decode: (m) => (/* … */ null) }),
+  ],
+  onData: (changes) => {
+    for (const change of changes) {
+      if (change.topic === 'kline') chart.refresh(change.data.bars());   // 一帧一次
+      if (change.topic === 'depth' && change.kind === 'resync') refetchSnapshot();
+    }
+  },
+});
+
+hub.subscribe('kline', { symbol: 'BTCUSDT', interval: '1m' });
+hub.client.connect();
+```
+
+## 公开 API 摘要
+
+| 导出 | 用途 |
+| --- | --- |
+| `createTradingChart(target, option, extras?, chartOptions?)` | 建图（注册系列 + 补齐 option），返回标准 `ICEChart` 实例 |
+| `toTradingOption(option, extras?)` | 只做 option 补齐，自己调 `createChart` 时用 |
+| `readOhlc(raw, option?)` / `hasOhlc` | 数据项 → `[开, 收, 低, 高]` |
+| `computePriceRange(seriesList, { padding? })` | 含影线的价格轴范围 |
+| `computeVolumeRange(values, ratio?)` / `buildVolumeSeries(source, option?)` | 成交量轴域与系列 |
+| `createPaneStack(container, specs, options)` | 真副图：多实例 + 联动 + 横向对齐 |
+| `createOverlaySeries` / `createMacdPaneOption` / `createRsiPaneOption` | 指标 option 构造（纯函数在 `sma` / `ema` / `bollinger` / `macd` / `rsi`） |
+| `createDrawingLayer(chart, options)` | 画线图层（SVG 覆盖层，数据坐标持久化） |
+| `createOrderBook(container, options)` | 盘口组件（买卖十档，自带样式与深度条） |
+| `createRealtimeClient` / `createRealtimeHub` / `createCandleStream` / `createDepthStore` / `createPositionStore` | 实时行情：连接生命周期 + 多 topic 中枢 + K 线 / 深度 / 仓位存储 |
+| `zoomValueAxis` / `panTimeAxis` / `zoomTimeAxis` / `resetAutoScale` | 标尺与键盘的视图控制（标尺双击自适应、滚轮缩放、上下拖缩放） |
+| `DARK_TERMINAL_THEME` / `LIGHT_TERMINAL_THEME` | 终端主题预设（一套 token 驱动图表 / 盘口 / 外壳） |
+| `formatPrice` / `formatVolume` / `formatSigned` / `formatPct` | 数字格式化（报价口径固定小数位，不去尾随 0） |
+
+## AI Agent 接入：JSON DSL
+
+和家族其它成员一样，这层也规划了 **JSON-first 的 K 线 DSL**（一张表 + `encoding` → `TradingOption`），让 Agent 不必手写每一根的四价。**当前尚未发布** —— 需要 Agent 直接产 JSON 时，现在可以先用 [`ice-chart-dsl`](/docs/ice-chart-dsl) 产通用图表，K 线本身走本包的 `createTradingChart` 命令式 API。
+
+## 相关链接
+
+- GitHub：[ice-trading-chart](https://github.com/ice-render/ice-trading-chart)
+- npm：[ice-trading-chart](https://www.npmjs.com/package/ice-trading-chart)
+- 上游图表库：[ice-chart 概览](/docs/ice-chart) · 图表 DSL：[ice-chart-dsl](/docs/ice-chart-dsl)
+- 引擎内核文档：[ICE Render 介绍](/docs/intro)

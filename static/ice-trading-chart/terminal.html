@@ -1,0 +1,4256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>ice-trading-chart · 交易终端</title>
+    <style>
+      /* ================= 深色合约终端配色（对齐主流合约交易所的盘面） =================
+         底色近黑、面板浅一档、边框极细；涨绿跌红；强调色是品牌黄（选中态 / 主按钮）。
+         数字一律等宽字体，报价带千分位。 */
+      /*
+        颜色**只有一处来源**：`ICETradingChart.DARK_TERMINAL_THEME`（库里的终端主题）。
+        页面启动时 `applyTerminalTheme()` 把这些 token 写成下面这些 CSS 变量，
+        样式表里一律 `var(--xxx)`；这里的值是**没有 JS 时的回退**（保证首屏不闪白）。
+        换肤（深色 / 浅色 / 自家品牌色）只需要换一个主题对象，图表 / 盘口 / 外壳一起变。
+      */
+      :root {
+        --bg: #0b0e11;
+        --panel: #181a20;
+        --panel-2: #1e2329;
+        --line: #2b3139;
+        --line-soft: #21262e;
+        --text: #eaecef;
+        --dim: #b7bdc6;
+        --muted: #848e9c;
+        --accent: #f0b90b;
+        --accent-ink: #0b0e11;
+        --ruler: rgba(132, 142, 156, 0.66);
+        --session-line: rgba(255, 255, 255, 0.05);
+        --up: #0ecb81;
+        --down: #f6465d;
+        --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        --mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--text); font: 12px/1.5 var(--font);
+        overflow: hidden; height: 100vh; display: flex; flex-direction: column;
+      }
+      b { font-family: var(--mono); font-weight: 500; }
+      .mono { font-family: var(--mono); }
+      .up { color: var(--up); }
+      .down { color: var(--down); }
+      button { font-family: inherit; }
+
+      /* ---------------- 顶部：行情跑马灯 + 交易对抬头 ---------------- */
+      .ticker-strip {
+        display: flex; align-items: center; gap: 18px; height: 28px; padding: 0 12px;
+        background: var(--panel); border-bottom: 1px solid var(--line); overflow: hidden;
+        font: 12px/1 var(--mono); white-space: nowrap; flex: 0 0 auto;
+      }
+      .ticker-strip .tk { color: var(--muted); }
+      .ticker-strip .tk b { color: inherit; font-weight: 500; }
+      .ticker-strip .tk i { font-style: normal; color: var(--dim); }
+
+      .symbol-bar {
+        display: flex; align-items: center; gap: 18px; padding: 6px 12px 8px;
+        background: var(--panel); border-bottom: 1px solid var(--line); flex: 0 0 auto; flex-wrap: wrap;
+      }
+      .symbol-id { display: flex; align-items: center; gap: 8px; min-width: 300px; }
+      .symbol-id .star { color: var(--accent); font-size: 14px; cursor: pointer; }
+      .symbol-id .coin {
+        width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+        display: inline-flex; align-items: center; justify-content: center; font: 600 11px/1 var(--font);
+      }
+      .symbol-id .pair { font-size: 17px; font-weight: 600; letter-spacing: 0.2px; }
+      .symbol-id .pair small { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 4px; }
+      .symbol-id .caret { color: var(--muted); font-size: 10px; }
+      .symbol-id .mark { display: flex; flex-direction: column; margin-left: 10px; }
+      .symbol-id .mark b { font-size: 22px; font-weight: 600; letter-spacing: 0.2px; }
+      .symbol-id .mark span { font-size: 12px; }
+      .stats { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+      .stat { display: flex; flex-direction: column; gap: 1px; }
+      .stat span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+      /*
+        ⚠️ 数值的**宽度必须稳定**：24h 成交额 29.17B → 9.87B 这种位数变化会让这一条重新换行，
+        顶部一变高，图表区（flex 项）就跟着变 —— 「同一段视窗，量两次几何竟然不一样」，
+        像素类用例当场飘（实测踩到）。等宽数字 + 固定最小宽度把这一条钉死。
+      */
+      .stat b {
+        font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums;
+        min-width: 92px; text-align: right;
+      }
+      .symbol-bar .tools { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+      /* ---------------- 通用面板 / 按钮 ---------------- */
+      .btn {
+        background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
+        color: var(--dim); padding: 4px 10px; font-size: 12px; cursor: pointer;
+      }
+      .btn:hover { color: var(--text); border-color: #3a424c; }
+      .btn.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+      .workspace {
+        flex: 1 1 auto; min-height: 0; display: grid; gap: 4px; padding: 4px;
+        grid-template-columns: minmax(0, 1fr) 252px 268px;
+        grid-template-rows: minmax(0, 1fr) 232px;
+        background: var(--bg);
+      }
+      .panel {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+        min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+      }
+      .chart-col { grid-column: 1; grid-row: 1; }
+      .book-col { grid-column: 2; grid-row: 1; }
+      .order-col { grid-column: 3; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 4px; background: none; border: 0; }
+      .bottom-col { grid-column: 1 / span 2; grid-row: 2; }
+      .panel-head {
+        display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px;
+        color: var(--text); font-size: 13px; font-weight: 600;
+      }
+      .panel-head .right { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 400; }
+      .panel-section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+
+      /* ---------------- 图表顶部工具条（图标 + 下拉） ---------------- */
+      .chart-bar {
+        display: flex; align-items: center; gap: 6px; padding: 6px 10px; flex: 0 0 auto;
+        border-bottom: 1px solid var(--line-soft); flex-wrap: wrap;
+      }
+      .chart-bar .tabs { display: flex; gap: 14px; }
+      .chart-bar .tabs button {
+        background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer;
+        padding: 2px 0 4px; border-bottom: 2px solid transparent;
+      }
+      .chart-bar .tabs button.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+      .sep { width: 1px; height: 16px; background: var(--line); margin: 0 3px; }
+      .tb-menu { position: relative; }
+      .tb-trigger {
+        display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 6px;
+        background: none; border: 1px solid transparent; border-radius: 4px;
+        color: var(--dim); cursor: pointer; position: relative;
+      }
+      .tb-trigger:hover { background: var(--panel-2); color: var(--text); }
+      .tb-trigger svg { width: 16px; height: 16px; display: block; }
+      .tb-trigger .lbl { font: 12px/1 var(--mono); color: inherit; }
+      .tb-trigger .dot {
+        display: none; position: absolute; right: 3px; top: 3px; width: 4px; height: 4px;
+        border-radius: 50%; background: var(--accent);
+      }
+      .tb-trigger.on .dot { display: block; }
+      .tb-trigger.on { color: var(--text); }
+      .tb-menu.open .tb-trigger { color: var(--text); background: var(--panel-2); }
+      .tb-panel {
+        position: absolute; top: calc(100% + 5px); left: 0; z-index: 40; display: none;
+        min-width: 200px; max-height: 340px; overflow: auto;
+        background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); padding: 5px;
+      }
+      .tb-menu.open .tb-panel { display: block; }
+      .tb-title { padding: 3px 7px; color: var(--muted); font-size: 11px; }
+      .tb-item {
+        display: flex; align-items: center; gap: 7px; padding: 5px 7px; border-radius: 4px;
+        cursor: pointer; font-size: 12px; color: var(--dim); white-space: nowrap;
+      }
+      .tb-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+      .tb-item.active { color: var(--text); background: rgba(240, 185, 11, 0.14); }
+      .tb-mark { width: 10px; color: var(--accent); }
+      .tb-param { display: flex; align-items: center; gap: 5px; padding: 4px 7px; color: var(--dim); font-size: 12px; }
+      .tb-param input {
+        width: 46px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+        color: var(--text); padding: 3px 4px; font: 12px/1.4 var(--mono);
+      }
+      .readout { margin-left: auto; color: var(--muted); font: 11px/1.4 var(--mono); }
+
+      /* ---------------- 图表本体 ---------------- */
+      .chart-body { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; }
+      .draw-bar {
+        width: 38px; flex: 0 0 38px; display: flex; flex-direction: column; align-items: center;
+        gap: 2px; padding: 6px 0; border-right: 1px solid var(--line-soft);
+      }
+      .draw-bar .spacer { flex: 1; }
+      .draw-tool {
+        width: 28px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+        background: none; border: 1px solid transparent; border-radius: 4px; color: var(--dim); cursor: pointer;
+      }
+      .draw-tool:hover { background: var(--panel-2); color: var(--text); }
+      .draw-tool.on { background: rgba(240, 185, 11, 0.16); color: var(--accent); }
+      .draw-tool svg { width: 16px; height: 16px; }
+      .chart-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+      #panes { flex: 1 1 auto; min-height: 360px; overflow: hidden; }
+      /*
+        ⚠️ 脚注**固定高度**：提示文案长短会换行（默认那句长、点完只剩「价格轴已自适应」），
+        高度一变图表区就跟着变 —— 「同一段视窗量两次几何不一样」，像素用例当场飘（实测踩到）。
+      */
+      .chart-foot {
+        display: flex; align-items: center; gap: 16px; padding: 0 10px; height: 30px;
+        border-top: 1px solid var(--line-soft); font: 11px/1.5 var(--mono); color: var(--muted);
+        flex: 0 0 auto; overflow: hidden;
+      }
+      .chart-foot > span { white-space: nowrap; }
+      .chart-foot b { color: var(--dim); }
+      #s-hint { color: var(--muted); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      /*
+        行情链路状态（客户端状态机的出口）。点一下模拟断线：客户端应当自己重连、
+        重放全部订阅，页面不需要知道「断过」这件事的细节。
+      */
+      #s-feed { cursor: pointer; user-select: none; }
+
+      /* 图表外壳（HTML 覆盖层，几何由 syncChromeBox 对齐到主图画布） */
+      .chrome { position: absolute; left: 0; top: 0; pointer-events: none; font-family: var(--mono); }
+      .chrome > * { position: absolute; }
+      .ohlc { display: flex; gap: 9px; font-size: 11px; white-space: nowrap; }
+      .ohlc .sym { color: var(--text); font-weight: 600; }
+      .ohlc .kv { color: var(--muted); }
+      .ohlc .kv b { color: var(--dim); }
+      .pane-title { display: flex; gap: 9px; font-size: 11px; white-space: nowrap; color: var(--muted); }
+      .pane-title .name { color: var(--dim); font-weight: 600; }
+      .pane-title .arg { color: var(--muted); }
+      .pane-title .val { color: var(--dim); }
+      .pane-title .up { color: var(--up); }
+      .pane-title .down { color: var(--down); }
+      .hline { height: 0; border-top: 1px dashed var(--ruler); }
+      .vline { width: 0; border-left: 1px dashed var(--ruler); }
+      .lastline { height: 0; border-top: 1px dashed var(--accent); }
+      .session-layer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+      .session-layer i { position: absolute; width: 0; border-left: 1px solid var(--session-line); }
+      .watermark {
+        transform: translate(-50%, -50%); font-size: 42px; font-weight: 600; letter-spacing: 2px;
+        color: rgba(234, 236, 239, 0.04); white-space: nowrap; pointer-events: none;
+      }
+      .tag { padding: 1px 5px; border-radius: 2px; font: 11px/1.5 var(--mono); text-align: center; white-space: nowrap; overflow: hidden; }
+      .tag.price { background: var(--muted); color: var(--bg); }
+      .tag.last { color: #fff; }
+      .tag.time { background: var(--muted); color: var(--bg); transform: translateX(-50%); }
+
+      /* 盘口 / 最新成交 */
+      .book-col { gap: 0; }
+      /*
+        盘口吃掉剩下的高度（`overflow: hidden` 保证**十档排不下时被裁掉、而不是画到成交那一格上**），
+        最新成交固定占下面三分之一并给一个最小高度 —— 否则盘口按自身高度一排，成交只剩表头（实测）。
+      */
+      .book-col #order-book { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+      .trades-wrap {
+        flex: 0 0 34%; min-height: 128px; display: flex; flex-direction: column;
+        border-top: 1px solid var(--line);
+      }
+      .trades-head { display: flex; align-items: center; gap: 14px; padding: 6px 10px 4px; }
+      .trades-head button {
+        background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer;
+        padding: 2px 0 3px; border-bottom: 2px solid transparent;
+      }
+      .trades-head button.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+      .trades { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 10px 6px; }
+      .trades table { width: 100%; border-collapse: collapse; }
+      .trades th { color: var(--muted); font: 11px/1.6 var(--mono); font-weight: 400; text-align: right; padding: 2px 0; }
+      .trades th:first-child, .trades td:first-child { text-align: left; }
+      .trades td { font: 11px/1.55 var(--mono); padding: 1px 0; color: var(--dim); text-align: right; white-space: nowrap; }
+
+      /* 下单面板 */
+      .order-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+      .order-top { display: flex; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid var(--line-soft); }
+      .pill {
+        background: var(--panel-2); border: 1px solid transparent; border-radius: 4px; color: var(--text);
+        padding: 4px 10px; font: 12px/1.3 var(--mono); cursor: pointer;
+      }
+      .pill.dim { color: var(--muted); }
+      .pill:hover { border-color: #3a424c; }
+      .order-top .spacer { margin-left: auto; color: var(--muted); }
+      form.order { padding: 8px 10px 10px; display: grid; gap: 6px; }
+      .order-tabs { display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--line-soft); padding-bottom: 6px; }
+      .order-tabs button {
+        background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer;
+        padding: 1px 0 4px; border-bottom: 2px solid transparent;
+      }
+      .order-tabs button.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+      .order-tabs .spacer { margin-left: auto; }
+      .order-tabs .info { color: var(--muted); font-size: 13px; }
+      .avail { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+      .avail b { color: var(--dim); }
+      .field-label { color: var(--muted); font-size: 11px; margin-top: 2px; }
+      .field-row { display: grid; grid-template-columns: minmax(0, 1fr) 62px; gap: 6px; align-items: stretch; }
+      .input-wrap {
+        display: flex; align-items: center; gap: 6px; background: var(--bg);
+        border: 1px solid var(--line); border-radius: 4px; padding: 0 8px; height: 32px;
+      }
+      .input-wrap:focus-within { border-color: var(--accent); }
+      .input-wrap input {
+        flex: 1 1 auto; min-width: 0; background: none; border: 0; outline: none;
+        color: var(--text); font: 14px/1.4 var(--mono);
+      }
+      .input-wrap input:disabled { color: var(--muted); }
+      .input-wrap .unit { color: var(--muted); font: 12px/1 var(--mono); }
+      .best {
+        background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
+        color: var(--dim); font-size: 11px; cursor: pointer;
+      }
+      .best:hover { color: var(--text); }
+      /* 百分比滑杆（25% 一档的菱形刻度 + 可拖动的手柄） */
+      .pct-slider { position: relative; height: 26px; margin: 2px 0 0; }
+      .pct-slider .track { position: absolute; left: 5px; right: 5px; top: 12px; height: 1px; background: var(--line); }
+      .pct-slider .tick {
+        position: absolute; top: 9px; width: 7px; height: 7px; margin-left: -3.5px;
+        border: 1px solid var(--muted); background: var(--panel); transform: rotate(45deg); cursor: pointer;
+      }
+      .pct-slider .tick.on { border-color: var(--accent); background: var(--accent); }
+      .pct-slider .tick:hover { border-color: var(--text); }
+      .leverage { display: grid; grid-template-columns: 32px 1fr 34px; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+      .leverage input[type='range'] { width: 100%; accent-color: var(--accent); }
+      .leverage b { color: var(--dim); font: 12px/1 var(--mono); }
+      .checks { display: flex; gap: 14px; color: var(--dim); font-size: 11px; flex-wrap: wrap; }
+      .checks label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+      .checks input { accent-color: var(--accent); }
+      .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .row-2 input {
+        background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+        color: var(--text); padding: 6px 8px; font: 12px/1.4 var(--mono);
+      }
+      .submit { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 2px; }
+      .submit button { border: 0; border-radius: 4px; padding: 10px 0; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+      .submit .buy { background: var(--up); }
+      .submit .sell { background: var(--down); }
+      .submit button:hover { filter: brightness(1.08); }
+      .hintline { color: var(--muted); font-size: 11px; min-height: 15px; }
+
+      /* 账户 */
+      .account { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px 10px; }
+      .account h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+      .account .acct-title { color: var(--text); font-size: 12px; margin-bottom: 6px; }
+      .account .row { display: flex; justify-content: space-between; padding: 3px 0; color: var(--muted); font-size: 12px; }
+      .account .row b { color: var(--text); }
+      .account .acct-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-soft); }
+      .account .acct-actions button {
+        background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
+        color: var(--muted); padding: 6px 0; font-size: 11px; cursor: pointer;
+      }
+      .account .acct-actions button:hover { color: var(--text); }
+
+      /* 底部：持仓 / 委托 / 画线记录（选项卡） */
+      .bottom-tabs { display: flex; align-items: center; gap: 18px; padding: 8px 12px 6px; border-bottom: 1px solid var(--line-soft); }
+      .bottom-tabs button {
+        background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer;
+        padding: 2px 0 5px; border-bottom: 2px solid transparent;
+      }
+      .bottom-tabs button.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+      .bottom-tabs .count { color: var(--muted); font-size: 12px; }
+      .bottom-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+      .bottom-body .pane { display: none; height: 100%; }
+      .bottom-body .pane.on { display: block; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 6px 12px; text-align: right; font: 12px/1.6 var(--mono); white-space: nowrap; }
+      th { color: var(--muted); font-weight: 400; font-size: 11px; border-bottom: 1px solid var(--line-soft); }
+      th:first-child, td:first-child { text-align: left; }
+      tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+      td.empty { color: var(--muted); text-align: center; padding: 18px; }
+      .cancel { color: var(--accent); cursor: pointer; }
+      pre.dump {
+        margin: 0; padding: 8px 12px; max-height: 168px; overflow: auto;
+        font: 11px/1.6 var(--mono); color: var(--dim); white-space: pre-wrap;
+      }
+
+      /* 价格轴右键菜单 */
+      .ctx-menu {
+        position: fixed; z-index: 60; display: none; min-width: 148px; padding: 5px;
+        background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); font-size: 12px; color: var(--dim);
+      }
+      .ctx-menu.open { display: block; }
+      .lead { color: var(--muted); margin: 10px 14px 16px; font-size: 11px; }
+      .lead code { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <!-- 价格轴右键菜单（贴在指针位置；挂在 body 上，因为图表外壳那一层是 pointer-events:none） -->
+    <div class="ctx-menu" id="ctx-menu"></div>
+
+    <!-- 行情跑马灯：一排交易对的涨跌（等宽字体，涨绿跌红） -->
+    <div class="ticker-strip" id="ticker-strip"></div>
+
+    <!-- 交易对抬头：符号 + 标记价 + 一排指标（对齐合约交易所的抬头） -->
+    <header class="symbol-bar">
+      <div class="symbol-id">
+        <span class="star" title="自选">★</span>
+        <span class="coin">SYN</span>
+        <span class="pair">SYN/USDT<small>永续</small></span>
+        <span class="caret">▾</span>
+        <div class="mark"><b id="t-last">-</b><span id="t-chg">-</span></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span data-i18n="top.mark">标记价格</span><b id="t-mark">-</b></div>
+        <div class="stat"><span data-i18n="top.index">指数价格</span><b id="t-index">-</b></div>
+        <div class="stat"><span data-i18n="top.funding">资金费率 (8时) / 倒计时</span><b><i id="t-funding" style="font-style:normal">-</i> / <i id="t-fund-countdown" style="font-style:normal">--:--:--</i></b></div>
+        <div class="stat"><span data-i18n="top.high">24h 最高价</span><b id="t-high">-</b></div>
+        <div class="stat"><span data-i18n="top.low">24h 最低价</span><b id="t-low">-</b></div>
+        <div class="stat"><span data-i18n="top.volume">24h 成交量 (SYN)</span><b id="t-vol">-</b></div>
+        <div class="stat"><span data-i18n="top.amount">24h 成交额 (USDT)</span><b id="t-amount">-</b></div>
+      </div>
+      <div class="tools">
+        <button class="btn" id="btn-toggle" data-i18n="btn.pause">暂停</button>
+        <button class="btn" id="btn-reset" data-i18n="btn.reset">重置</button>
+        <button class="btn" id="btn-latest" style="display:none" data-i18n="btn.latest">回到最新</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <!-- ① 图表 -->
+      <section class="panel chart-col">
+        <div class="chart-bar" id="chart-bar">
+          <div class="tabs"><button type="button" class="on" data-i18n="chart.tab">图表</button><button type="button" data-i18n="chart.info">信息</button><button type="button" data-i18n="chart.data">数据</button></div>
+          <span class="sep"></span>
+          <div class="tabs" id="tb-intervals"></div>
+          <div class="tb-menu" data-menu="intervals">
+            <button class="tb-trigger" type="button" title="周期" aria-label="周期" data-i18n-title="tool.intervals">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                <circle cx="8" cy="8" r="6.2" />
+                <path d="M8 4.4V8l2.6 1.6" stroke-linecap="round" />
+              </svg>
+              <b class="lbl" data-tb="interval">5m</b>
+            </button>
+            <div class="tb-panel" id="panel-intervals"></div>
+          </div>
+          <span class="sep"></span>
+          <div class="tb-menu" data-menu="type">
+            <button class="tb-trigger" type="button" title="图表类型" aria-label="图表类型" data-i18n-title="tool.type">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+                <path d="M5 2.4v11.2M11 3.4v9.2" stroke-linecap="round" />
+                <rect x="3.3" y="5" width="3.4" height="6" rx="0.4" fill="currentColor" stroke="none" />
+                <rect x="9.3" y="5.8" width="3.4" height="4.4" rx="0.4" fill="currentColor" stroke="none" />
+              </svg>
+              <i class="dot"></i>
+            </button>
+            <div class="tb-panel" id="panel-type"></div>
+          </div>
+          <div class="tb-menu" data-menu="indicators">
+            <button class="tb-trigger" type="button" title="指标" aria-label="指标" data-i18n-title="tool.indicators">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                <path d="M3.2 12.4V8.6M8 12.4V3.6M12.8 12.4v-5.2" />
+              </svg>
+              <i class="dot"></i>
+            </button>
+            <div class="tb-panel" id="panel-indicators"></div>
+          </div>
+          <div class="tb-menu" data-menu="drawings">
+            <button class="tb-trigger" type="button" title="画线" aria-label="画线" data-i18n-title="tool.drawing">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
+                <path d="M11.4 2.6l2 2L5.6 12.4l-2.6.6.6-2.6 7.8-7.8z" />
+                <path d="M10.2 3.8l2 2" stroke-linecap="round" />
+              </svg>
+              <i class="dot"></i>
+            </button>
+            <div class="tb-panel" id="panel-drawings"></div>
+          </div>
+          <div class="tb-menu" data-menu="display">
+            <button class="tb-trigger" type="button" title="显示" aria-label="显示" data-i18n-title="tool.display">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                <path d="M2.6 4.6h10.8M2.6 11.4h10.8" />
+                <circle cx="6" cy="4.6" r="1.6" fill="var(--panel)" />
+                <circle cx="10.4" cy="11.4" r="1.6" fill="var(--panel)" />
+              </svg>
+              <i class="dot"></i>
+            </button>
+            <div class="tb-panel" id="panel-display"></div>
+          </div>
+          <span class="readout" id="readout">-</span>
+        </div>
+        <div class="chart-body">
+          <!-- 左侧画线图标条（竖排图标，选中态高亮） -->
+          <div class="draw-bar" id="draw-bar"></div>
+          <div class="chart-main">
+            <div id="panes"></div>
+            <div class="chart-foot">
+              <span><span data-i18n="foot.countdown">下一根</span> <b id="s-countdown">--:--</b></span>
+              <span><span data-i18n="foot.funding">距资金费率</span> <b id="s-next">--:--</b></span>
+              <span><span data-i18n="foot.pushed">已推送</span> <b id="s-pushed">0</b></span>
+              <span>fps <b id="s-fps">0</b></span>
+              <span id="s-feed" data-i18n-title="foot.feed">行情 --</span>
+              <span id="s-hint">滚轮缩放任一 pane · 标尺：上下拖 / 滚轮缩放、双击自适应、右键菜单 · 键盘：←→ 平移、↑↓ 价格轴、+/- 时间轴、Home 回到最新</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ② 订单簿 + 最新成交 -->
+      <section class="panel book-col">
+        <div class="panel-head"><span data-i18n="book.title">订单簿</span> <span class="right" id="b-levels">10 档</span></div>
+        <!-- 盘口由库里的 createOrderBook 组件渲染（结构 / 样式 / 深度条 / 点击都在组件里） -->
+        <div id="order-book"></div>
+        <div class="trades-wrap">
+          <div class="trades-head">
+            <button type="button" class="on" data-i18n="trades.title">最新成交</button>
+            <button type="button" data-i18n="trades.moves">市场异动</button>
+          </div>
+          <div class="trades">
+            <table>
+              <thead><tr><th data-i18n="trades.price">价格 (USDT)</th><th data-i18n="trades.size">数量 (SYN)</th><th data-i18n="trades.time">时间</th></tr></thead>
+              <tbody id="trades"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ③ 下单 + 账户 -->
+      <section class="order-col">
+        <div class="order-panel">
+          <div class="order-top">
+            <button type="button" class="pill" data-margin="cross" data-i18n="order.cross">全仓</button>
+            <button type="button" class="pill dim" data-margin="isolated" data-i18n="order.isolated">逐仓</button>
+            <button type="button" class="pill" id="o-lev-pill" title="杠杆">10x</button>
+            <span class="spacer">···</span>
+          </div>
+          <form class="order" id="order-form" onsubmit="return false">
+            <div class="order-tabs" id="order-tabs">
+              <button type="button" data-type="limit" class="on" data-i18n="order.limit">限价</button>
+              <button type="button" data-type="market" data-i18n="order.market">市价</button>
+              <span class="spacer"></span>
+              <span class="info" title="限价单以指定价格挂单；市价单立即成交">ⓘ</span>
+            </div>
+            <div class="avail"><span data-i18n="order.available">可用</span><b id="o-avail">-</b></div>
+            <div class="field-label" data-i18n="order.price">委托价格</div>
+            <div class="field-row">
+              <div class="input-wrap"><input id="o-price" class="mono" type="text" inputmode="decimal" /><span class="unit">USDT</span></div>
+              <button type="button" class="best" id="o-best" data-i18n="order.best">最优价</button>
+            </div>
+            <div class="field-label" data-i18n="order.size">数量</div>
+            <div class="input-wrap"><input id="o-size" class="mono" type="text" inputmode="decimal" value="0.5" /><span class="unit">SYN</span></div>
+            <div class="pct-slider" id="o-pct" title="按可用保证金的百分比填数量"></div>
+            <div class="leverage">
+              <label data-i18n="order.leverage">杠杆</label>
+              <input id="o-lev" type="range" min="1" max="50" value="10" />
+              <b id="o-lev-text">10×</b>
+            </div>
+            <div class="checks">
+              <label><input type="checkbox" id="o-tp" /> <span data-i18n="order.tpsl">止盈止损</span></label>
+              <label><input type="checkbox" id="o-ro" /> <span data-i18n="order.reduceOnly">只减仓</span></label>
+            </div>
+            <div class="row-2" id="o-tpsl" style="display:none">
+              <input id="o-tp-price" class="mono" type="text" placeholder="止盈价" />
+              <input id="o-sl-price" class="mono" type="text" placeholder="止损价" />
+            </div>
+            <div class="submit">
+              <button type="button" class="buy" id="o-buy" data-i18n="order.buy">买入 / 做多</button>
+              <button type="button" class="sell" id="o-sell" data-i18n="order.sell">卖出 / 做空</button>
+            </div>
+            <div class="hintline" id="o-hint">可用 100,000 USDT · 市价单立即成交</div>
+          </form>
+        </div>
+        <div class="account">
+          <h4 data-i18n="account.title">账户</h4>
+          <div class="acct-title" data-i18n="account.ratio">保证金比率</div>
+          <div class="row"><span data-i18n="account.ratio">保证金比率</span><b id="acct-ratio">0.00%</b></div>
+          <div class="row"><span data-i18n="account.maint">维持保证金</span><b id="acct-maint">0.0000 USDT</b></div>
+          <div class="row"><span data-i18n="account.balance">保证金余额</span><b id="acct-balance">-</b></div>
+          <div class="acct-actions">
+            <button type="button" data-action="transfer" data-i18n="account.transfer">划转</button>
+            <button type="button" data-action="buy" data-i18n="account.buy">买币</button>
+            <button type="button" data-action="convert" data-i18n="account.convert">兑换</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ 底部：持仓 / 当前委托 / 画线记录 -->
+      <section class="panel bottom-col">
+        <div class="bottom-tabs" id="bottom-tabs">
+          <button type="button" class="on" data-tab="positions"><span data-i18n="tab.positions">持仓</span> <span class="count" id="p-count">0</span></button>
+          <button type="button" data-tab="orders"><span data-i18n="tab.orders">当前委托</span> <span class="count" id="ord-count">0</span></button>
+          <button type="button" data-tab="drawings"><span data-i18n="tab.drawings">画线记录</span> <span class="count" id="d-count">0</span></button>
+        </div>
+        <div class="bottom-body" id="bottom-body">
+          <div class="pane on" data-pane="positions">
+            <table>
+              <thead><tr><th data-i18n="th.side">方向</th><th data-i18n="th.size">数量</th><th data-i18n="th.entry">开仓均价</th><th data-i18n="th.mark">标记价</th><th data-i18n="th.pnl">未实现盈亏</th><th data-i18n="th.margin">保证金</th><th data-i18n="th.liq">强平价</th><th data-i18n="th.leverage">杠杆</th></tr></thead>
+              <tbody id="positions"></tbody>
+            </table>
+          </div>
+          <div class="pane" data-pane="orders">
+            <table>
+              <thead><tr><th data-i18n="th.time">时间</th><th data-i18n="th.side">方向</th><th data-i18n="th.type">类型</th><th data-i18n="th.price">价格</th><th data-i18n="th.size">数量</th><th data-i18n="th.status">状态</th><th></th></tr></thead>
+              <tbody id="orders"></tbody>
+            </table>
+          </div>
+          <div class="pane" data-pane="drawings">
+            <pre class="dump" id="d-dump">[]</pre>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="./vendor/ice-render.umd.js"></script>
+    <script src="./vendor/ice-chart.umd.js"></script>
+    <script src="./vendor/ice-trading-chart.umd.js"></script>
+    <script>
+      class TerminalPage {
+        /**
+         * 各周期，按「分组 + 别名」组织，供顶部工具条的周期下拉使用。
+         *
+         * 采样条数的取法要保证**类目标签逐根唯一** —— 类目轴按字符串去重，
+         * 标签重复会让两根 K 线塌缩到同一个类目上（命中与抬头全乱）。
+         */
+        static INTERVALS = {
+          '1m': { ms: 60e3, count: 120, group: '分钟', label: '1 分钟' },
+          '3m': { ms: 3 * 60e3, count: 120, group: '分钟', label: '3 分钟' },
+          '5m': { ms: 5 * 60e3, count: 120, group: '分钟', label: '5 分钟' },
+          '15m': { ms: 15 * 60e3, count: 95, group: '分钟', label: '15 分钟' },
+          '30m': { ms: 30 * 60e3, count: 96, group: '分钟', label: '30 分钟' },
+          '1H': { ms: 3600e3, count: 120, group: '小时', label: '1 小时' },
+          '2H': { ms: 2 * 3600e3, count: 90, group: '小时', label: '2 小时' },
+          '4H': { ms: 4 * 3600e3, count: 90, group: '小时', label: '4 小时' },
+          '1D': { ms: 86400e3, count: 90, group: '天', label: '1 天' },
+          '1W': { ms: 7 * 86400e3, count: 78, group: '周', label: '1 周' },
+          '1M': { ms: 30 * 86400e3, count: 60, group: '月', label: '1 月' },
+        };
+        /** 周期下拉里的分组顺序（自定义周期排最后）。 */
+        static INTERVAL_GROUPS = ['分钟', '小时', '天', '周', '月', '自定义'];
+        /** 周期分组名的英文对照（目录里的 key 是中文分组名）。 */
+        static GROUP_LABELS = {
+          en: { 分钟: 'Minutes', 小时: 'Hours', 天: 'Days', 周: 'Weeks', 月: 'Months', 自定义: 'Custom' },
+        };
+        /**
+         * **页面自己的文案目录**（应用侧的那一半）。
+         *
+         * 库渲染的文案（提示框四价、盘口表头、指标序列名）不在这里 —— 那是库的 `TerminalMessages`
+         * （见 `this.messages`）。这里放的是页面自己画的东西：抬头、面板、表单、表格、按钮。
+         * 接 i18n 的姿势就两步：**一份目录 + `t()` / `data-i18n`**（下面 `applyI18n()` 负责刷）。
+         *
+         * 说明：演示页只把**静态骨架**接进了目录；下拉面板里的选项、`setHint()` 的动态提示
+         * 仍是中文写死（那是应用自己的业务文案，接法与这里完全一样，只是字更多）。
+         */
+        static PAGE_MESSAGES = {
+          zh: {
+            'top.mark': '标记价格',
+            'top.index': '指数价格',
+            'top.funding': '资金费率 (8时) / 倒计时',
+            'top.high': '24h 最高价',
+            'top.low': '24h 最低价',
+            'top.volume': '24h 成交量 (SYN)',
+            'top.amount': '24h 成交额 (USDT)',
+            'btn.pause': '暂停',
+            'btn.resume': '继续',
+            'btn.reset': '重置',
+            'btn.latest': '回到最新',
+            'chart.tab': '图表',
+            'chart.info': '信息',
+            'chart.data': '数据',
+            'tool.intervals': '周期',
+            'tool.type': '图表类型',
+            'tool.indicators': '指标',
+            'tool.drawing': '画线',
+            'tool.display': '显示',
+            'book.title': '订单簿',
+            'book.levels': '{n} 档',
+            'trades.title': '最新成交',
+            'trades.moves': '市场异动',
+            'trades.price': '价格 (USDT)',
+            'trades.size': '数量 (SYN)',
+            'trades.time': '时间',
+            'order.cross': '全仓',
+            'order.isolated': '逐仓',
+            'order.limit': '限价',
+            'order.market': '市价',
+            'order.available': '可用',
+            'order.price': '委托价格',
+            'order.best': '最优价',
+            'order.size': '数量',
+            'order.leverage': '杠杆',
+            'order.tpsl': '止盈止损',
+            'order.reduceOnly': '只减仓',
+            'order.buy': '买入 / 做多',
+            'order.sell': '卖出 / 做空',
+            'account.title': '账户',
+            'account.ratio': '保证金比率',
+            'account.maint': '维持保证金',
+            'account.balance': '保证金余额',
+            'account.transfer': '划转',
+            'account.buy': '买币',
+            'account.convert': '兑换',
+            'tab.positions': '持仓',
+            'tab.orders': '当前委托',
+            'tab.drawings': '画线记录',
+            'th.side': '方向',
+            'th.size': '数量',
+            'th.entry': '开仓均价',
+            'th.mark': '标记价',
+            'th.pnl': '未实现盈亏',
+            'th.margin': '保证金',
+            'th.liq': '强平价',
+            'th.leverage': '杠杆',
+            'th.time': '时间',
+            'th.type': '类型',
+            'th.price': '价格',
+            'th.status': '状态',
+            'empty.positions': '暂无持仓',
+            'empty.orders': '暂无委托',
+            'foot.countdown': '下一根',
+            'foot.funding': '距资金费率',
+            'foot.pushed': '已推送',
+            'foot.fps': 'fps',
+            'foot.feed': '行情链路（点一下模拟断线）',
+            'feed.label': '行情',
+            'feed.idle': '未连接',
+            'feed.connecting': '连接中',
+            'feed.open': '已连接',
+            'feed.reconnecting': '重连中',
+            'feed.closed': '已断开',
+            'feed.resyncs': '盘口序列号跳号，已重取快照 {n} 次',
+            'tool.trend': '趋势线',
+            'tool.hline': '水平线',
+            'tool.vline': '垂直线',
+            'tool.rect': '区间矩形',
+            'tool.delete': '删除选中',
+            'tool.clear': '清空全部',
+          },
+          en: {
+            'top.mark': 'Mark Price',
+            'top.index': 'Index Price',
+            'top.funding': 'Funding (8h) / Countdown',
+            'top.high': '24h High',
+            'top.low': '24h Low',
+            'top.volume': '24h Volume (SYN)',
+            'top.amount': '24h Turnover (USDT)',
+            'btn.pause': 'Pause',
+            'btn.resume': 'Resume',
+            'btn.reset': 'Reset',
+            'btn.latest': 'Latest',
+            'chart.tab': 'Chart',
+            'chart.info': 'Info',
+            'chart.data': 'Data',
+            'tool.intervals': 'Interval',
+            'tool.type': 'Chart type',
+            'tool.indicators': 'Indicators',
+            'tool.drawing': 'Drawing',
+            'tool.display': 'Display',
+            'book.title': 'Order Book',
+            'book.levels': '{n} levels',
+            'trades.title': 'Market Trades',
+            'trades.moves': 'Moves',
+            'trades.price': 'Price (USDT)',
+            'trades.size': 'Size (SYN)',
+            'trades.time': 'Time',
+            'order.cross': 'Cross',
+            'order.isolated': 'Isolated',
+            'order.limit': 'Limit',
+            'order.market': 'Market',
+            'order.available': 'Available',
+            'order.price': 'Price',
+            'order.best': 'Best',
+            'order.size': 'Size',
+            'order.leverage': 'Leverage',
+            'order.tpsl': 'TP/SL',
+            'order.reduceOnly': 'Reduce-only',
+            'order.buy': 'Buy / Long',
+            'order.sell': 'Sell / Short',
+            'account.title': 'Account',
+            'account.ratio': 'Margin ratio',
+            'account.maint': 'Maintenance margin',
+            'account.balance': 'Margin balance',
+            'account.transfer': 'Transfer',
+            'account.buy': 'Buy Crypto',
+            'account.convert': 'Convert',
+            'tab.positions': 'Positions',
+            'tab.orders': 'Open Orders',
+            'tab.drawings': 'Drawings',
+            'th.side': 'Side',
+            'th.size': 'Size',
+            'th.entry': 'Entry',
+            'th.mark': 'Mark',
+            'th.pnl': 'Unrealized PnL',
+            'th.margin': 'Margin',
+            'th.liq': 'Liq. Price',
+            'th.leverage': 'Leverage',
+            'th.time': 'Time',
+            'th.type': 'Type',
+            'th.price': 'Price',
+            'th.status': 'Status',
+            'empty.positions': 'No positions',
+            'empty.orders': 'No open orders',
+            'foot.countdown': 'Next bar',
+            'foot.funding': 'Funding in',
+            'foot.pushed': 'Pushed',
+            'foot.fps': 'fps',
+            'foot.feed': 'Market feed (click to simulate a drop)',
+            'feed.label': 'Feed',
+            'feed.idle': 'idle',
+            'feed.connecting': 'connecting',
+            'feed.open': 'live',
+            'feed.reconnecting': 'reconnecting',
+            'feed.closed': 'closed',
+            'feed.resyncs': 'order book resynced {n}×',
+            'tool.trend': 'Trend line',
+            'tool.hline': 'Horizontal line',
+            'tool.vline': 'Vertical line',
+            'tool.rect': 'Rectangle',
+            'tool.delete': 'Delete selected',
+            'tool.clear': 'Clear all',
+          },
+        };
+
+        /**
+         * 三块 pane 的 id，顺序与 `mount()` 里传给 createPaneStack 的 specs 一致。
+         * 十字准星要靠它把「指针落在哪一块」翻译成「读哪一块的 y 轴」。
+         */
+        static PANES = ['price', 'volume', 'indicator'];
+        /**
+         * 初次载入的历史 = 可见根数 × 这个倍数。
+         *
+         * 为什么要多载：平移被夹在**已载入的数据范围**内，如果「显示多少就载多少」，
+         * 默认缩放下拖动是零位移（实测 `clamp(0 + shift, 0, 0) = 0`）。多载一段才有得拖，
+         * 而默认窗口仍然只显示最后 `count` 根，画面不变。
+         * 再多出来的部分靠 `ensureHistory()` 边拖边补 —— 左边是**无限**的。
+         */
+        static HISTORY_FACTOR = 3;
+        /** 每次往左补多少根历史。 */
+        static HISTORY_CHUNK = 400;
+        /**
+         * 交给图表的**渲染窗口**：视窗左右各多带这么多根。
+         *
+         * 归一化 / 指标 / 图元全是 O(n)：实测一次 `refresh` 在 360 根时 1.8ms、
+         * 1560 根 6.5ms、2760 根 10.7ms —— 拖动时每帧一次就顶到 60fps 的预算了。
+         * 所以内存里可以存很多历史、**交给图表的只裁到视窗附近**，开销恒定。
+         * 顺带把指标的预热期（MACD 要 33 根）留在视野外：用户也就看不到「副图左边空一块」。
+         */
+        static RENDER_MARGIN = 300;
+        /** 视窗左边缘在全量历史里的下标小于这个数就往前补一段（要 ≥ RENDER_MARGIN，别让渲染窗口贴到数据边界）。 */
+        static HISTORY_PREFETCH = 400;
+        /** 全量历史的内存上限（只影响内存，不影响渲染开销）。 */
+        static HISTORY_MAX = 20000;
+        /** 超限这么多还没能裁（视窗长期停在最左边）就硬裁：内存优先于视窗稳定。 */
+        static HISTORY_HARD_OVER = 2000;
+        /**
+         * 最新一根之后留多少个**未来空位**。
+         *
+         * 为什么要有：视窗贴到最新数据后，往左拖（内容跟着手往左）本该继续动，
+         * 主流看盘软件在那里留的是**空白**。类目轴的窗口只能落在已存在的类目上，
+         * 所以空白得靠「没有价量的占位棒」撑出来（`readOhlc` 读不出四个价 → 不画）。
+         * 600 根 ≈ 五屏，够拖；拖得更远时 `extendFutureSlots()` 再补。
+         */
+        static FUTURE_SLOTS = 600;
+        /** 未来空位的上限（再往左拖就撞墙了，但那已经是二十屏之外）。 */
+        static FUTURE_MAX = 2400;
+        /**
+         * 准星标尺色：竖线（引擎画）与横线（`.hline`）必须同色，否则十字会看起来是断的。
+         * CSS 侧是 `--ruler`，改这里记得一起改。
+         */
+        static RULER_COLOR = 'rgba(138, 151, 166, 0.72)';
+        /**
+         * 引擎自带的准星**整体关掉**，两条线都由页面覆盖层画。
+         *
+         * 原因是引擎的准星**吸附到柱心**：实测慢速横移 61 步（每步 1px）时，
+         * 目标位置只变了 9 个值、竖线 60 步里 53 步位移为 0，剩下 7 步一次跳 8px ——
+         * 表现就是「鼠标在动、线一动不动，攒够了跳一格」，也就是用户说的「卡卡的」。
+         * 横线本来就是页面画的、1:1 跟手，两者一对比更明显。
+         *
+         * 页面画的前提是三块 pane 的绘图区 **x 范围完全相同**（`plot.x` / `plot.width` 一致，
+         * 由 pane 栈的等宽对齐保证），所以一个 x 就能贯穿整摞图。
+         * 引擎的悬停状态照旧保留 —— 抬头读数、准星的读数都还靠它。
+         */
+        static CROSSHAIR = { show: false };
+        /**
+         * 网格：横向 + **纵向**都要。
+         *
+         * 引擎默认 `grid.x: false`（只有横向平行线），打开之后是「方格」—— 主流看盘软件的样子。
+         * 竖线的位置由引擎给（跟 x 轴标签抽稀同一批，见 ice-chart 的 `grid-x.test.ts`），
+         * 所以三块 pane 因为绘图区等宽 + 同一个 x 窗口，竖线天然对齐成方格。
+         */
+        static GRID = { x: true };
+        /**
+         * 三块 pane 共用的交互配置：**关掉悬停标记**（`hover.mark: false`）。
+         *
+         * 引擎默认会**给整列每个系列各画一个标记**（折线是半透明白填充的圆环、
+         * 柱形是描边）。`nearest-x` 悬停是整列命中，主图上一根 K 会连带 MA / BOLL
+         * 一起被画上圆环，白花花的比准星本身还抢眼，还把蜡烛盖住了。
+         *
+         * 关掉的是**引擎这层**；蜡烛系列自己的那圈描边（`CandlestickSeries` 里的
+         * `drawHoverOverlay`：淡填充 + 细描边，贴着蜡烛实体画）保留 —— 它够轻，
+         * 而且正好回答「读的是哪一根」。
+         */
+        static INTERACTION = {
+          hover: { mark: false },
+          /**
+           * 关掉**引擎的**键盘导航（←/→ 在数据点之间挪活动点、↑/↓ 换系列）。
+           *
+           * 那套语义不属于看盘：主流看盘软件里方向键是**平移 / 缩放视图**（←/→ 平移时间轴、
+           * ↑/↓ 缩放数值轴），而且它会把悬停（准星 + 读数）挪到数据点上，跟「准星跟指针」冲突。
+           * 页面自己接管这些键，见 `bindKeyboard`。
+           */
+          keyboard: false,
+          /**
+           * 拖动平移。横向是时间轴；**纵向也开** —— 用户要求横纵都能拖。
+           *
+           * 纵向拖过之后引擎会把那个 y 窗口记在 `viewState.y` 里，页面按可见窗口重算的
+           * 量程就不再覆盖它（这就是「手动量程」的语义）；按「重置」会退回自动。
+           */
+          pan: { enabled: true, axes: 'xy' },
+        };
+
+        /** 默认收藏的周期（顶部工具条上常显的那一排）。 */
+        static DEFAULT_FAVORITES = ['1m', '5m', '15m', '1H', '4H', '1D'];
+        static PREFS_KEY = 'ice-trading-terminal-prefs';
+        static TICK_MS = 600;
+        static TICKS_PER_BAR = 3;
+        /** 标尺上滚轮一格的价格轴倍率（与引擎 `interaction.zoom.wheelFactor` 的默认值同口径）。 */
+        static ZOOM_FACTOR = 1.2;
+        /** 图表区最小高度（真正的高度跟容器走，见 mount 里的 createPaneStack）。 */
+        static CHART_MIN_HEIGHT = 360;
+        /**
+         * 刻度标签的定宽字符数（三块 pane 的右轴预留宽度靠它拉平）。
+         *
+         * ⚠️ 报价带两位小数之后标签变长了：`42300.00` 是 8 字符、六位数的价格就是 9 ——
+         * 预算不够长就不再补空格，三块 pane 的右轴宽度立刻不一样、绘图区当场错位。
+         */
+        static AXIS_CHARS = 9;
+        /** 报价小数位（价格轴刻度与提示框都用它，和页面自己的价签口径一致）。 */
+        static PRICE_PRECISION = 2;
+        /** 副图两条线的颜色（与 `createMacdPaneOption` 里给的一致，图例里要用同样的颜色）。 */
+        static DIF_COLOR = '#f5a524';
+        static DEA_COLOR = '#3b82f6';
+        static BASE_PRICE = 42000;
+        /** 盘口每侧的档数（组件默认也是 10）。 */
+        static LEVELS = 10;
+        /** 盘口的最小变动价位（演示值：1 USDT 一档，价格 4 万上下看着才有位感）。 */
+        static BOOK_TICK = 1;
+        static EQUITY = 100000;
+
+        static round2(value) {
+          return Math.round(value * 100) / 100;
+        }
+
+        static pad2(value) {
+          return String(value).padStart(2, '0');
+        }
+
+        /** 时间戳 → `HH:MM:SS`（最新成交那一列的写法）。 */
+        static clock(at) {
+          const date = new Date(at);
+          return `${TerminalPage.pad2(date.getHours())}:${TerminalPage.pad2(date.getMinutes())}:${TerminalPage.pad2(date.getSeconds())}`;
+        }
+
+        /** 显示精度：报价一律两位小数（终端的展示口径，与数据精度无关）。 */
+        static price(value) {
+          if (value === null || value === undefined || !isFinite(value)) return '-';
+          return ICETradingChart.formatPrice(value, TerminalPage.PRICE_PRECISION);
+        }
+
+        static pct(value) {
+          return ICETradingChart.formatPct(value);
+        }
+
+        /** 小数比率 → 带符号百分比（+1.23%）。价格轴的「百分比坐标」与价签共用。 */
+        static pctLabel(ratio) {
+          if (!isFinite(ratio)) return '-';
+          const value = ratio * 100;
+          const sign = value > 0 ? '+' : '';
+          return `${sign}${value.toFixed(2)}%`;
+        }
+
+        candles = [];
+        stack = null;
+        drawing = null;
+        readout = null;
+        chrome = null;
+        canvasEl = null;
+        /** 设备像素比（对齐用；引擎按它渲染，页面画的线也得对齐到同一套设备像素）。 */
+        dpr = 1;
+        running = true;
+        timer = null;
+        intervalKey = '5m';
+        price = TerminalPage.BASE_PRICE;
+        open24 = TerminalPage.BASE_PRICE;
+        high24 = TerminalPage.BASE_PRICE;
+        low24 = TerminalPage.BASE_PRICE;
+        volume24 = 0;
+        ticksInBar = 0;
+        pushed = 0;
+        frames = 0;
+        fpsAt = 0;
+        orderType = 'limit';
+        marginMode = 'cross';
+        /** 默认**涨绿跌红**（合约盘面的通行口径），「显示」面板里可切。 */
+        scheme = 'greenUp';
+        /**
+         * 盘面主题（深色 / 浅色）。**一份 token 驱动三处**：图表（经 ice-chart 的主题桥推到引擎）、
+         * 盘口组件、以及页面外壳的 CSS 变量 —— 见库里的 `src/theme.ts`。
+         */
+        terminalTheme = ICETradingChart.DARK_TERMINAL_THEME;
+        /** 界面语言（'zh' / 'en'）。 */
+        lang = 'zh';
+        /** 库渲染的文案目录（提示框 / 盘口表头 / 指标序列名）。 */
+        messages = ICETradingChart.resolveTerminalMessages('zh');
+        indicators = { ma: true, ema: false, boll: false };
+        /**
+         * 图表类型：`candle` 蜡烛 / `hollow` 空心蜡烛 / `line` 折线 / `area` 面积。
+         *
+         * 线和面积只换**渲染**（走 `renderAs`），交易语义一样不少 —— 影线量程、成交量副图、
+         * OHLC 抬头 / 提示框照旧按 K 线算，切类型不会丢掉任何读数。
+         */
+        chartType = 'candle';
+        /** 价格轴坐标：`linear` 线性 / `log` 对数 / `percent` 百分比（相对可见窗口第一根）。 */
+        priceScale = 'linear';
+        /** 十字光标磁吸：横线吸附到最近的开 / 高 / 低 / 收。 */
+        magnet = false;
+        /** 量图上的均量线（MA5 / MA10）。 */
+        volumeMa = true;
+        /** 跨天的会话分隔线。 */
+        sessionLines = true;
+        /** 指标参数（「指标」面板里可改）。 */
+        macdParams = { fast: 12, slow: 26, signal: 9 };
+        rsiPeriod = 14;
+        maPeriods = [7, 25];
+        emaPeriods = [12, 26];
+        bollPeriod = 20;
+        favorites = TerminalPage.DEFAULT_FAVORITES.slice();
+        customIntervals = {};
+        customFormOpen = false;
+        openMenu = null;
+        paneKind = 'macd';
+        position = null;
+        orders = [];
+        orderSeq = 0;
+        book = null;
+        bookData = { asks: [], bids: [] };
+        /** 指针位置：`{ pane, x, y }`，`x`/`y` 是**那一块 pane 画布内**的坐标；不在图上时为 null。 */
+        pointer = null;
+        /** 是否按住主键（只用来驱动光标，见 bindPanCursor / syncCursor）。 */
+        pressed = false;
+        /**
+         * 指针是不是停在**右侧数值标尺**上（同样是驱动光标：标尺上是 `ns-resize`）。
+         * 标尺上的按下归「拖拽缩放」，不给平移小手，见 bindPanCursor。
+         */
+        axisHover = false;
+        /** 进行中的「标尺拖拽缩放」：`{ pane, scale }`（`scale` 是按下那一刻的快照）。 */
+        axisDrag = null;
+        /** 最近一次写下去的光标值（避免每次 pointermove 都写 style）。 */
+        cursor = '';
+        /** 平移 / 缩放的量程重算（rAF 节流句柄）。 */
+        viewFrame = 0;
+        /**
+         * 视窗（x）的指纹 = 「页面认得的那个视窗」。
+         *
+         * 用来区分「用户动过视窗」与「只是动了数值轴」：纵向拖动、标尺滚轮缩放都会抛
+         * `pan:change` / `zoom:change`，但**时间窗口一根没动** —— 那种情况不该把跟盘踢掉
+         * （主流看盘软件里调价格轴不影响时间轴的跟盘）。页面自己摆窗口的地方
+         * （`pinToLatest` / `invalidate`）负责把它刷新成当前值。
+         */
+        viewKey = '';
+        /** `visibleRange()` 的缓存（key = 总量 + 视窗两端 + 周期）。 */
+        rangeKey = '';
+        rangeValue = null;
+        /** 最新一根之后的未来空位（视窗往左越过最新数据时看到的空白）。 */
+        futureSlots = [];
+        /**
+         * 缩放时右端的闸门：**本轮视窗到过的最右位置**（池子下标）。
+         *
+         * `null` = 还没记过（按「最新一根」算）。平移 / 回到最新会把它刷成当前右端 ——
+         * 缩放只许向左让，不许比它更靠右（见 `anchorRightOnZoom`）。
+         */
+        zoomRightCap = null;
+        /**
+         * 是否**跟盘**：新的 K 出来时把窗口钉在最后 `count` 根上。
+         *
+         * 为什么必须有这个状态：窗口一旦被锚在「左端某一根」上，那根要被移出数据要等
+         * 240 根之后，于是**新 K 会一直掉在窗口右边外面**（实测窗口停在 `[238..358]`、
+         * 最新那根是 359）。所以「不自动向右延伸」不能是默认行为 —— 默认必须跟盘，
+         * 用户一旦自己动过视窗（拖 / 滚轮）才切成手动，并给一个「回到最新」回去。
+         */
+        follow = true;
+        /** 覆盖层原点相对 `#panes` 的偏移（`#panes` 有内边距，必须显式对齐）。 */
+        chromeOrigin = { x: 0, y: 0 };
+        /** 副图图例的指标值（按「数据 + 周期 + 参数 + 副图类型」缓存，指针移动时不必重算 O(n)）。 */
+        paneKey = '';
+        paneValue = null;
+        /** 会话分隔线的几何签名（视窗一变就重建那几条线）。 */
+        sessionSig = '';
+        /** 容器尺寸观察者（图表区高度跟容器走）。 */
+        observer = null;
+        /** 当前交易对（订阅 topic 的 key 里要用）。 */
+        symbol = 'SYNUSDT';
+        /**
+         * **实时行情接入**：真实链路是「交易所 WS → `createRealtimeClient` → `createRealtimeHub`
+         * → topic store → 页面」。演示页里没有交易所，所以由页面自己扮演**网关**（`market`），
+         * 走的是同一套客户端 / 中枢（订阅、按帧合并、断线重连、快照对账全都真跑）。
+         */
+        feed = null;
+        /** 演示网关：负责「发出」报文，以及模拟断线。 */
+        market = null;
+        /** 行情连接状态（页脚上显示）。 */
+        feedState = 'idle';
+        feedDetail = null;
+        /** 深度序列号（演示网关自增；偶尔跳号用来验证 resync）。 */
+        depthSeq = 0;
+        /** 网关**当前**推给客户端的盘口梯子（移动时要按协议把离开窗口的档删掉）。 */
+        depthBook = { bids: [], asks: [] };
+        /** 盘口重取过快照几次（链路健康计数，显示在脚注那一格里）。 */
+        feedResyncs = 0;
+        /** 顶部跑马灯里的合成行情（演示数据，跟主图无关）。 */
+        tickers = [
+          { symbol: 'BTCUSDT', price: 82532.4, pct: 2.73, digits: 1 },
+          { symbol: 'ETHUSDT', price: 4201.6, pct: 4.22, digits: 2 },
+          { symbol: 'SOLUSDT', price: 232.14, pct: -1.35, digits: 2 },
+          { symbol: 'BNBUSDT', price: 728.9, pct: 3.52, digits: 1 },
+          { symbol: 'XRPUSDT', price: 0.7231, pct: -0.86, digits: 4 },
+          { symbol: 'DOGEUSDT', price: 0.1834, pct: 6.41, digits: 4 },
+        ];
+        /** 最新成交的环形缓冲（最近 30 笔）。 */
+        trades = [];
+        tradesSig = '';
+        /** 主图画布的 CSS 尺寸。 */
+        canvasBox = { width: 0, height: 0 };
+        /** 每块 pane 相对**主图画布顶部**的偏移与高度（指针落在哪一块 + 横线画在哪一行）。 */
+        paneGeom = {};
+        xtagText = '';
+        xtagWidth = 52;
+        /** 价签高度（首次绘制时量一次）。 */
+        tagHeight = 0;
+        chromeSig = '';
+        readoutSig = '';
+
+        constructor() {
+          this.seed();
+          this.mount();
+          this.bind();
+          this.paintAll();
+          this.syncChrome(true);
+          this.timer = setInterval(() => this.step(), TerminalPage.TICK_MS);
+          this.fpsAt = performance.now();
+          // 首帧之后再排一次：pane 栈的高度读的是容器 clientHeight，而建栈那一刻
+          // flex 布局还没定稿（字体、换行会再改一次），量到的可能是临时值 ——
+          // 量大了画布就比容器高，最下面的时间轴被脚注压住（实测）。
+          requestAnimationFrame(() => this.resize());
+          // 之后交给 ResizeObserver：顶部那几条一旦因为换行/字体变高，图表区就得跟着重排 ——
+          // 光监听 window.resize 是不够的（窗口没动、容器自己变了，实测漏过一次）。
+          if (typeof ResizeObserver === 'function') {
+            this.observer = new ResizeObserver(() => this.resize());
+            this.observer.observe(document.getElementById('panes'));
+          }
+        }
+
+        /** 阳线空心 = 图表类型选了「空心蜡烛」。 */
+        get hollow() {
+          return this.chartType === 'hollow';
+        }
+
+        get upColor() {
+          return this.scheme === 'redUp' ? this.terminalTheme.down : this.terminalTheme.up;
+        }
+
+        get downColor() {
+          return this.scheme === 'redUp' ? this.terminalTheme.up : this.terminalTheme.down;
+        }
+
+        /** 当前周期（内置 + 自定义都要能取到，自定义周期走 allIntervals）。 */
+        get interval() {
+          return this.allIntervals()[this.intervalKey] || TerminalPage.INTERVALS['5m'];
+        }
+
+        get candleSeries() {
+          const series = {
+            id: 'k',
+            type: 'candlestick',
+            name: '价格',
+            // 画的是**渲染窗口**（视窗附近那几百根，不是全部历史）
+            data: this.seriesCandles,
+            // barWidth 不写就是默认（铺满类目带宽，只留 20% 间隙）
+            candle: {
+              upColor: this.upColor,
+              downColor: this.downColor,
+              borderWidth: 1,
+              // 阳线空心（只描边不填充）：国内传统画法，看涨跌构成更直观
+              hollowUp: this.hollow,
+            },
+          };
+          if (this.chartType === 'line' || this.chartType === 'area') {
+            return { ...series, renderAs: this.chartType, color: this.upColor, lineWidth: 1.4 };
+          }
+          return series;
+        }
+
+        /**
+         * 指标的数据源：**只喂真实 K**。
+         *
+         * 为什么不能直接拿 `candleSeries`（它带着未来空位）：指标是顺着收盘价一路算下去的，
+         * 空位没有 OHLC，`closeSeries` 会**沿用上一根的收盘** —— 于是均线 / MACD 会在
+         * 未来那段空位上拉出一条平线，看着像「指标跑到未来去了」。空位只该给类目轴占位，
+         * 不该进指标（K 线自己没这个问题：没有 OHLC 就什么都不画）。
+         */
+        get indicatorSource() {
+          const { from, to } = this.renderSlice();
+          return { ...this.candleSeries, data: this.poolSlice(from, Math.min(to, this.candles.length)) };
+        }
+
+        /**
+         * 副图的「未来空位锚点」：一串只带 x、**什么都不画**的柱子。
+         *
+         * 副图（MACD / RSI）的指标系列只到最后一根真实 K 为止 —— 这是对的（见 `indicatorSource`）。
+         * 但类目轴是按「这一格系列里出现过的 x」建域的：副图里没有未来那串类目，
+         * 三块 pane 就**对不齐**了 —— 联动过来的窗口在副图这儿找不到右端 key，
+         * 引擎的 clamp 只能让它停在老窗口上，于是「K 线已经是空白区了，副图还在画老数据」
+         * （实测：MACD 图照旧画满 03:00~13:00，K 线那边早就是未来）。
+         * 所以给副图挂一个占位系列把类目补齐：`type: 'bar'` + `value: null` 是
+         * **有类目、不画**的那一格（量图处理空位用的就是这一手，实测像素为 0）。
+         */
+        get blankAnchor() {
+          const { to } = this.renderSlice();
+          const real = this.candles.length;
+          if (to <= real) return [];
+          const data = [];
+          for (const slot of this.poolSlice(real, to)) data.push({ x: slot.x, value: null });
+          return data.length ? [{ id: 'k__blank', type: 'bar', data }] : [];
+        }
+
+        /**
+         * 副图当前的指标值（图例那一行要用）。
+         *
+         * 按「数据长度 + 周期 + 副图类型」缓存：指针在图上移动时 `renderReadout` 会按签名跑很多次，
+         * 每次都重算一遍 O(n) 的 EMA 没必要（`createMacdPaneOption` 已经算过一份，但那是 option 侧、拿不到）。
+         */
+        get paneIndicator() {
+          const source = this.indicatorSource;
+          const key = `${source.data.length}|${this.intervalKey}|${this.paneKind}|${this.macdParams.fast},${this.macdParams.slow},${this.macdParams.signal}|${this.rsiPeriod}`;
+          if (this.paneKey === key && this.paneValue) return this.paneValue;
+          this.paneKey = key;
+          const closes = ICETradingChart.closeSeries(source);
+          this.paneValue =
+            this.paneKind === 'rsi'
+              ? { kind: 'rsi', rsi: ICETradingChart.rsi(closes, 14) }
+              : { kind: 'macd', ...ICETradingChart.macd(closes, 12, 26, 9) };
+          return this.paneValue;
+        }
+
+        /** 主图叠加（在渲染窗口的真实 K 上算）。 */
+        get overlaySeries() {
+          const spec = { palette: ['#f0b90b', '#b57bff', '#848e9c', '#0ecb81', '#f6465d'] };
+          spec.messages = this.messages;
+          if (this.indicators.ma) spec.ma = this.maPeriods.slice();
+          if (this.indicators.ema) spec.emaPeriods = this.emaPeriods.slice();
+          if (this.indicators.boll) spec.boll = { period: this.bollPeriod, multiplier: 2 };
+          return ICETradingChart.createOverlaySeries(this.indicatorSource, spec);
+        }
+
+        get priceOption() {
+          return {
+            legend: { show: false },
+            animation: { enabled: false },
+            tooltip: { show: false },
+            interaction: TerminalPage.INTERACTION,
+            crosshair: { ...TerminalPage.CROSSHAIR, lineColor: TerminalPage.RULER_COLOR },
+            grid: TerminalPage.GRID,
+            // x 轴标签只在最下面那块副图上显示：上面两块藏掉，省纵向空间也更干净
+            xAxis: { type: 'category', show: false, formatter: (value) => this.displayLabel(value) },
+            // 三块 pane 的左右 margin 必须一致，绘图区才能严格对齐；
+            // 上下 margin 各自收紧（画布上下各 12px 的默认留白在三块 pane 间会白吃 48px）
+            margin: { top: 10, right: 16, bottom: 2, left: 12 },
+            yAxis: { position: 'right', ...this.visiblePriceRange(), ...this.priceScaleAxis() },
+            volume: false,
+            series: [this.candleSeries].concat(this.overlaySeries),
+          };
+        }
+
+        /**
+         * 价格轴坐标：线性（默认）/ 对数 / 百分比。
+         *
+         * 百分比**只改标签口径**（以可见窗口第一根的收盘为基准），几何仍是价格 ——
+         * 引擎的刻度位置是按数据域取整出来的，我们没法把刻度挪到整数百分比上；
+         * 这是当前引擎能力下的口径，页面里写清楚（AGENTS 也记了一条）。
+         */
+        priceScaleAxis() {
+          if (this.priceScale === 'log') return { type: 'log' };
+          if (this.priceScale === 'percent') {
+            const base = this.percentBase();
+            return { formatter: (value) => TerminalPage.pctLabel(Number(value) / base - 1) };
+          }
+          return {};
+        }
+
+        /** 百分比坐标的基准价：可见窗口**第一根**的收盘（主流看盘软件的口径）。 */
+        percentBase() {
+          const rows = this.visibleCandles();
+          for (const row of rows) {
+            if (typeof row.c === 'number' && isFinite(row.c) && row.c !== 0) return row.c;
+          }
+          const last = this.candles[this.candles.length - 1];
+          return last && last.c ? last.c : 1;
+        }
+
+        /** 价格轴 / 价签上的读数：百分比坐标下写成百分比，其余照旧写价格。 */
+        priceLabel(value) {
+          if (this.priceScale !== 'percent') return TerminalPage.price(value);
+          return TerminalPage.pctLabel(value / this.percentBase() - 1);
+        }
+
+        /** 成交量轴的上下界：贴住数据 + 4% 余量（不用 nice，避免上界被抬高一截）。 */
+        get volumeAxisMax() {
+          let max = 0;
+          for (const row of this.visibleCandles()) if (row.v > max) max = row.v;
+          return max > 0 ? max * 1.04 : undefined;
+        }
+
+        get volumeOption() {
+          // 视窗里一根能读出量的 K 都没有时 `buildVolumeSeries` 返回 **null**
+          // （视窗停在「未来空位」上就是这个情况），空系列要整个不挂 —— 挂 null 上去
+          // 引擎会当成「series[0] 缺少 type」直接抛错（实测踩到）。
+          const volumeSeries = ICETradingChart.buildVolumeSeries(this.candleSeries, {
+            axisIndex: 0,
+            upColor: this.upColor,
+            downColor: this.downColor,
+          });
+          return {
+            legend: { show: false },
+            animation: { enabled: false },
+            tooltip: { show: false },
+            interaction: TerminalPage.INTERACTION,
+            crosshair: { ...TerminalPage.CROSSHAIR, lineColor: TerminalPage.RULER_COLOR },
+            grid: TerminalPage.GRID,
+            xAxis: { type: 'category', show: false, formatter: (value) => this.displayLabel(value) },
+            margin: { top: 2, right: 16, bottom: 0, left: 12 },
+            // 成交量轴**贴着数据**：nice 取整会把上界抬高（实测 3188 → 4200），
+            // 白白在柱子上方留出一大块空档。关掉 nice、自己给一个 4% 的余量。
+            yAxis: {
+              position: 'right',
+              nice: false,
+              min: 0,
+              max: this.volumeAxisMax,
+              formatter: (value) => ICETradingChart.formatVolume(Number(value)),
+            },
+            series: volumeSeries ? [volumeSeries].concat(this.volumeMa ? this.volumeMaSeries : []) : [],
+          };
+        }
+
+        /**
+         * 量图上的均量线（MA5 / MA10）。
+         *
+         * 数据跟量柱同一批 x；**首尾读不出量的点会被 `seriesData()` 裁掉** —— 折线系列会把
+         * null 点当 0 画出一条假竖线（上游行为，AGENTS 里记着），所以尾部那串未来空位必须裁。
+         */
+        get volumeMaSeries() {
+          const { from, to } = this.renderSlice();
+          const rows = this.poolSlice(from, to);
+          const source = { ...this.candleSeries, data: rows };
+          const values = rows.map((row) => (typeof row.v === 'number' && isFinite(row.v) ? row.v : null));
+          const line = (id, label, period, color) => {
+            const out = [];
+            const window = [];
+            for (const value of values) {
+              if (value === null) {
+                window.length = 0;
+                out.push(null);
+                continue;
+              }
+              window.push(value);
+              if (window.length > period) window.shift();
+              out.push(window.length === period ? window.reduce((sum, item) => sum + item, 0) / period : null);
+            }
+            return {
+              id,
+              type: 'line',
+              name: label,
+              lineWidth: 1.1,
+              color,
+              data: ICETradingChart.seriesData(source, out),
+            };
+          };
+          return [line('v__ma5', 'MA5', 5, '#f5a524'), line('v__ma10', 'MA10', 10, '#3b82f6')];
+        }
+
+        get indicatorPaneOption() {
+          if (this.paneKind === 'rsi') {
+            const built = ICETradingChart.createRsiPaneOption(this.indicatorSource, { period: this.rsiPeriod, messages: this.messages });
+            return {
+              legend: { show: false },
+              animation: { enabled: false },
+              tooltip: { show: false },
+              interaction: TerminalPage.INTERACTION,
+              crosshair: { ...TerminalPage.CROSSHAIR, lineColor: TerminalPage.RULER_COLOR },
+              grid: TerminalPage.GRID,
+              xAxis: { type: 'category', formatter: (value) => this.displayLabel(value) },
+              margin: { top: 2, right: 16, bottom: 0, left: 12 },
+              yAxis: { position: 'right', nice: false, min: 0, max: 100 },
+              series: built.series.concat(this.blankAnchor),
+              annotation: built.annotation,
+            };
+          }
+          const built = ICETradingChart.createMacdPaneOption(this.indicatorSource, {
+            ...this.macdParams,
+            messages: this.messages,
+            upColor: this.upColor,
+            downColor: this.downColor,
+          });
+          // 量程按**可见窗口**算，副图才贴数据
+          const range = ICETradingChart.macdRange({ ...this.candleSeries, data: this.visibleCandles() }, this.macdParams);
+          return {
+            legend: { show: false },
+            animation: { enabled: false },
+            tooltip: { show: false },
+            interaction: TerminalPage.INTERACTION,
+            crosshair: { ...TerminalPage.CROSSHAIR, lineColor: TerminalPage.RULER_COLOR },
+            grid: TerminalPage.GRID,
+            xAxis: { type: 'category', formatter: (value) => this.displayLabel(value) },
+            margin: { top: 2, right: 16, bottom: 0, left: 12 },
+            yAxis: {
+              position: 'right',
+              nice: false,
+              min: range ? range.min : undefined,
+              max: range ? range.max : undefined,
+            },
+            series: built.series.concat(this.blankAnchor),
+          };
+        }
+
+        /**
+         * 类目 **key**，用作类目轴的值 —— **必须全局唯一**。
+         *
+         * 类目轴按字符串去重，重复的 key 会让两根 K 塌缩到同一个类目上（命中与抬头全乱）。
+         * 现在图上载入的是「可见根数 × `HISTORY_FACTOR`」的历史（要留出可拖动的余量），
+         * 跨度会跨天，所以 key 里**一律带日期**；「显示时露多少」交给 `displayLabel()`
+         * 按当前可见跨度决定 —— key 要稳定，显示要跟着窗口变，两件事不能混在一个字符串里。
+         */
+        keyOf(at) {
+          const date = new Date(at);
+          const yy = String(date.getFullYear()).slice(2);
+          const mo = TerminalPage.pad2(date.getMonth() + 1);
+          if (this.interval.ms >= 30 * 86400e3) return `${yy}-${mo}`;
+          const md = `${mo}-${TerminalPage.pad2(date.getDate())}`;
+          if (this.interval.ms >= 86400e3) return `${yy}-${md}`;
+          return `${yy}-${md} ${TerminalPage.pad2(date.getHours())}:${TerminalPage.pad2(date.getMinutes())}`;
+        }
+
+        /**
+         * 时间标签的**显示**写法：按当前**可见跨度**决定露多少。
+         *
+         * key 里一直有日期（唯一性要靠它），但一屏只显示几小时的时候把日期也甩出来就没必要了，
+         * 所以短的可见跨度只露 `HH:MM`（key 的后 5 位），跨天才把日期露出来。
+         * 轴刻度、抬头的时间、准星的时间签都走这里，三处写法必须一致。
+         */
+        displayLabel(key) {
+          const interval = this.interval;
+          const text = String(key === undefined || key === null ? '' : key);
+          if (interval.ms >= 30 * 86400e3) return text;
+          if (interval.ms >= 86400e3) {
+            // 日线：一屏不足一年多就只给 `MM-DD`
+            return this.visibleCount() * interval.ms >= 400 * 86400e3 ? text : text.slice(3);
+          }
+          return this.visibleCount() * interval.ms >= 86400e3 ? text.slice(3) : text.slice(-5);
+        }
+
+        /** 图上载入多少根（可见根数 × HISTORY_FACTOR，拖动要有余量）。 */
+        get historyCount() {
+          return this.interval.count * TerminalPage.HISTORY_FACTOR;
+        }
+
+        /**
+         * 视窗在**全量历史**里的下标范围。**必须缓存**。
+         *
+         * 为什么：`displayLabel` 是 x 轴的 formatter，一次渲染按刻度数要被调十几次，
+         * 每次都做两趟 O(n) 的 `indexOf` —— 全量到两万根时一次渲染就是几十万次比较。
+         * 缓存的 key 用「总量 + 视窗两端 + 周期」，这几个都是现成的、不用扫数组。
+         */
+        visibleRange() {
+          const total = this.candles.length + this.futureSlots.length;
+          const chart = this.stack ? this.stack.chartOf('price') : null;
+          const domain = chart ? chart.getDomain('x') : null;
+          const first = domain && domain.length ? domain[0] : '';
+          const last = domain && domain.length ? domain[domain.length - 1] : '';
+          const key = `${total}|${first}|${last}|${this.intervalKey}`;
+          if (this.rangeKey === key && this.rangeValue) return this.rangeValue;
+          let from = -1;
+          let to = -1;
+          if (domain && domain.length >= 2) {
+            from = this.poolIndexOf(first);
+            to = this.poolIndexOf(last);
+          }
+          if (!(from >= 0 && to > from)) {
+            // 首帧图还没建好（option 要先于图表求值）或窗口取不到：退回「最后 count 根真实 K」
+            to = this.candles.length - 1;
+            from = Math.max(0, to - this.interval.count + 1);
+          }
+          this.rangeKey = key;
+          this.rangeValue = { from, to };
+          return this.rangeValue;
+        }
+
+        /** 当前**可见窗口**里的那一段（量程、标签写法都按它算）。 */
+        visibleCandles() {
+          const { from, to } = this.visibleRange();
+          return this.poolSlice(from, to + 1);
+        }
+
+        visibleCount() {
+          const { from, to } = this.visibleRange();
+          return to - from + 1;
+        }
+
+        /**
+         * 维护「未来的空位」。
+         *
+         * 时间槽**锚在绝对时刻**上：新 K 进来时把已经变成真实 K 的那几个从前面去掉、
+         * 末尾再补，**已经存在的槽 key 不变** —— 否则视窗停在未来时会被新 K 顶得每根跳一下。
+         */
+        ensureFutureSlots() {
+          const interval = this.interval;
+          const newest = this.candles[this.candles.length - 1];
+          if (!newest) return;
+          while (this.futureSlots.length && this.futureSlots[0].at <= newest.at) this.futureSlots.shift();
+          let at = this.futureSlots.length ? this.futureSlots[this.futureSlots.length - 1].at : newest.at;
+          while (this.futureSlots.length < TerminalPage.FUTURE_SLOTS) {
+            at += interval.ms;
+            this.futureSlots.push({ at, x: this.keyOf(at) });
+          }
+        }
+
+        /** 视窗拖到未来空位深处时再补一段（上限 `FUTURE_MAX`）。 */
+        extendFutureSlots() {
+          const newest = this.candles[this.candles.length - 1];
+          if (!newest || this.futureSlots.length >= TerminalPage.FUTURE_MAX) return;
+          const vis = this.visibleCandles();
+          const lastAt = vis.length ? vis[vis.length - 1].at : newest.at;
+          const used = Math.round((lastAt - newest.at) / this.interval.ms);
+          if (used < this.futureSlots.length - TerminalPage.HISTORY_PREFETCH) return; // 前面还够
+          const target = Math.min(TerminalPage.FUTURE_MAX, this.futureSlots.length + TerminalPage.HISTORY_CHUNK);
+          let at = this.futureSlots[this.futureSlots.length - 1].at;
+          while (this.futureSlots.length < target) {
+            at += this.interval.ms;
+            this.futureSlots.push({ at, x: this.keyOf(at) });
+          }
+        }
+
+        /**
+         * 池子 = **真实数据 + 未来空位**（按下标取一段）。
+         *
+         * 视窗的下标一律按池子算：视窗落在未来空位上时，`from` 会比真实数据的长度还大，
+         * 所以不能直接拿 `this.candles` 当全集。
+         */
+        poolSlice(from, to) {
+          const real = this.candles.length;
+          const out = this.candles.slice(Math.max(0, from), Math.min(real, to));
+          const slotFrom = Math.max(0, from - real);
+          const slotTo = Math.min(this.futureSlots.length, to - real);
+          for (let i = slotFrom; i < slotTo; i++) out.push(this.futureSlots[i]);
+          return out;
+        }
+
+        /** 类目 key → 池子下标。 */
+        poolIndexOf(key) {
+          for (let i = 0; i < this.candles.length; i++) if (this.candles[i].x === key) return i;
+          for (let i = 0; i < this.futureSlots.length; i++) if (this.futureSlots[i].x === key) return this.candles.length + i;
+          return -1;
+        }
+
+        /**
+         * 交给图表的渲染窗口（视窗左右各多带 `RENDER_MARGIN` 根）。
+         *
+         * 两个都要命：
+         * - **跟盘时一定把最右端带上**：`pinToLatest()` 是按「全量历史最后 count 根的 key」
+         *   去钉窗口的，如果那几根不在图表当前那段数据里，引擎的 clamp 找不到 key，
+         *   会把窗口解析成「整段数据」——「回到最新」就会飞进老历史里（实测踩到）。
+         * - **一定带上最后 `count` 根真实 K**：视窗拖进未来空位深处时，这一段里可能一根
+         *   真实 K 都没有，量程就没了依据 —— 实测价格轴掉到 `[-148, 451]`、量图掉到
+         *   `[0, 1]`、副图掉到 `[-1, 1]`（MACD 的收盘价序列退化成了一串 0）。
+         *   只是把真实 K 带进**数据**里（视窗之外的那些类目不会画出来），量程就稳住了。
+         */
+        renderSlice() {
+          const { from, to } = this.visibleRange();
+          const total = this.candles.length + this.futureSlots.length;
+          const anchor = Math.max(0, this.candles.length - this.interval.count);
+          const hi = this.follow ? total : to + 1 + TerminalPage.RENDER_MARGIN;
+          return {
+            from: Math.max(0, Math.min(from - TerminalPage.RENDER_MARGIN, anchor)),
+            to: Math.min(total, hi),
+          };
+        }
+
+        /**
+         * 价格轴量程：按**可见窗口**算。
+         *
+         * 载入的历史比可见的多得多，按全量算量程的话 K 线会整体变矮（随机游走的跨度
+         * 约 1.7 倍，K 线只剩 ~58% 高）。给出显式 min/max 后，`withPriceRange` 不会再覆盖
+         * （它只填没写的字段）。
+         */
+        visiblePriceRange() {
+          const range = ICETradingChart.computePriceRange([{ ...this.candleSeries, data: this.visibleCandles() }]);
+          return range ? { min: range.min, max: range.max } : {};
+        }
+
+        /**
+         * 画出来的那一整段 = **渲染窗口**，不是全部历史。
+         *
+         * 内存里可以存两万根（`HISTORY_MAX`），但交给图表的只有视窗附近这几百根 ——
+         * 「无限画布」和「开销恒定」就是靠这个分工同时成立的。
+         */
+        get seriesCandles() {
+          const { from, to } = this.renderSlice();
+          return this.poolSlice(from, to);
+        }
+
+        /**
+         * 往左补一段历史 —— 「无限画布」靠它。
+         *
+         * 从现有最老一根的**开盘价**往回接：这一根的收盘 = 右边那根的开盘，于是价格是连续的
+         * （指标在接缝处不会跳空）。注意 `this.price` 是现价，往回造历史时**不能碰它**。
+         */
+        prependHistory(count) {
+          const interval = this.interval;
+          const first = this.candles[0];
+          if (!first || count <= 0) return;
+          const bars = [];
+          let cursor = first.o;
+          let at = first.at;
+          for (let i = 0; i < count; i++) {
+            at -= interval.ms;
+            const open = cursor + (Math.random() - 0.5) * cursor * 0.0022;
+            const high = Math.max(open, cursor) + Math.random() * cursor * 0.001;
+            const low = Math.min(open, cursor) - Math.random() * cursor * 0.001;
+            bars.push({
+              at,
+              x: this.keyOf(at),
+              o: TerminalPage.round2(open),
+              c: TerminalPage.round2(cursor),
+              h: TerminalPage.round2(high),
+              l: TerminalPage.round2(low),
+              v: Math.round(600 + Math.random() * 2600),
+            });
+            cursor = open;
+          }
+          bars.reverse();
+          this.candles = bars.concat(this.candles);
+        }
+
+        /**
+         * 视窗快贴到数据左边缘时往前补一段。
+         *
+         * 为什么必须在**拖动过程中**就补：引擎的平移被夹在已载入的数据范围内，
+         * 补晚一步用户就已经撞到墙了（表现就是「拖到左边拖不动了」）。补完之后
+         * 同一轮拖动的下一次 pointermove 就能继续往左 —— 于是左边是无限的。
+         */
+        ensureHistory() {
+          if (this.candles.length >= TerminalPage.HISTORY_MAX) return;
+          const { from, to } = this.visibleRange();
+          if (to - from + 1 >= this.candles.length) return; // 整段都在视窗里，补了也没用
+          if (from > TerminalPage.HISTORY_PREFETCH) return; // 左边还够
+          this.prependHistory(Math.min(TerminalPage.HISTORY_CHUNK, TerminalPage.HISTORY_MAX - this.candles.length));
+        }
+
+        /**
+         * 全量历史的内存封顶。
+         *
+         * 现在渲染开销与历史长度无关（交给图表的只是渲染窗口），所以这里只关内存：
+         * 超过两万根才裁，而且**不裁进视窗左侧**（用户可能正停在最左边看）。
+         */
+        trimHistory() {
+          const over = this.candles.length - TerminalPage.HISTORY_MAX;
+          if (over <= 0) return;
+          const { from } = this.visibleRange();
+          // 两个约束：别裁进视窗左侧；也**永远保留最新 count 根**（`pinToLatest` 要靠它们）
+          const keepNewest = Math.max(0, this.candles.length - this.interval.count);
+          const spare = Math.max(0, Math.min(from - TerminalPage.HISTORY_PREFETCH, keepNewest));
+          const drop = over > TerminalPage.HISTORY_HARD_OVER ? over : Math.min(over, spare);
+          if (drop > 0) this.candles.splice(0, drop);
+        }
+
+        /**
+         * 把视窗钉到「最后 `count` 根」—— 跟盘时每次数据更新都要做。
+         *
+         * 为什么不走 `dataZoom.start/end`：那是**百分比**，`floor(66.666…% × 360)` 会落到
+         * 239 而不是 240（浮点少一点点），窗口就是 121 根而不是 120 根；根数一变成奇数，
+         * 刻度步长从 8 变 9，末端两个时间标签就挤在一起了（实测踩到）。
+         * 直接给两端的类目 key 才是指哪打哪。
+         *
+         * 已经对上了就早退，省掉一次重建（一帧里 setDomain 会触发完整 rebuild）。
+         */
+        pinToLatest() {
+          // 目标是**全量历史**的最后 count 根（不是渲染窗口的最后几根）
+          const drawn = this.candles;
+          if (!drawn.length || !this.stack) return;
+          const n = Math.min(this.interval.count, drawn.length);
+          const next = [drawn[drawn.length - n].x, drawn[drawn.length - 1].x];
+          const chart = this.stack.chartOf('price');
+          const current = chart.getDomain('x');
+          if (current && current.length >= 2 && current[0] === next[0] && current[current.length - 1] === next[1]) {
+            this.noteViewKey();
+            return;
+          }
+          // silent：这是页面自己钉的窗口，不必再往外抛 pan/zoom 事件把量程重算又跑一遍
+          chart.silent(() => chart.setDomain('x', next, 'api'));
+          this.stack.syncDomains();
+          this.noteViewKey();
+        }
+
+        /** 所有可选周期（内置 + 自定义）。 */
+        allIntervals() {
+          return { ...TerminalPage.INTERVALS, ...this.customIntervals };
+        }
+
+        intervalOf(key) {
+          return this.allIntervals()[key] || null;
+        }
+
+        /** 周期的显示名：中文用内置的「5 分钟」，英文直接用 key（5m）—— 与工具条那排收藏项一致。 */
+        intervalLabel(key) {
+          if (this.lang === 'en') return key;
+          const interval = this.intervalOf(key);
+          return interval && interval.label ? interval.label : key;
+        }
+
+        /** 周期分组名（下拉里的「分钟 / 小时 / …」）。 */
+        groupLabel(group) {
+          if (this.lang !== 'en') return group;
+          return TerminalPage.GROUP_LABELS.en[group] || group;
+        }
+
+        seed() {
+          const interval = this.interval;
+          const now = Date.now();
+          this.candles = [];
+          this.price = TerminalPage.BASE_PRICE;
+          this.open24 = TerminalPage.BASE_PRICE;
+          this.high24 = TerminalPage.BASE_PRICE;
+          this.low24 = TerminalPage.BASE_PRICE;
+          this.volume24 = 0;
+          this.ticksInBar = 0;
+          this.pushed = 0;
+          this.position = null;
+          this.orders = [];
+          // 载入 historyCount 根（默认只显示最后 count 根，其余是往左可拖的余量）
+          const history = this.historyCount;
+          for (let i = 0; i < history; i++) {
+            this.candles.push(this.makeBar(now - (history - 1 - i) * interval.ms));
+          }
+          this.futureSlots = [];
+          this.zoomRightCap = null;
+          this.ensureFutureSlots();
+          // 重新采样之后把这段历史当作「回补」喂回链路（真实项目里这一步是 REST 拉历史）
+          this.syncFeedHistory();
+        }
+
+        makeBar(at) {
+          const open = this.price;
+          const close = open + (Math.random() - 0.5) * open * 0.0022;
+          const high = Math.max(open, close) + Math.random() * open * 0.001;
+          const low = Math.min(open, close) - Math.random() * open * 0.001;
+          const volume = Math.round(600 + Math.random() * 2600);
+          this.price = close;
+          this.volume24 += volume;
+          this.high24 = Math.max(this.high24, high);
+          this.low24 = Math.min(this.low24, low);
+          return {
+            at,
+            x: this.keyOf(at),
+            o: TerminalPage.round2(open),
+            c: TerminalPage.round2(close),
+            l: TerminalPage.round2(low),
+            h: TerminalPage.round2(high),
+            v: volume,
+          };
+        }
+
+        mount() {
+          // 先把主题写成 CSS 变量：图表 / 盘口 / 页面外壳吃的是同一份 token
+          ICETradingChart.applyTerminalTheme(this.terminalTheme);
+          this.stack = ICETradingChart.createPaneStack(
+            document.getElementById('panes'),
+            [
+              {
+                id: 'price',
+                primary: true,
+                weight: 5,
+                option: () => this.priceOption,
+                extras: {
+                  autoVolume: false,
+                  pricePrecision: TerminalPage.PRICE_PRECISION,
+                  messages: this.messages,
+                },
+              },
+              { id: 'volume', weight: 2, option: () => this.volumeOption },
+              { id: 'indicator', weight: 2, option: () => this.indicatorPaneOption },
+            ],
+            // gap 用默认的 1px 分隔线（对齐主流终端的做法）
+            // 主题：底色跟着面板走、网格极淡、轴标签用 muted 灰（对齐合约盘面的观感）
+            {
+              // 高度**不写死**：交给 pane 栈跟容器（#panes 是 flex 项）走 ——
+              // 写死 540 的话，窗口一窄/字体一换（不同浏览器换行不同）图表就超出容器被裁掉，
+              // 最下面那块的时间轴跑到容器外面，双击时间轴根本收不到事件（实测在 Firefox 上踩到）。
+              axisLabelChars: TerminalPage.AXIS_CHARS,
+              // 图表主题 = 终端主题的一层映射（再经 ice-chart 的主题桥推到 ice-render 的引擎主题）
+              theme: ICETradingChart.terminalThemeToChartTheme(this.terminalTheme),
+            }
+          );
+          const priceChart = this.stack.chartOf('price');
+          this.canvasEl = priceChart.ice.canvasEl;
+          this.dpr = priceChart.ice.dpr || 1;
+          // 建图那一刻窗口是**全量**，这里同一帧内钉成最后 count 根；
+          // 浏览器在本轮任务结束后才绘制，所以用户看不到中间那帧。
+          this.pinToLatest();
+          // 顺手先把左边补一段：否则第一次往左拖很快就贴到数据边界了
+          this.ensureHistory();
+          this.readout = ICETradingChart.createOhlcReadout(priceChart, { volume: {} });
+          this.renderTrades();
+          this.renderTickerStrip();
+          this.drawing = ICETradingChart.createDrawingLayer(priceChart, {
+            onChange: () => this.renderDrawings(),
+          });
+          this.mountChrome();
+          this.book = ICETradingChart.createOrderBook(document.getElementById('order-book'), {
+            levels: TerminalPage.LEVELS,
+            theme: this.terminalTheme,
+            messages: this.messages,
+            // 卖盘用跌色、买盘用涨色；价格与数量按合约盘面的口径格式化（千分位 + 三位小数）
+            upColor: this.upColor,
+            downColor: this.downColor,
+            priceFormat: (price) => TerminalPage.price(price),
+            sizeFormat: (size) => size.toFixed(3),
+            labels: this.bookLabels(),
+            onPickPrice: (price) => {
+              document.getElementById('o-price').value = String(price);
+              this.setHint(`已填入盘口价 ${TerminalPage.price(price)}`);
+            },
+          });
+          document.getElementById('b-levels').textContent = this.t('book.levels', { n: TerminalPage.LEVELS });
+          this.renderDrawings();
+          this.applyI18n();
+          // 行情放在最后接：盘口 / 成交 / 持仓三个容器都建好了，第一条推送进来就能画
+          this.mountFeed();
+          window.addEventListener('resize', () => this.resize());
+        }
+
+        /**
+         * 图表外壳：抬头 / 最新价线 + 右轴价签 / 十字准星横线与两侧 chip。
+         *
+         * 挂在 `#panes`（整摞 pane 的容器）而不是主图那一格 —— 指针可能停在副图上，
+         * 横线得画在指针所在的那一块里。坐标系由 `syncChromeBox()` 对齐到主图画布。
+         */
+        mountChrome() {
+          const layer = document.createElement('div');
+          layer.className = 'chrome';
+          layer.innerHTML =
+            '<div class="ohlc">' +
+            '<span class="sym">SYN/USDT</span>' +
+            '<span class="kv" data-k="interval">5m</span>' +
+            `<span class="kv"><span data-ohlc-label="open">${this.messages.tooltip.open}</span> <b data-k="open">-</b></span>` +
+            `<span class="kv"><span data-ohlc-label="high">${this.messages.tooltip.high}</span> <b data-k="high">-</b></span>` +
+            `<span class="kv"><span data-ohlc-label="low">${this.messages.tooltip.low}</span> <b data-k="low">-</b></span>` +
+            `<span class="kv"><span data-ohlc-label="close">${this.messages.tooltip.close}</span> <b data-k="close">-</b></span>` +
+            `<span class="kv"><span data-ohlc-label="volume">${this.messages.tooltip.volume}</span> <b data-k="volume">-</b></span>` +
+            '<span class="kv" data-k="chg">-</span>' +
+            '<span class="kv" data-k="time">-</span>' +
+            '</div>' +
+            '<div class="session-layer"></div>' +
+            '<div class="pane-title" data-pane="volume"></div>' +
+            '<div class="pane-title" data-pane="indicator"></div>' +
+            '<div class="watermark">SYN/USDT</div>' +
+            '<div class="hline"></div>' +
+            '<div class="vline"></div>' +
+            '<div class="lastline"></div>' +
+            '<div class="tag price">-</div>' +
+            '<div class="tag last">-</div>' +
+            '<div class="tag time">-</div>';
+          document.getElementById('panes').appendChild(layer);
+          // 横线颜色与引擎竖线共用一个来源
+          document.documentElement.style.setProperty('--ruler', TerminalPage.RULER_COLOR);
+          const fields = {};
+          for (const node of layer.querySelectorAll('[data-k]')) fields[node.getAttribute('data-k')] = node;
+          this.chrome = {
+            layer,
+            fields,
+            ohlc: layer.querySelector('.ohlc'),
+            volumeTitle: layer.querySelector('.pane-title[data-pane="volume"]'),
+            indicatorTitle: layer.querySelector('.pane-title[data-pane="indicator"]'),
+            watermark: layer.querySelector('.watermark'),
+            sessionLayer: layer.querySelector('.session-layer'),
+            hline: layer.querySelector('.hline'),
+            vline: layer.querySelector('.vline'),
+            lastline: layer.querySelector('.lastline'),
+            ptag: layer.querySelector('.tag.price'),
+            ltag: layer.querySelector('.tag.last'),
+            xtag: layer.querySelector('.tag.time'),
+          };
+          this.syncChromeBox();
+          this.syncDrawBar();
+        }
+
+        /**
+         * 覆盖层的坐标系：原点对齐到**主图画布左上角**。
+         *
+         * 为什么不能直接 `inset: 0`：`#panes` 有内边距（`padding: 4px 6px 0`），
+         * 覆盖层相对它的 padding box 定位，会和画布错开 (6, 4) —— 准星横线立刻偏掉。
+         * 顺带把每块 pane 相对主图画布顶部的偏移缓存下来：指针在哪一块、
+         * 横线该画在哪一行都靠它，而且每帧不必再读一次布局。
+         */
+        syncChromeBox() {
+          if (!this.chrome || !this.canvasEl) return;
+          const host = document.getElementById('panes');
+          const hostRect = host.getBoundingClientRect();
+          const canvasRect = this.canvasEl.getBoundingClientRect();
+          this.chromeOrigin = { x: canvasRect.left - hostRect.left, y: canvasRect.top - hostRect.top };
+          this.canvasBox = { width: canvasRect.width, height: canvasRect.height };
+          const layer = this.chrome.layer;
+          layer.style.left = `${this.chromeOrigin.x}px`;
+          layer.style.top = `${this.chromeOrigin.y}px`;
+          layer.style.width = `${canvasRect.width}px`;
+          // 覆盖到最后一格 pane 的底部：横线要能画在下面两块副图里
+          layer.style.height = `${Math.max(0, hostRect.bottom - canvasRect.top)}px`;
+          this.paneGeom = {};
+          for (const id of TerminalPage.PANES) {
+            const chart = this.stack.chartOf(id);
+            if (!chart || !chart.ice || !chart.ice.canvasEl) continue;
+            const rect = chart.ice.canvasEl.getBoundingClientRect();
+            this.paneGeom[id] = { top: rect.top - canvasRect.top, height: rect.height };
+          }
+          this.placeTitles();
+        }
+
+        /** 三块 pane 左上角的图例行 + 主图水印的位置（几何一变就跟着走，文本在 renderReadout 里写）。 */
+        placeTitles() {
+          if (!this.chrome || !this.stack) return;
+          const pricePlot = ICETradingChart.plotRect(this.stack.chartOf('price'));
+          if (pricePlot && this.chrome.watermark) {
+            this.chrome.watermark.style.left = `${pricePlot.x + pricePlot.width / 2}px`;
+            this.chrome.watermark.style.top = `${pricePlot.y + pricePlot.height / 2}px`;
+          }
+          for (const id of ['volume', 'indicator']) {
+            const node = id === 'volume' ? this.chrome.volumeTitle : this.chrome.indicatorTitle;
+            if (!node) continue;
+            const chart = this.stack.chartOf(id);
+            const geom = this.paneGeom[id];
+            const plot = chart ? ICETradingChart.plotRect(chart) : null;
+            if (!geom || !plot) {
+              node.style.display = 'none';
+              continue;
+            }
+            node.style.display = 'flex';
+            node.style.left = `${plot.x + 8}px`;
+            node.style.top = `${geom.top + plot.y + 3}px`;
+          }
+        }
+
+        bind() {
+          document.getElementById('btn-toggle').addEventListener('click', () => {
+            this.running = !this.running;
+            document.getElementById('btn-toggle').textContent = this.running ? '暂停' : '继续';
+          });
+          document.getElementById('btn-reset').addEventListener('click', () => this.rebuild('已重置'));
+          document.getElementById('btn-latest').addEventListener('click', () => this.resumeFollow());
+          // 脚注上的行情状态：点一下把连接掐掉，看客户端自己重连 + 重放订阅
+          const chip = document.getElementById('s-feed');
+          if (chip) chip.addEventListener('click', () => this.simulateFeedDrop());
+          this.bindToolbar();
+          this.bindOrderForm();
+          this.bindBottomTabs();
+          this.bindPointer();
+          this.bindAxisGestures();
+          this.bindKeyboard();
+          this.bindViewSync();
+        }
+
+        /**
+         * 图表顶部工具条：常显的收藏周期 + 四组下拉。
+         *
+         * 交互约定（对齐主流终端的做法）：
+         * - 同一时刻只开一个下拉；点空白处或按 Esc 收起；
+         * - 选周期 / 选画线工具 / 执行操作后自动收起；指标是**多选**，勾选时保持展开；
+         * - 面板内容是动态渲染的，所以事件一律**委托在容器上**，不逐个绑。
+         */
+        bindToolbar() {
+          for (const menu of document.querySelectorAll('.tb-menu')) {
+            const trigger = menu.querySelector('.tb-trigger');
+            trigger.addEventListener('click', (event) => {
+              event.stopPropagation();
+              this.toggleMenu(menu.getAttribute('data-menu'));
+            });
+          }
+          document.getElementById('tb-intervals').addEventListener('click', (event) => {
+            const key = event.target.getAttribute && event.target.getAttribute('data-interval');
+            if (key) this.setIntervalKey(key);
+          });
+          for (const name of ['intervals', 'type', 'indicators', 'drawings', 'display']) {
+            const panel = document.getElementById(`panel-${name}`);
+            panel.addEventListener('click', (event) => {
+              event.stopPropagation();
+              this.onPanelClick(name, event);
+            });
+            // 参数输入：回车 / 失焦生效（用 change 而不是 input —— 每敲一个字符就重建图表太浪费）
+            panel.addEventListener('change', (event) => this.onPanelInput(event));
+          }
+          document.getElementById('draw-bar').addEventListener('click', (event) => this.onDrawBarClick(event));
+          document.getElementById('ctx-menu').addEventListener('click', (event) => {
+            const node = event.target.closest ? event.target.closest('[data-scale]') : null;
+            if (node) this.applyPriceScale(node.getAttribute('data-scale'));
+          });
+          document.addEventListener('click', () => this.closeMenus());
+          document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            this.closeMenus();
+            // Esc 也退出画线模式（主流看盘软件里 Esc 就是「取消当前绘制」）
+            if (this.drawing && this.drawing.mode()) {
+              this.drawing.setMode(null);
+              this.renderDrawingPanel();
+              this.setHint('已退出画线模式');
+            }
+          });
+          this.loadPrefs();
+          this.renderToolbar();
+        }
+
+        toggleMenu(name) {
+          this.openMenu = this.openMenu === name ? null : name;
+          for (const menu of document.querySelectorAll('.tb-menu')) {
+            menu.classList.toggle('open', menu.getAttribute('data-menu') === this.openMenu);
+          }
+        }
+
+        closeMenus() {
+          this.closeContextMenu();
+          if (!this.openMenu) return;
+          this.openMenu = null;
+          for (const menu of document.querySelectorAll('.tb-menu')) menu.classList.remove('open');
+        }
+
+        onPanelClick(name, event) {
+          const target = event.target.closest ? event.target.closest('[data-interval],[data-star],[data-type],[data-ind],[data-pane],[data-tool],[data-action],[data-scheme],[data-display],[data-theme],[data-lang],[data-custom]') : null;
+          if (!target) return;
+          const read = (key) => target.getAttribute(key);
+          const star = read('data-star');
+          if (star) return this.toggleFavorite(star);
+
+          const custom = read('data-custom');
+          if (custom === 'open') {
+            this.customFormOpen = !this.customFormOpen;
+            return this.renderIntervalPanel();
+          }
+          if (custom === 'add') return this.addCustomInterval();
+
+          const interval = read('data-interval');
+          if (interval) return this.setIntervalKey(interval);
+
+          const chartType = read('data-type');
+          if (chartType) {
+            this.chartType = chartType;
+            this.renderTypePanel();
+            this.closeMenus();
+            // 换渲染类型要把整张图重建一次（系列类型变了），但 x 窗口 / 走位都保留
+            this.invalidate();
+            return this.setHint(`图表类型：${this.chartTypeLabel()}`);
+          }
+
+          const ind = read('data-ind');
+          if (ind) {
+            this.indicators[ind] = !this.indicators[ind];
+            this.renderIndicatorPanel();
+            this.invalidate();
+            return undefined;
+          }
+          const pane = read('data-pane');
+          if (pane) {
+            this.paneKind = pane;
+            this.renderIndicatorPanel();
+            this.stack.refresh({ animate: false, preserveView: true });
+            return undefined;
+          }
+          const tool = read('data-tool');
+          if (tool) {
+            const next = this.drawing.mode() === tool ? null : tool;
+            this.drawing.setMode(next);
+            this.renderDrawingPanel();
+            this.closeMenus();
+            return this.setHint(next ? '在图上点一下（趋势线 / 区间点两下）' : '已退出画线模式');
+          }
+          const action = read('data-action');
+          if (action) {
+            this.closeMenus();
+            if (action === 'delete') {
+              const selected = this.drawing.selected();
+              if (!selected) return this.setHint('先点一下某条线选中它');
+              this.drawing.remove(selected.id);
+              return this.setHint(`已删除 ${selected.id}`);
+            }
+            if (action === 'clear') {
+              this.drawing.clear();
+              return this.setHint('已清空画线');
+            }
+            return undefined;
+          }
+          const scheme = read('data-scheme');
+          if (scheme) {
+            this.scheme = scheme;
+            if (this.book) this.book.setPalette({ upColor: this.upColor, downColor: this.downColor });
+            this.renderDisplayPanel();
+            this.invalidate();
+            return undefined;
+          }
+          const langKey = read('data-lang');
+          if (langKey) return this.setLanguage(langKey);
+
+          const themeKey = read('data-theme');
+          if (themeKey) return this.setTerminalTheme(themeKey);
+
+          const display = read('data-display');
+          if (display === 'magnet') {
+            this.magnet = !this.magnet;
+            this.renderDisplayPanel();
+            this.chromeSig = '';
+            this.paintAll();
+            this.syncChrome(true);
+            return undefined;
+          }
+          if (display === 'volumeMa') {
+            this.volumeMa = !this.volumeMa;
+            this.renderDisplayPanel();
+            return this.invalidate();
+          }
+          if (display === 'sessionLines') {
+            this.sessionLines = !this.sessionLines;
+            this.renderDisplayPanel();
+            this.syncSessionLines(true);
+            return undefined;
+          }
+          return undefined;
+        }
+
+        setIntervalKey(key) {
+          if (!key || key === this.intervalKey || !this.intervalOf(key)) return;
+          const previous = this.intervalKey;
+          this.intervalKey = key;
+          this.setFollow(true);
+          // 换了周期，类目标签整批换掉：旧的画线锚点没有对应类目了，视窗也要重置
+          this.drawing.clear();
+          // 换周期 = 换一条 K 线通道：先退订旧的，重新采样之后再订阅新的
+          if (this.feed) this.feed.unsubscribe('kline', { symbol: this.symbol, interval: previous });
+          this.seed();
+          // 新订阅建出新的 store；订阅报文一发出去网关就回一份当前 K 线，随后把历史 load 回去
+          if (this.feed) {
+            this.feed.subscribe('kline', { symbol: this.symbol, interval: key });
+            this.syncFeedHistory();
+          }
+          this.closeMenus();
+          this.renderToolbar();
+          this.invalidate(true);
+          this.setHint(`已切到 ${key}`);
+        }
+
+        toggleFavorite(key) {
+          const index = this.favorites.indexOf(key);
+          if (index >= 0) this.favorites.splice(index, 1);
+          else this.favorites.push(key);
+          this.savePrefs();
+          this.renderToolbar();
+        }
+
+        /**
+         * 自定义周期：类型 × 数值 → `{ ms, count }`。
+         *
+         * 条数按「类目标签必须唯一」反推并夹到 20~120：盘中周期不超过一天、日线以上不超过一年。
+         */
+        addCustomInterval() {
+          const type = document.getElementById('tb-custom-type').value;
+          const value = Number(document.getElementById('tb-custom-value').value);
+          if (!isFinite(value) || value <= 0 || Math.floor(value) !== value) {
+            return this.setHint('自定义周期要填正整数');
+          }
+          const unit = { 分钟: 60e3, 小时: 3600e3, 天: 86400e3 }[type] || 60e3;
+          const suffix = { 分钟: 'm', 小时: 'H', 天: 'D' }[type] || 'm';
+          const ms = unit * value;
+          const limit = ms < 86400e3 ? 86400e3 : 365 * 86400e3;
+          const count = Math.max(20, Math.min(120, Math.floor(limit / ms)));
+          const key = `${value}${suffix}`;
+          this.customIntervals[key] = { ms, count, group: '自定义', label: `${value} ${type}` };
+          this.customFormOpen = false;
+          this.savePrefs();
+          this.setIntervalKey(key);
+        }
+
+        renderToolbar() {
+          this.renderIntervalBar();
+          this.renderIntervalPanel();
+          this.renderTypePanel();
+          this.renderIndicatorPanel();
+          this.renderDrawingPanel();
+          this.renderDisplayPanel();
+          this.syncToolbarState();
+        }
+
+        /** 图表类型（蜡烛 / 空心蜡烛 / 折线 / 面积）。 */
+        renderTypePanel() {
+          this.syncToolbarState();
+          const types = [
+            ['candle', '蜡烛'],
+            ['hollow', '空心蜡烛'],
+            ['line', '折线'],
+            ['area', '面积'],
+          ];
+          document.getElementById('panel-type').innerHTML =
+            '<div class="tb-title">图表类型</div>' +
+            types
+              .map(
+                ([id, label]) =>
+                  `<div class="tb-item ${this.chartType === id ? 'active' : ''}" data-type="${id}"><span class="tb-mark">${this.chartType === id ? '●' : ''}</span>${label}</div>`
+              )
+              .join('');
+        }
+
+        /**
+         * 图标按钮上的状态：周期文字 + 三个「有内容」的小圆点。
+         *
+         * 主流看盘软件的顶部工具条是图标，图标本身说不出「现在开着没」——
+         * 所以指标开着、画线武装着（或已经画了东西）、显示改了默认值时各点一个圆点。
+         */
+        syncToolbarState() {
+          // 用周期**本身**（"5m"），和旁边那排收藏项同一个写法 —— 写成「5 分钟」就重复了
+          const label = document.querySelector('.tb-trigger [data-tb="interval"]');
+          if (label) label.textContent = this.intervalKey;
+          const drawings = this.drawing ? this.drawing.dump() : [];
+          const states = {
+            type: this.chartType !== 'candle',
+            indicators: !!(this.indicators.ma || this.indicators.ema || this.indicators.boll),
+            drawings: !!((this.drawing && this.drawing.mode()) || drawings.length),
+            display: this.scheme !== 'redUp' || this.magnet || !this.volumeMa || !this.sessionLines,
+          };
+          for (const menu of document.querySelectorAll('.tb-menu')) {
+            const name = menu.getAttribute('data-menu');
+            const trigger = menu.querySelector('.tb-trigger');
+            if (trigger && name) trigger.classList.toggle('on', !!states[name]);
+          }
+        }
+
+        /** 顶部工具条上常显的那一排周期（就是收藏列表）。 */
+        renderIntervalBar() {
+          // 图标按钮上的周期文字与状态点跟着刷新
+          this.syncToolbarState();
+          const bar = document.getElementById('tb-intervals');
+          bar.innerHTML = this.favorites
+            .filter((key) => this.intervalOf(key))
+            .map((key) => `<button type="button" data-interval="${key}" class="${key === this.intervalKey ? 'on' : ''}">${key}</button>`)
+            .join('');
+        }
+
+        renderIntervalPanel() {
+          const all = this.allIntervals();
+          const groups = {};
+          for (const key of Object.keys(all)) {
+            const group = all[key].group || '自定义';
+            if (!groups[group]) groups[group] = [];
+            groups[group].push(key);
+          }
+          const rows = ['<div class="tb-item" data-custom="open"><span class="tb-mark">＋</span>自定义周期</div>'];
+          if (this.customFormOpen) {
+            rows.push(
+              '<div class="tb-form">' +
+                '<select id="tb-custom-type"><option>分钟</option><option>小时</option><option>天</option></select>' +
+                '<input id="tb-custom-value" type="text" inputmode="numeric" value="7" />' +
+                '<button type="button" data-custom="add">添加</button>' +
+                '</div>'
+            );
+          }
+          for (const group of TerminalPage.INTERVAL_GROUPS) {
+            if (!groups[group] || !groups[group].length) continue;
+            rows.push(`<div class="tb-title">${this.groupLabel(group)}</div>`);
+            for (const key of groups[group]) {
+              const active = key === this.intervalKey;
+              const starred = this.favorites.indexOf(key) >= 0;
+              rows.push(
+                `<div class="tb-item ${active ? 'active' : ''}" data-interval="${key}">` +
+                  `<span class="tb-mark">${active ? '✓' : ''}</span>${this.intervalLabel(key)}` +
+                  `<span class="tb-star ${starred ? 'on' : ''}" data-star="${key}" title="加入/移出收藏">★</span>` +
+                  '</div>'
+              );
+            }
+          }
+          document.getElementById('panel-intervals').innerHTML = rows.join('');
+        }
+
+        renderIndicatorPanel() {
+          this.syncToolbarState();
+          const row = (id, label, checked) =>
+            `<div class="tb-item ${checked ? 'active' : ''}" data-ind="${id}"><span class="tb-mark">${checked ? '✓' : ''}</span>${label}</div>`;
+          const pane = (id, label, checked) =>
+            `<div class="tb-item ${checked ? 'active' : ''}" data-pane="${id}"><span class="tb-mark">${checked ? '●' : ''}</span>${label}</div>`;
+          const param = (key, value, label) =>
+            `<label class="tb-param">${label}<input type="number" min="2" max="200" step="1" data-param="${key}" value="${value}" /></label>`;
+          const macd = this.macdParams;
+          document.getElementById('panel-indicators').innerHTML =
+            '<div class="tb-title">主图叠加</div>' +
+            row('ma', `均线 MA(${this.maPeriods.join(',')})`, this.indicators.ma) +
+            row('ema', `均线 EMA(${this.emaPeriods.join(',')})`, this.indicators.ema) +
+            row('boll', `布林带 BOLL(${this.bollPeriod},2)`, this.indicators.boll) +
+            '<div class="tb-title">副图</div>' +
+            pane('macd', `MACD(${macd.fast},${macd.slow},${macd.signal})`, this.paneKind === 'macd') +
+            pane('rsi', `RSI(${this.rsiPeriod})`, this.paneKind === 'rsi') +
+            '<div class="tb-title">参数（回车或失焦生效）</div>' +
+            (this.paneKind === 'rsi'
+              ? param('rsi', this.rsiPeriod, 'RSI')
+              : param('macdFast', macd.fast, '快') +
+                param('macdSlow', macd.slow, '慢') +
+                param('macdSignal', macd.signal, '信号')) +
+            param('maFast', this.maPeriods[0], 'MA1') +
+            param('maSlow', this.maPeriods[1], 'MA2') +
+            param('emaFast', this.emaPeriods[0], 'EMA1') +
+            param('emaSlow', this.emaPeriods[1], 'EMA2') +
+            param('boll', this.bollPeriod, 'BOLL');
+        }
+
+        renderDrawingPanel() {
+          this.syncToolbarState();
+          this.syncDrawBar();
+          const mode = this.drawing ? this.drawing.mode() : null;
+          const tool = (id, label) =>
+            `<div class="tb-item ${mode === id ? 'active' : ''}" data-tool="${id}"><span class="tb-mark">${mode === id ? '✓' : ''}</span>${label}</div>`;
+          document.getElementById('panel-drawings').innerHTML =
+            '<div class="tb-title">画线工具（选一种再在图上点）</div>' +
+            tool('hline', '水平线') +
+            tool('vline', '垂直线') +
+            tool('trend', '趋势线') +
+            tool('rect', '区间矩形') +
+            '<div class="tb-title">操作</div>' +
+            '<div class="tb-item" data-action="delete"><span class="tb-mark"></span>删除选中</div>' +
+            '<div class="tb-item" data-action="clear"><span class="tb-mark"></span>清空全部</div>';
+        }
+
+        renderDisplayPanel() {
+          this.syncToolbarState();
+          const scheme = (id, label) =>
+            `<div class="tb-item ${this.scheme === id ? 'active' : ''}" data-scheme="${id}"><span class="tb-mark">${this.scheme === id ? '●' : ''}</span>${label}</div>`;
+          const toggle = (id, label, on) =>
+            `<div class="tb-item ${on ? 'active' : ''}" data-display="${id}"><span class="tb-mark">${on ? '✓' : ''}</span>${label}</div>`;
+          const isLight = this.terminalTheme === ICETradingChart.LIGHT_TERMINAL_THEME;
+          document.getElementById('panel-display').innerHTML =
+            '<div class="tb-title">语言 / Language</div>' +
+            `<div class="tb-item ${this.lang === 'zh' ? 'active' : ''}" data-lang="zh"><span class="tb-mark">${this.lang === 'zh' ? '●' : ''}</span>中文</div>` +
+            `<div class="tb-item ${this.lang === 'en' ? 'active' : ''}" data-lang="en"><span class="tb-mark">${this.lang === 'en' ? '●' : ''}</span>English</div>` +
+            '<div class="tb-title">盘面 / Theme</div>' +
+            `<div class="tb-item ${isLight ? 'active' : ''}" data-theme="light"><span class="tb-mark">${isLight ? '●' : ''}</span>浅色盘面</div>` +
+            `<div class="tb-item ${isLight ? '' : 'active'}" data-theme="dark"><span class="tb-mark">${isLight ? '' : '●'}</span>深色盘面</div>` +
+            '<div class="tb-title">涨跌配色</div>' +
+            scheme('redUp', '红涨绿跌') +
+            scheme('greenUp', '绿涨红跌') +
+            '<div class="tb-title">十字光标</div>' +
+            toggle('magnet', '磁吸最近的开高低收', this.magnet) +
+            '<div class="tb-title">成交量</div>' +
+            toggle('volumeMa', '均量线 MA5 / MA10', this.volumeMa) +
+            '<div class="tb-title">时间轴</div>' +
+            toggle('sessionLines', '会话分隔线（跨天）', this.sessionLines);
+        }
+
+        /** 收藏的周期与自定义周期存本地，刷新后还在。 */
+        loadPrefs() {
+          try {
+            const raw = window.localStorage && window.localStorage.getItem(TerminalPage.PREFS_KEY);
+            if (!raw) return;
+            const prefs = JSON.parse(raw);
+            if (Array.isArray(prefs.favorites) && prefs.favorites.length) this.favorites = prefs.favorites;
+            if (prefs.custom && typeof prefs.custom === 'object') this.customIntervals = prefs.custom;
+          } catch (error) {
+            void error;
+          }
+        }
+
+        savePrefs() {
+          try {
+            if (!window.localStorage) return;
+            window.localStorage.setItem(
+              TerminalPage.PREFS_KEY,
+              JSON.stringify({ favorites: this.favorites, custom: this.customIntervals })
+            );
+          } catch (error) {
+            void error;
+          }
+        }
+
+        bindOrderForm() {
+          const setMargin = (margin) => {
+            this.marginMode = margin;
+            for (const button of document.querySelectorAll('.order-top [data-margin]')) {
+              const on = button.getAttribute('data-margin') === margin;
+              button.classList.toggle('on', on);
+              button.classList.toggle('dim', !on);
+            }
+            this.renderPosition();
+            this.renderAccount();
+          };
+          const tabs = document.getElementById('order-tabs');
+          tabs.addEventListener('click', (event) => {
+            const target = event.target;
+            const type = target.getAttribute && target.getAttribute('data-type');
+            if (!type) return;
+            this.orderType = type;
+            for (const button of document.querySelectorAll('#order-tabs [data-type]')) {
+              button.classList.toggle('on', button === target);
+            }
+            document.getElementById('o-price').disabled = type === 'market';
+            document.getElementById('o-hint').textContent =
+              type === 'market' ? '市价单立即按盘口成交' : '限价单挂进委托表，现价触及时成交';
+          });
+          document.querySelector('.order-top').addEventListener('click', (event) => {
+            const margin = event.target.getAttribute && event.target.getAttribute('data-margin');
+            if (margin) setMargin(margin);
+          });
+          document.getElementById('o-best').addEventListener('click', () => {
+            document.getElementById('o-price').value = String(TerminalPage.round2(this.price));
+            this.setHint(`已填入最新价 ${TerminalPage.price(this.price)}`);
+          });
+          this.buildPctSlider();
+          document.getElementById('o-lev').addEventListener('input', (event) => {
+            document.getElementById('o-lev-text').textContent = `${event.target.value}×`;
+            document.getElementById('o-lev-pill').textContent = `${event.target.value}x`;
+            this.renderPosition();
+            this.renderAccount();
+          });
+          document.getElementById('o-tp').addEventListener('change', (event) => {
+            document.getElementById('o-tpsl').style.display = event.target.checked ? 'grid' : 'none';
+          });
+          document.getElementById('o-buy').addEventListener('click', () => this.placeOrder('long'));
+          document.getElementById('o-sell').addEventListener('click', () => this.placeOrder('short'));
+          document.getElementById('orders').addEventListener('click', (event) => {
+            const id = event.target.getAttribute && event.target.getAttribute('data-cancel');
+            if (id) this.cancelOrder(id);
+          });
+        }
+
+        /**
+         * 指针跟踪：监听挂在**整摞 pane 的容器**上，而不是某一块画布。
+         *
+         * 两个理由：
+         * - 准星横线要画在指针所在的那一块里（在成交量 pane 上读数就是成交量），
+         *   挂在主图画布上就做不到；
+         * - pane 之间有 1px 分隔条，逐块监听会在这条缝上收到 leave，准星会闪一下。
+         */
+        bindPointer() {
+          const host = document.getElementById('panes');
+          host.addEventListener('pointermove', (event) => {
+            this.pointer = this.pointerAt(event.clientX, event.clientY);
+            this.axisHover = this.overAxis(event.clientX, event.clientY);
+            this.syncCursor();
+            this.syncChrome();
+          });
+          host.addEventListener('pointerleave', () => {
+            this.pointer = null;
+            this.axisHover = false;
+            this.syncCursor();
+            this.syncChrome();
+          });
+          this.bindPanCursor();
+        }
+
+        /**
+         * 光标：按住主键 → 小手；抬起 → 收回。
+         *
+         * 引擎完全不碰 cursor，这块归页面。两个细节：
+         * - **按下就变**，不等移动。引擎的 `updateDrag` 有 3px 死区（小于 3px 不算拖动），
+         *   光标跟它对齐的话，用户按住拖了 1~2px 时看着毫无反馈；用户要的也是「按下就变手」。
+         * - **标尺上不给小手**：那一条是「拖拽缩放数值轴」，光标是 `ns-resize`
+        * - 画线工具武装时这一片归画线层（它的 SVG 会把 `pointer-events` 打开并给
+         *   `crosshair`），那不是平移，不参与。
+         */
+        bindPanCursor() {
+          const host = document.getElementById('panes');
+          const finish = () => {
+            if (!this.pressed) return;
+            this.pressed = false;
+            this.syncCursor();
+          };
+          host.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0) return;
+            if (this.drawing && this.drawing.mode()) return;
+            if (this.valueAxisAt(event.clientX, event.clientY)) return;
+            this.pressed = true;
+            this.syncCursor();
+          });
+          // 松手可能发生在图外（甚至窗口外），挂在 window 上才不会漏
+          window.addEventListener('pointerup', finish);
+          window.addEventListener('pointercancel', finish);
+        }
+
+        /** 盘口表头的列名：目录里的词 + 单位（单位跟交易对走，不进目录）。 */
+        bookLabels() {
+          const text = this.messages.orderBook;
+          return { price: `${text.price} (USDT)`, size: `${text.size} (SYN)`, total: `${text.total} (SYN)` };
+        }
+
+        /**
+         * 接上实时行情：客户端（重连 / 心跳 / 排队）+ 中枢（订阅记账 / 按帧合并 / 多 topic 分流）。
+         *
+         * 四种 topic 都在：**K 线**（驱动主图）、**深度**（驱动盘口）、**仓位**（驱动持仓表）、
+         * **成交**（驱动「最新成交」）。前三种用库里内置的 topic 工厂，最后一种是页面**自己写**
+         * 的一个 topic —— 这正好说明「接一个新的 topic」的姿势：只要给 `{ name, keyOf,
+         * subscribe, decode, apply }`，中枢就把它和别的 topic 一视同仁（订阅记账、断线重放、
+         * 按帧合并都自动有）。
+         *
+         * 协议部分（订阅报文 / 报文解析）由页面给 —— 真实项目里换成交易所的字段名即可，
+         * 其余一行不用改。
+         */
+        mountFeed() {
+          const symbol = this.symbol;
+          this.feed = ICETradingChart.createRealtimeHub({
+            clientOptions: {
+              url: 'wss://demo-gateway.local/market',
+              createSocket: (url) => this.createMarketSocket(url),
+              heartbeat: { payload: { op: 'ping' }, intervalMs: 5000, timeoutMs: 12000 },
+              reconnect: { minDelayMs: 300, maxDelayMs: 4000, factor: 2, jitter: 0.2 },
+              onError: (error) => this.setHint(`行情出错：${String(error && error.message ? error.message : error)}`),
+            },
+            topics: [
+              ICETradingChart.createCandleTopic({
+                subscribe: (params) => ({ op: 'sub', ch: 'kline', sym: params.symbol, interval: params.interval }),
+                unsubscribe: (params) => ({ op: 'unsub', ch: 'kline', sym: params.symbol, interval: params.interval }),
+                decode: (message) =>
+                  message && message.ch === 'kline' && message.sym === symbol && message.interval === this.intervalKey
+                    ? { key: `${message.sym}:${message.interval}`, bar: message.bar, closed: message.closed === true }
+                    : null,
+              }),
+              ICETradingChart.createDepthTopic({
+                depth: TerminalPage.LEVELS,
+                subscribe: (params) => ({ op: 'sub', ch: 'depth', sym: params.symbol }),
+                decode: (message) =>
+                  message && message.ch === 'depth' && message.sym === symbol ? { key: message.sym, message: message.data } : null,
+              }),
+              ICETradingChart.createPositionTopic({
+                subscribe: (params) => ({ op: 'sub', ch: 'positions', ...(params || {}) }),
+                decode: (message) => (message && message.ch === 'positions' ? { key: 'account', positions: message.data } : null),
+              }),
+              // 页面自己写的 topic：store 就是一个「最近 30 笔」的小对象
+              {
+                name: 'trade',
+                keyOf: (params) => params.symbol,
+                subscribe: (params) => ({ op: 'sub', ch: 'trade', sym: params.symbol }),
+                unsubscribe: (params) => ({ op: 'unsub', ch: 'trade', sym: params.symbol }),
+                decode: (message) =>
+                  message && message.ch === 'trade' && message.sym === symbol ? { key: message.sym, payload: message.data } : null,
+                initial: () => ({ list: [] }),
+                apply: (store, payload) => {
+                  const next = store || { list: [] };
+                  next.list = next.list.concat([payload]).slice(-30);
+                  return { data: next, kind: 'trade' };
+                },
+              },
+            ],
+            onData: (changes) => this.onMarketData(changes),
+            onState: (state, detail) => {
+              const previous = this.feedState;
+              this.feedState = state;
+              this.feedDetail = detail;
+              this.renderFeedState();
+              // 断线重连是**用户看得见的事**（行情停过一段），回到线上时说一声
+              if (state === 'open' && previous === 'reconnecting') this.setHint('行情已重连，订阅已重放');
+            },
+          });
+          this.feed.subscribe('kline', { symbol, interval: this.intervalKey });
+          this.feed.subscribe('depth', { symbol });
+          this.feed.subscribe('positions', { account: 'demo' });
+          this.feed.subscribe('trade', { symbol });
+          // 历史这一段不走 WS（真实项目里来自 REST），直接 load 进 K 线 stream：
+          // 「历史 + 增量」才拼成完整的图，这也是 `CandleStream.load()` 存在的理由。
+          this.syncFeedHistory();
+          // 建立连接：未连上时上面的订阅会记在中枢里，连上后自动重放
+          this.feed.client.connect();
+          this.renderFeedState();
+        }
+
+        /**
+         * 合并后的行情落到页面上（**每帧一次**，由中枢保证）。
+         *
+         * ⚠️ 这里**一条报文都可能对应很多次推送**：同一条流一秒推几十上百次，中枢把它们合进
+         * store，但每帧只叫醒应用一次。所以下面的写法是「这一帧结束时的状态是什么」，
+         * 而不是「这条报文该怎么叠上去」—— 图表刷新在一帧里只做一次（实测一次 `refresh`
+         * 3.7ms@p50，每帧一次就顶到 60fps 预算了）。
+         *
+         * K 线按 x 就地改 / 接新的；深度直接拿 store 里的盘口；仓位拿 store 里的列表；
+         * 成交拿 topic 自己的小 store。
+         */
+        onMarketData(changes) {
+          let dataChanged = false;
+          let bookChanged = false;
+          let positionsChanged = false;
+          let tradesChanged = false;
+          for (const change of changes) {
+            if (change.topic === 'kline') {
+              const bar = change.payload.bar;
+              const last = this.candles[this.candles.length - 1];
+              if (!last || !bar || change.kind === 'ignored' || change.kind === 'load') continue;
+              if (change.kind === 'append') {
+                // ⚠️ 一帧里「收盘 + 起新的一根」是两条报文，但合并后只会剩最后一条（append）。
+                // 所以这里从 store 里把**最后两根**都捞出来同步 —— 否则收盘那根的收/高/低/量
+                // 会漏掉，画面上「上一根收在哪」和「下一根从哪开」就对不上。
+                for (const row of change.data.bars().slice(-2)) this.mergeCandle(row);
+                this.ensureFutureSlots();
+                dataChanged = true;
+              } else if (change.kind === 'update' || change.kind === 'close') {
+                // 同一根在变：就地改（用 x 找，乱序或换周期时找不到就当没有）
+                dataChanged = this.mergeCandle(bar) || dataChanged;
+              }
+              continue;
+            }
+            if (change.topic === 'depth') {
+              if (change.kind === 'resync') {
+                /**
+                 * 序列号跳号：按契约**重取快照**，而不是继续用一本错账。
+                 *
+                 * ⚠️ 这件事**不写 `setHint()`**：脚注那一行是共用的（手势反馈、下单结果都在上面），
+                 * 而丢包是链路自己的事，一有丢包就把用户刚看到的反馈顶掉会让人莫名其妙。
+                 * 链路状态归脚注那一格（`#s-feed`），计数 + 悬停提示都在那儿。
+                 */
+                this.feedResyncs += 1;
+                this.renderFeedState();
+                this.market.requestSnapshot();
+                continue;
+              }
+              bookChanged = true;
+              continue;
+            }
+            if (change.topic === 'positions') {
+              positionsChanged = true;
+              continue;
+            }
+            if (change.topic === 'trade') {
+              tradesChanged = true;
+              continue;
+            }
+          }
+          if (bookChanged) this.syncBookFromFeed();
+          if (positionsChanged) this.renderPosition();
+          if (tradesChanged) this.syncTradesFromFeed();
+          if (dataChanged) this.refreshChartFromFeed();
+        }
+
+        /**
+         * 一根（来自 WS 的）K 线并进页面的模型。
+         *
+         * 页面的 `this.candles` 是**展示模型**（比 WS 多带 `at` 与未来空位，还有左侧无限历史），
+         * store 是**链路模型**（协议报文原样进来，谁订阅谁收到）：两者按 x 对齐，WS 负责推
+         * 最近这一段，页面负责历史与视窗。真实项目里历史那一段来自 REST 回补（`stream.load()`）。
+         */
+        mergeCandle(bar) {
+          if (!bar || bar.x === undefined || bar.x === null) return false;
+          const at = bar.at === undefined ? this.atOfKey(bar.x) : bar.at;
+          for (let i = this.candles.length - 1; i >= 0 && i >= this.candles.length - 6; i--) {
+            if (this.candles[i].x === bar.x) {
+              this.candles[i] = { ...this.candles[i], ...bar, at: this.candles[i].at };
+              return true;
+            }
+          }
+          const last = this.candles[this.candles.length - 1];
+          // 比最后一根更旧 → 丢掉（乱序报文不能把画面往回拽）
+          if (last && String(bar.x) < String(last.x)) return false;
+          this.candles.push({ ...bar, at });
+          this.trimHistory();
+          return true;
+        }
+
+        /** 行情更新后的图表刷新：跟盘就重新钉窗口，其余保持视窗。 */
+        refreshChartFromFeed() {
+          const last = this.candles[this.candles.length - 1];
+          if (last) {
+            this.price = last.c;
+            this.high24 = Math.max(this.high24, last.h);
+            this.low24 = Math.min(this.low24, last.l);
+          }
+          this.stack.refresh({ animate: false, preserveView: true });
+          if (this.follow) this.pinToLatest();
+          this.paintAll();
+          this.syncChrome();
+        }
+
+        /** 用深度 store 渲染盘口（`bids` / `asks` 已经是排好序、裁到设定档数的）。 */
+        syncBookFromFeed() {
+          const store = this.feed ? this.feed.data(this.depthKey) : null;
+          const book = store ? store.book() : null;
+          if (!book) return;
+          this.bookData = { asks: book.asks.slice(0, TerminalPage.LEVELS), bids: book.bids.slice(0, TerminalPage.LEVELS) };
+          this.renderBook();
+        }
+
+        /** 用成交 topic 的 store 渲染「最新成交」。 */
+        syncTradesFromFeed() {
+          const store = this.feed ? this.feed.data(this.tradeKey) : null;
+          this.trades = store && store.list ? store.list.slice() : [];
+          this.renderTrades();
+        }
+
+        /**
+         * 四条流的 key。
+         *
+         * 一律走 `hub.keyOf()` 反求，**不在应用侧拼字符串** —— 订阅时用的 key 与查 store 时用的
+         * key 就是同一个来源，自定义 topic 改了 `keyOf` 口径也不会两边对不上。
+         */
+        get klineKey() {
+          return this.feed ? this.feed.keyOf('kline', { symbol: this.symbol, interval: this.intervalKey }) : '';
+        }
+
+        get depthKey() {
+          return this.feed ? this.feed.keyOf('depth', { symbol: this.symbol }) : '';
+        }
+
+        get positionsKey() {
+          return this.feed ? this.feed.keyOf('positions', { account: 'demo' }) : '';
+        }
+
+        get tradeKey() {
+          return this.feed ? this.feed.keyOf('trade', { symbol: this.symbol }) : '';
+        }
+
+        /** 页面自己的历史 → K 线 stream（真实项目里这一步是 REST 回补，走的就是 `load()`）。 */
+        syncFeedHistory() {
+          const stream = this.feed ? this.feed.data(this.klineKey) : null;
+          if (stream && stream.load) stream.load(this.candles.slice(), { replace: true });
+        }
+
+        /** 当前这一根的快照（订阅 / 重连后网关补推一条，客户端立刻回到最新状态）。 */
+        currentBar() {
+          const last = this.candles[this.candles.length - 1];
+          if (!last) return null;
+          return { at: last.at, x: last.x, o: last.o, h: last.h, l: last.l, c: last.c, v: last.v };
+        }
+
+        /** 仓位变了 → 交给网关推一条（真实场景里这是交易所推给你的账户流）。 */
+        publishPositions() {
+          if (this.market) this.market.pushPositions();
+        }
+
+        /**
+         * 网关侧的**盘口梯子**：以现价为锚、每档 1 USDT 的十档（演示用的最小变动价位）。
+         *
+         * 为什么梯子要跟着现价走：盘口是「围绕最新价的一扇窗」。真实网关在价格移动时会把
+         * 离开窗口的档**删掉**、补进新档；只 upsert 不删除的话，一张 4 万的盘口会慢慢攒下
+         * 一堆陈价，最后买一高于卖一（价差变成负数）—— 演示页早先就是这个毛病。
+         */
+        depthLadder() {
+          const tick = TerminalPage.BOOK_TICK;
+          const base = Math.round(this.price / tick) * tick;
+          const bids = [];
+          const asks = [];
+          for (let i = 1; i <= TerminalPage.LEVELS; i++) {
+            bids.push({ price: TerminalPage.round2(base - tick * i), size: TerminalPage.round2(0.2 + Math.random() * 2.4) });
+            asks.push({ price: TerminalPage.round2(base + tick * i), size: TerminalPage.round2(0.2 + Math.random() * 2.4) });
+          }
+          return { bids, asks };
+        }
+
+        /** 脚注上的行情链路状态（状态机的出口就在这一个 span 上）。 */
+        renderFeedState() {
+          const node = document.getElementById('s-feed');
+          if (!node) return;
+          const state = this.feedState || 'idle';
+          const color = state === 'open' ? this.upColor : state === 'closed' ? this.downColor : this.terminalTheme.accent;
+          const detail = this.feedDetail || {};
+          const suffix = state === 'reconnecting' && detail.attempt ? ` #${detail.attempt}` : '';
+          const resync = this.feedResyncs ? ` ⟳${this.feedResyncs}` : '';
+          node.innerHTML =
+            `<span style="color:${color}">●</span> ${this.t('feed.label')} ${this.t(`feed.${state}`)}${suffix}${resync}`;
+          const title = this.feedResyncs ? `${this.t('foot.feed')} · ${this.t('feed.resyncs', { n: this.feedResyncs })}` : this.t('foot.feed');
+          node.setAttribute('title', title);
+          node.setAttribute('aria-label', title);
+        }
+
+        /** 演示：把行情连接掐掉（真实场景是网络 / 服务端断流，客户端应当自己重连并重放订阅）。 */
+        simulateFeedDrop() {
+          if (!this.market || !this.market.socket || this.market.socket.readyState !== 1) {
+            return this.setHint('行情没连着，不用断');
+          }
+          this.market.drop();
+        }
+
+        /** 类目 key → 时间戳（新增的 K 需要它来算「下一根」）。 */
+        atOfKey(key) {
+          const text = String(key);
+          const minute = /^(\d{2})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(text);
+          if (minute) {
+            return new Date(2000 + +minute[1], +minute[2] - 1, +minute[3], +minute[4], +minute[5]).getTime();
+          }
+          const day = /^(\d{2})-(\d{2})-(\d{2})$/.exec(text);
+          if (day) return new Date(2000 + +day[1], +day[2] - 1, +day[3]).getTime();
+          const month = /^(\d{2})-(\d{2})$/.exec(text);
+          if (month) return new Date(2000 + +month[1], +month[2] - 1, 1).getTime();
+          return Date.now();
+        }
+
+        /**
+         * 页面扮演的「交易所网关」：一个 WebSocket 形状的对象，收到订阅就按节奏推数据。
+         *
+         * 它**只实现传输层**（`readyState` / `addEventListener` / `send` / `close`），
+         * 上行报文由它翻译成「该推什么」，下行一律走 `socket.push()`。客户端拿到的是真连接
+         * 一样的对象，所以重连 / 心跳 / 排队 / 订阅重放这套逻辑在演示页里是**真跑**的。
+         */
+        createMarketSocket(url) {
+          const page = this;
+          const listeners = {};
+          const socket = {
+            url,
+            readyState: 0,
+            sent: [],
+            addEventListener(type, listener) {
+              (listeners[type] = listeners[type] || new Set()).add(listener);
+            },
+            removeEventListener(type, listener) {
+              if (listeners[type]) listeners[type].delete(listener);
+            },
+            send(raw) {
+              socket.sent.push(String(raw));
+              let message = null;
+              try {
+                message = JSON.parse(String(raw));
+              } catch {
+                return;
+              }
+              if (!message || !message.op) return;
+              // 心跳：网关回一条 pong（客户端收到任何报文都会把静默看门狗重新计时）
+              if (message.op === 'ping') {
+                socket.push({ op: 'pong' });
+                return;
+              }
+              if (message.op === 'reqSnapshot') {
+                page.market.requestSnapshot();
+                return;
+              }
+              if (message.op !== 'sub') return;
+              // 订阅即回一份**当前状态**：真实网关也是这样（否则客户端要等下一次变化才知道现状）
+              if (message.ch === 'depth') page.market.requestSnapshot();
+              else if (message.ch === 'positions') page.market.pushPositions();
+              else if (message.ch === 'kline') page.market.pushCandle(page.currentBar(), false);
+              else if (message.ch === 'trade') page.market.pushRecentTrades(12);
+            },
+            close() {
+              socket.readyState = 3;
+              socket.emit('close', { code: 1000, reason: 'client-close' });
+            },
+            emit(type, event) {
+              for (const listener of Array.from(listeners[type] || [])) listener(event);
+            },
+            // 网关侧：把一条报文推给客户端
+            push(message) {
+              if (socket.readyState !== 1) return;
+              socket.emit('message', { data: JSON.stringify(message) });
+            },
+          };
+          // 真实连接是异步打开的
+          setTimeout(() => {
+            if (socket.readyState === 3) return;
+            socket.readyState = 1;
+            socket.emit('open', {});
+          }, 30);
+          page.market = {
+            socket,
+            /** 模拟断线（把连接掐掉，客户端应当自己重连并重订阅）。 */
+            drop() {
+              socket.readyState = 3;
+              socket.emit('close', { code: 1006, reason: 'simulated-drop' });
+              page.setHint('行情断线：等待自动重连');
+            },
+            /** 推一条深度快照（订阅时 / resync 后 / 重连后都会要）。 */
+            requestSnapshot() {
+              page.depthSeq += 1;
+              const ladder = page.depthLadder();
+              page.depthBook = { bids: ladder.bids.map((level) => level.price), asks: ladder.asks.map((level) => level.price) };
+              socket.push({
+                ch: 'depth',
+                sym: page.symbol,
+                data: { type: 'snapshot', seq: page.depthSeq, bids: ladder.bids, asks: ladder.asks },
+              });
+            },
+            /**
+             * 推一串深度增量（每 tick 一次；偶尔跳号）。
+             *
+             * 增量包含两件事：**新梯子的档位**（upsert）与**离开窗口的档位**（size 0 删除）。
+             * 只 upsert 不删除，盘口会攒陈价、最后买一高于卖一。跳号那次让 `prevSeq` 对不上
+             * store 手里的序列号 —— 应用会收到 `resync` 并按契约**重取快照**，而不是拿着一个
+             * 悄悄错下去的盘口接着画。
+             */
+            pushDepth() {
+              const ladder = page.depthLadder();
+              const bidPrices = ladder.bids.map((level) => level.price);
+              const askPrices = ladder.asks.map((level) => level.price);
+              const leave = (previous, current) =>
+                previous.filter((price) => current.indexOf(price) < 0).map((price) => ({ price, size: 0 }));
+              const bids = ladder.bids.concat(leave(page.depthBook.bids, bidPrices));
+              const asks = ladder.asks.concat(leave(page.depthBook.asks, askPrices));
+              page.depthBook = { bids: bidPrices, asks: askPrices };
+              // 偶尔「丢一个序列号」（3% ≈ 半分钟一次）：演示 resync 之后应用会重取快照
+              const skip = Math.random() < 0.03;
+              const prev = page.depthSeq;
+              page.depthSeq = prev + (skip ? 2 : 1);
+              socket.push({
+                ch: 'depth',
+                sym: page.symbol,
+                data: { type: 'diff', seq: page.depthSeq, prevSeq: skip ? prev + 1 : prev, bids, asks },
+              });
+            },
+            /** 推 K 线（同一根反复推 / 收盘；由页面自己的模型决定内容）。 */
+            pushCandle(bar, closed) {
+              if (!bar) return;
+              socket.push({ ch: 'kline', sym: page.symbol, interval: page.intervalKey, bar, closed: closed === true });
+            },
+            /** 推一笔成交（「最新成交」走的是**页面自己写的那条 topic**）。 */
+            pushTrade(trade) {
+              socket.push({ ch: 'trade', sym: page.symbol, data: trade });
+            },
+            /** 订阅成交流时回补最近几笔（网关的「最近成交」快照）。 */
+            pushRecentTrades(count) {
+              const now = Date.now();
+              for (let i = count - 1; i >= 0; i -= 1) {
+                page.market.pushTrade({
+                  price: TerminalPage.round2(page.price * (1 + (Math.random() - 0.5) * 0.0004)),
+                  size: TerminalPage.round2(0.002 + Math.random() * 0.6),
+                  at: TerminalPage.clock(now - i * 1000),
+                  up: Math.random() > 0.5,
+                });
+              }
+            },
+            /** 推仓位（演示：网关读页面本地的「交易所侧」状态；真实场景由交易所推给你）。 */
+            pushPositions() {
+              const position = page.position;
+              socket.push({
+                ch: 'positions',
+                data: position
+                  ? [
+                      {
+                        symbol: page.symbol,
+                        side: position.side,
+                        size: TerminalPage.round2(position.size),
+                        entryPrice: TerminalPage.round2(position.entry),
+                        leverage: position.leverage,
+                      },
+                    ]
+                  : [],
+              });
+            },
+          };
+          return socket;
+        }
+
+        /** 页面自己文案的取词（缺失时退回中文，再退回 key）。 */
+        t(key, params) {
+          const table = TerminalPage.PAGE_MESSAGES[this.lang] || TerminalPage.PAGE_MESSAGES.zh;
+          let text = table[key] !== undefined ? table[key] : TerminalPage.PAGE_MESSAGES.zh[key] !== undefined ? TerminalPage.PAGE_MESSAGES.zh[key] : key;
+          if (params) {
+            for (const name of Object.keys(params)) text = text.replace(`{${name}}`, String(params[name]));
+          }
+          return text;
+        }
+
+        /**
+         * 把页面自己的文案刷到 DOM：`data-i18n` 写文本、`data-i18n-title` 写悬停提示。
+         *
+         * 这就是「应用侧接 i18n」的全部姿势 —— 一份目录 + 两个属性（JS 里动态拼的文案走 `t()`）。
+         */
+        applyI18n() {
+          for (const node of document.querySelectorAll('[data-i18n]')) {
+            node.textContent = this.t(node.getAttribute('data-i18n'));
+          }
+          for (const node of document.querySelectorAll('[data-i18n-title]')) {
+            node.setAttribute('title', this.t(node.getAttribute('data-i18n-title')));
+            node.setAttribute('aria-label', this.t(node.getAttribute('data-i18n-title')));
+          }
+          // 库渲染的文案：盘口表头（目录 + 单位）；档数那一行是页面自己写的
+          if (this.book) this.book.setMessages(this.messages, this.bookLabels());
+          const levels = document.getElementById('b-levels');
+          if (levels) levels.textContent = this.t('book.levels', { n: TerminalPage.LEVELS });
+          // 抬头那五个行名来自**库的**文案目录（与提示框同一份）
+          const tips = this.messages.tooltip;
+          const ohlcLabels = { open: tips.open, high: tips.high, low: tips.low, close: tips.close, volume: tips.volume };
+          for (const node of document.querySelectorAll('[data-ohlc-label]')) {
+            node.textContent = ohlcLabels[node.getAttribute('data-ohlc-label')] || node.textContent;
+          }
+          this.renderToolbar();
+          this.syncDrawBar();
+          this.renderFeedState();
+        }
+
+        /**
+         * 换语言：库侧（提示框 / 盘口表头 / 指标序列名）走 `TerminalMessages`，
+         * 页面侧（抬头 / 面板 / 表单 / 表格）走 `PAGE_MESSAGES` + `data-i18n`。
+         */
+        setLanguage(lang) {
+          this.lang = lang;
+          this.messages = ICETradingChart.resolveTerminalMessages(lang);
+          this.applyI18n();
+          this.readoutSig = '';
+          this.invalidate();
+          this.setHint(lang === 'en' ? '语言：English' : '语言：中文');
+        }
+
+        /**
+         * 换盘面主题（深色 / 浅色）。
+         *
+         * 三处一起换：CSS 变量（页面外壳）→ 盘口组件 `setTheme` → 图表（重新求值 option 里的
+         * `theme`，经 ice-chart 的主题桥推到 ice-render 的引擎主题）。涨跌色也取自主题 token，
+         * 所以顺手 `invalidate()` 重建一次。
+         */
+        setTerminalTheme(key) {
+          this.terminalTheme = key === 'light' ? ICETradingChart.LIGHT_TERMINAL_THEME : ICETradingChart.DARK_TERMINAL_THEME;
+          ICETradingChart.applyTerminalTheme(this.terminalTheme);
+          if (this.book) this.book.setTheme(this.terminalTheme);
+          // 图表主题是在建栈那一刻解析的，换肤要显式告诉 pane 栈（它内部重新求值 option 再应用）
+          if (this.stack) this.stack.setTheme(ICETradingChart.terminalThemeToChartTheme(this.terminalTheme));
+          this.renderDisplayPanel();
+          this.invalidate();
+          this.setHint(key === 'light' ? '盘面：浅色' : '盘面：深色');
+        }
+
+        /**
+         * 键盘（主流看盘软件的口径）：←/→ 平移时间轴、↑/↓ 缩放数值轴、`+`/`-` 缩放时间轴、
+         * `Home` 回到最新。都在**主图**上执行 —— 三块 pane 的 x 窗口是联动的，主图动了其余跟着动。
+         *
+         * 两条纪律：
+         * - **表单里不抢键**：光标在输入框里时方向键/加减号是人家的（自定义周期、下单面板）；
+         * - 视图动作一律走公开的 `panTimeAxis` / `zoomTimeAxis` / `zoomValueAxis`，
+         *   于是跟鼠标手势共用同一套引擎夹取（minBarSpacing / minSpan），并且照常抛
+         *   `pan:change` / `zoom:change`，页面的「跟盘 → 手动」那条链不用另写一份。
+         */
+        bindKeyboard() {
+          document.addEventListener('keydown', (event) => {
+            if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+            const tag = event.target && event.target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            const chart = this.stack ? this.stack.chartOf('price') : null;
+            if (!chart) return;
+            const key = event.key;
+            let handled = false;
+            if (key === 'ArrowLeft' || key === 'ArrowRight') {
+              const step = Math.max(1, Math.round(this.visibleCount() * 0.1));
+              handled = ICETradingChart.panTimeAxis(chart, { bars: key === 'ArrowRight' ? step : -step });
+            } else if (key === 'ArrowUp' || key === 'ArrowDown') {
+              const factor = key === 'ArrowUp' ? TerminalPage.ZOOM_FACTOR : 1 / TerminalPage.ZOOM_FACTOR;
+              handled = ICETradingChart.zoomValueAxis(chart, { factor });
+            } else if (key === '+' || key === '=') {
+              handled = ICETradingChart.zoomTimeAxis(chart, { factor: TerminalPage.ZOOM_FACTOR });
+            } else if (key === '-' || key === '_') {
+              handled = ICETradingChart.zoomTimeAxis(chart, { factor: 1 / TerminalPage.ZOOM_FACTOR });
+            } else if (key === 'Home') {
+              this.resumeFollow('已回到最新');
+              handled = true;
+            }
+            if (handled) event.preventDefault();
+          });
+        }
+
+        /**
+         * **标尺上的手势**（这条带子归页面，引擎不认 —— 它的交互一律要求指针落在绘图区内）。
+         *
+         * | 手势 | 作用 | 为什么需要 |
+         * | --- | --- | --- |
+         * | 右侧数值标尺上**双击** | 该 pane 的数值轴自适应 | `pan.axes: 'xy'` 让纵向拖动成为「手动量程」，拖过头之后唯一的出口是「重置」，而那个会连数据一起重采样 |
+         * | 右侧数值标尺上**滚轮** | 缩放该 pane 的数值轴（指针为锚点） | 滚轮在绘图区里是**时间轴**缩放，数值轴的缩放要有自己的落点，主流看盘软件就是在标尺上滚 |
+         * | 右侧数值标尺上**按住上下拖** | 缩放该 pane 的数值轴（向上拖 = 放大） | 主流看盘软件的主力手势：滚轮适合微调，拖拽才是「一把拉到位」 |
+         * | 底部**时间轴**上双击 | 重置时间轴：回到默认根数 + 跟盘 | 缩放到一根 K 占半屏之后，要有一步回到默认视野的入口 |
+         *
+         * 判据都是「落在哪一条带子上」：右侧标尺 = 绘图区右缘 → 画布右缘且纵向在绘图区内；
+         * 时间轴 = 最下面那块绘图区下缘 → 画布下缘。落在绘图区里的双击 / 滚轮都不是这些手势
+         * （滚轮照旧归引擎）。三块 pane 各自认自己的标尺。
+         *
+         * 画线工具武装时这一片归画线层（与拖动平移同一条纪律），不参与。
+         */
+        bindAxisGestures() {
+          const host = document.getElementById('panes');
+          host.addEventListener('dblclick', (event) => this.onAxisDblclick(event));
+          // 标尺上的滚轮必须 preventDefault（否则整页跟着滚），所以这里不能是 passive
+          host.addEventListener('wheel', (event) => this.onAxisWheel(event), { passive: false });
+          host.addEventListener('contextmenu', (event) => this.onAxisContextMenu(event));
+          host.addEventListener('pointerdown', (event) => this.onAxisDragStart(event, host));
+          host.addEventListener('pointermove', (event) => this.onAxisDragMove(event));
+          host.addEventListener('pointerup', () => this.onAxisDragEnd());
+          host.addEventListener('pointercancel', () => this.onAxisDragEnd());
+        }
+
+        /**
+         * 标尺上按下 = 开始「拖拽缩放」（不是平移）。
+         *
+         * 拖动过程中指针会离开标尺（甚至离开绘图区），所以按下时**抓住指针**：
+         * 后面的 move / up 全都会送到 `#panes` 上，不会因为离开元素而丢事件。
+         */
+        onAxisDragStart(event, host) {
+          if (event.button !== 0) return;
+          if (this.drawing && this.drawing.mode()) return;
+          const hit = this.valueAxisAt(event.clientX, event.clientY);
+          if (!hit) return;
+          const chart = this.stack.chartOf(hit.pane);
+          const scale = chart ? ICETradingChart.beginValueAxisScale(chart, hit.y) : null;
+          if (!scale) return;
+          this.axisDrag = { pane: hit.pane, scale };
+          // 这里**不能** preventDefault：取消 pointerdown 会连带压掉兼容鼠标事件，
+          // 有些浏览器里双击就不成立了（标尺上的双击是「自适应」）。要拦的默认行为
+          // （拖拽选中文字）在 move 那一步拦，见 onAxisDragMove。
+          if (typeof host.setPointerCapture === 'function') {
+            try {
+              host.setPointerCapture(event.pointerId);
+            } catch (error) {
+              // 指针已经不在了（合成事件 / 已经抬起）——不影响后续的 move 处理
+            }
+          }
+          this.syncCursor();
+        }
+
+        /** 标尺拖拽中：把窗口按快照重新算一遍（拖回出发点就回到原样）。 */
+        onAxisDragMove(event) {
+          if (!this.axisDrag) return;
+          // 按住拖动时别让浏览器顺手选中页面上的文字（取消 move 的兼容鼠标事件即可）
+          event.preventDefault();
+          const chart = this.stack.chartOf(this.axisDrag.pane);
+          const local = this.paneLocalY(this.axisDrag.pane, event.clientY);
+          if (!chart || local === null) return;
+          if (!ICETradingChart.applyValueAxisScale(chart, this.axisDrag.scale, local)) return;
+          this.chromeSig = '';
+          this.syncChrome(true);
+        }
+
+        onAxisDragEnd() {
+          if (!this.axisDrag) return;
+          this.axisDrag = null;
+          this.syncCursor();
+        }
+
+        /** 右侧标尺双击 = 数值轴自适应；底部时间轴双击 = 重置时间轴。 */
+        onAxisDblclick(event) {
+          if (this.drawing && this.drawing.mode()) return;
+          const value = this.valueAxisAt(event.clientX, event.clientY);
+          if (value) {
+            event.preventDefault();
+            const chart = this.stack.chartOf(value.pane);
+            if (!chart || !ICETradingChart.resetAutoScale(chart)) return;
+            // 量程变了 → 外壳（最新价线、右轴价签、准星横线）要按新刻度重画
+            this.chromeSig = '';
+            this.syncChrome(true);
+            // 而且要让 option 重新求值一次：刻度档数是按**当前 y 窗口**反推的，
+            // 自适应把窗口换回自动那一段之后，旧档数是照手动窗口算的（实测：档数偏粗，一档 57px）
+            this.scheduleViewRefresh();
+            return this.setHint(value.pane === 'price' ? '价格轴已自适应' : '已恢复自动量程');
+          }
+          if (!this.timeAxisAt(event.clientX, event.clientY)) return;
+          event.preventDefault();
+          this.resumeFollow('时间轴已重置（回到最新）');
+        }
+
+        /** 右侧标尺滚轮 = 缩放该 pane 的数值轴（指针指着的那个价格停在原地）。 */
+        onAxisWheel(event) {
+          if (this.drawing && this.drawing.mode()) return;
+          const hit = this.valueAxisAt(event.clientX, event.clientY);
+          if (!hit) return;
+          event.preventDefault();
+          const chart = this.stack.chartOf(hit.pane);
+          if (!chart) return;
+          const factor = event.deltaY < 0 ? TerminalPage.ZOOM_FACTOR : 1 / TerminalPage.ZOOM_FACTOR;
+          if (!ICETradingChart.zoomValueAxis(chart, { factor, anchorY: hit.y })) return;
+          this.chromeSig = '';
+          this.syncChrome(true);
+        }
+
+        /**
+         * 光标：**只在按住主键的那段时间**是「抓住」的小手。
+         *
+         * 用户明确要求「不要一开始就把鼠标变成小手，要等按下鼠标之后再变」——
+         * 所以悬停**不给** `grab`，图表上鼠标保持普通箭头；按下主键立刻变手，
+         * 松手（哪怕指针已经拖到图外）立刻收回来。
+         *
+         * **数值标尺是唯一的例外**：那一条上悬停就给 `ns-resize`（上下箭头），
+         * 因为那里按下就是「上下拖拽缩放」，光标得先说明这件事 —— 这也是主流看盘软件的做法。
+         *
+         * 屏幕坐标无关：这几件事只发生在**按下 / 抬起**两个瞬间，跟移动了多少像素无关。
+         */
+        syncCursor() {
+          const next = this.axisDrag || this.axisHover ? 'ns-resize' : this.pressed ? 'grabbing' : '';
+          if (next === this.cursor) return;
+          this.cursor = next;
+          document.getElementById('panes').style.cursor = next;
+        }
+
+        /**
+         * 平移 / 缩放后重算量程。
+         *
+         * 价格、成交量、MACD 的量程都是按**可见窗口**算的，窗口一动它们就得跟着动，
+         * 否则拖着拖着 K 线会顶到上沿或者缩成一条线。用 rAF 节流：一次拖动每帧只需要重算一次。
+         *
+         * 三块 pane 都要订 —— 联动的回显走 `silent()`，被联动的那两块不会自己抛事件。
+         */
+        bindViewSync() {
+          for (const chart of this.stack.charts) {
+            // 用户自己动过视窗 → 立刻退出跟盘（否则下一根 K 出来就把他的视窗拽回去）
+            chart.on('pan:change', () => this.onViewChange('pan'));
+            chart.on('zoom:change', () => this.onViewChange('zoom'));
+          }
+        }
+
+        /** 视窗指纹：只看两端与根数 —— 补历史 / 裁历史不会改变它（类目 key 是稳定的）。 */
+        xKey(domain) {
+          return domain && domain.length >= 2 ? `${domain.length}|${domain[0]}|${domain[domain.length - 1]}` : '';
+        }
+
+        /** 记下「页面自己摆出来的视窗」（跟盘钉窗口、重置之后）。 */
+        noteViewKey() {
+          const chart = this.stack ? this.stack.chartOf('price') : null;
+          if (chart) this.viewKey = this.xKey(chart.getDomain('x'));
+        }
+
+        /**
+         * 视窗变化（三块 pane 联动，只认主图发出的那一份）。
+         *
+         * ⚠️ **只看 x**：纵向拖动与标尺滚轮也会抛 `pan:change` / `zoom:change`，但它们不动
+         * 时间窗口 —— 那时跟盘不该退出（用户只是调了下价格轴，K 线还得继续跟着最新一根走）。
+         * 顺带这也顺手去重：一次联动三个 pane 各抛一次事件，只有与当前视窗不一致的那一次
+         * 会走到下面（其余两次在指纹上就被挡掉），量程不会重算三遍。
+         */
+        onViewChange(kind) {
+          const chart = this.stack ? this.stack.chartOf('price') : null;
+          if (!chart) return;
+          if (this.xKey(chart.getDomain('x')) === this.viewKey) {
+            // 只动了数值轴：跟盘不退出，但**刻度密度要按新窗口重算**
+            // （档数是按「绘图区高度 ÷ 一档的最小像素」反推的，窗口一变就得跟着变）
+            this.scheduleViewRefresh();
+            return;
+          }
+          if (kind === 'zoom') this.anchorRightOnZoom();
+          else this.syncZoomRightCap();
+          this.setFollow(false);
+          this.noteViewKey();
+          this.scheduleViewRefresh();
+        }
+
+        /** 记住「本轮视窗到过的最右位置」（缩放不许越过它，见 `anchorRightOnZoom`）。 */
+        syncZoomRightCap() {
+          const domain = this.stack ? this.stack.chartOf('price').getDomain('x') : null;
+          if (!domain || domain.length < 2) return;
+          const right = this.poolIndexOf(domain[domain.length - 1]);
+          if (right >= 0) this.zoomRightCap = right;
+        }
+
+        /**
+         * 缩小时**不许凭空长出未来空位**。
+         *
+         * 滚轮缩放绕指针锚定，窗口往两边一起长 —— 停在最新一根上缩小时，右半边会一路长进
+         * 那 600 个未来空位里，画面右半变成一片空白（实测缩到底：3565 根里 2400 根是空位，
+         * 一根都占不到一个像素）。主流看盘软件不是这样：缩小时最新那根始终贴在最右边，
+         * 多出来的是**历史**。所以这里给右端加一条闸门：`cap = max(本轮右端, 最新一根)`，
+         * 超了就整窗左移（跨度不变，正好是「往左看更多历史」）。
+         *
+         * 为什么不是把右端一律钉死在最新一根：用户可能**自己拖进空位**在看未来，
+         * 缩小时不该把他拽回去 —— 闸门只拦「比之前更靠右」（`zoomRightCap` 由平移刷新）。
+         * 同理也不拦 `pan:change`：往左拖进空位正是「未来空位」这个功能本身。
+         */
+        anchorRightOnZoom() {
+          const chart = this.stack.chartOf('price');
+          const domain = chart.getDomain('x');
+          if (!domain || domain.length < 2) return;
+          const right = this.poolIndexOf(domain[domain.length - 1]);
+          if (right < 0) return;
+          const newest = this.candles.length - 1;
+          const cap = Math.max(this.zoomRightCap === null ? newest : this.zoomRightCap, newest);
+          if (right <= cap) {
+            this.zoomRightCap = Math.max(cap, right);
+            return;
+          }
+          const count = domain.length;
+          const left = Math.max(0, cap - count + 1);
+          const rows = this.poolSlice(left, Math.min(left + count, this.candles.length + this.futureSlots.length));
+          if (rows.length < 2) return;
+          this.zoomRightCap = cap;
+          chart.silent(() => chart.setDomain('x', [rows[0].x, rows[rows.length - 1].x]));
+          this.stack.syncDomains();
+        }
+
+        setFollow(next, hint) {
+          if (this.follow === next) return;
+          this.follow = next;
+          document.getElementById('btn-latest').style.display = next ? 'none' : '';
+          if (hint) this.setHint(hint);
+        }
+
+        /** 回到跟盘：重新按「最后 count 根」开窗，并恢复自动量程（`hint` 由调用方给文案）。 */
+        resumeFollow(hint) {
+          this.follow = true;
+          this.zoomRightCap = null;
+          document.getElementById('btn-latest').style.display = 'none';
+          this.chromeSig = '';
+          // 分两步：先让图表拿到「最右端那段数据」（此刻视窗还停在老历史里，
+          // 渲染窗口是「老视窗 → 最右端」这一大段），再钉窗口。
+          this.stack.refresh({ animate: false, preserveView: false });
+          this.pinToLatest();
+          // 视窗已经跳到最右端了，再刷一次把渲染窗口收回到视窗附近（否则图表会一直
+          // 攥着刚才那一大段数据，开销白白变大）
+          this.stack.refresh({ animate: false, preserveView: true });
+          this.paintAll();
+          this.syncChrome(true);
+          this.setHint(hint || '已回到最新');
+        }
+
+        scheduleViewRefresh() {
+          if (this.viewFrame) return;
+          this.viewFrame = requestAnimationFrame(() => {
+            this.viewFrame = null;
+            // 先补历史再刷新：补晚一步，这一帧的拖动就已经撞墙了
+            this.ensureHistory();
+            this.extendFutureSlots();
+            this.stack.refresh({ animate: false, preserveView: true });
+            this.chromeSig = '';
+            this.syncChrome(true);
+          });
+        }
+
+        /**
+         * 屏幕坐标 → 「落在哪一块 pane 的哪个局部 y」。
+         *
+         * 用的是 `syncChromeBox()` 缓存好的几何，每帧不读布局。指针落在两格之间
+         * 那 1px 分隔条上时取**更近**的一格，避免过缝时准星闪断。
+         */
+        pointerAt(clientX, clientY) {
+          const host = document.getElementById('panes').getBoundingClientRect();
+          const x = clientX - host.left - this.chromeOrigin.x;
+          const y = clientY - host.top - this.chromeOrigin.y;
+          if (x < 0 || x > this.canvasBox.width) return null;
+          let best = null;
+          for (const id of TerminalPage.PANES) {
+            const geom = this.paneGeom[id];
+            if (!geom) continue;
+            const distance = y < geom.top ? geom.top - y : y > geom.top + geom.height ? y - (geom.top + geom.height) : 0;
+            if (!best || distance < best.distance) best = { pane: id, y: y - geom.top, distance };
+          }
+          return best ? { pane: best.pane, x, y: best.y } : null;
+        }
+
+        chartTypeLabel() {
+          return { candle: '蜡烛', hollow: '空心蜡烛', line: '折线', area: '面积' }[this.chartType] || this.chartType;
+        }
+
+        /** 指标参数输入（回车 / 失焦生效）：改完重建图表 + 刷新图例。 */
+        onPanelInput(event) {
+          const input = event.target;
+          const key = input && input.getAttribute ? input.getAttribute('data-param') : null;
+          if (!key) return;
+          const value = Number(input.value);
+          if (!isFinite(value)) return;
+          const period = Math.max(2, Math.min(200, Math.round(value)));
+          input.value = String(period);
+          if (key === 'macdFast') this.macdParams = { ...this.macdParams, fast: period };
+          else if (key === 'macdSlow') this.macdParams = { ...this.macdParams, slow: period };
+          else if (key === 'macdSignal') this.macdParams = { ...this.macdParams, signal: period };
+          else if (key === 'rsi') this.rsiPeriod = period;
+          else if (key === 'maFast') this.maPeriods = [period, this.maPeriods[1]];
+          else if (key === 'maSlow') this.maPeriods = [this.maPeriods[0], period];
+          else if (key === 'emaFast') this.emaPeriods = [period, this.emaPeriods[1]];
+          else if (key === 'emaSlow') this.emaPeriods = [this.emaPeriods[0], period];
+          else if (key === 'boll') this.bollPeriod = period;
+          if (this.macdParams.slow <= this.macdParams.fast) {
+            this.macdParams = { ...this.macdParams, slow: this.macdParams.fast + 1 };
+          }
+          this.paneKey = '';
+          this.readoutSig = '';
+          this.renderIndicatorPanel();
+          this.invalidate();
+        }
+
+        /**
+         * 价格轴右键菜单（主流看盘软件在右轴上的那一份）：自动量程 / 线性 / 对数 / 百分比。
+         *
+         * 只在**右侧数值标尺**上响应；绘图区里的右键留给浏览器（我们没有「图表右键」那一套）。
+         */
+        onAxisContextMenu(event) {
+          if (this.drawing && this.drawing.mode()) return;
+          const hit = this.valueAxisAt(event.clientX, event.clientY);
+          if (!hit) return;
+          event.preventDefault();
+          const menu = document.getElementById('ctx-menu');
+          const item = (id, label, active) =>
+            `<div class="tb-item ${active ? 'active' : ''}" data-scale="${id}"><span class="tb-mark">${active ? '●' : ''}</span>${label}</div>`;
+          menu.innerHTML =
+            '<div class="tb-title">价格轴</div>' +
+            item('auto', '自动量程', false) +
+            item('linear', '线性坐标', this.priceScale === 'linear') +
+            item('log', '对数坐标', this.priceScale === 'log') +
+            item('percent', '百分比坐标', this.priceScale === 'percent');
+          menu.style.left = `${Math.min(event.clientX, window.innerWidth - 170)}px`;
+          menu.style.top = `${Math.min(event.clientY, window.innerHeight - 150)}px`;
+          menu.classList.add('open');
+        }
+
+        closeContextMenu() {
+          const menu = document.getElementById('ctx-menu');
+          if (menu) menu.classList.remove('open');
+        }
+
+        /** 应用价格轴坐标（auto = 只自适应一次，不改坐标类型）。 */
+        applyPriceScale(mode) {
+          this.closeContextMenu();
+          const chart = this.stack ? this.stack.chartOf('price') : null;
+          if (!chart) return;
+          if (mode === 'auto') {
+            ICETradingChart.resetAutoScale(chart);
+            this.chromeSig = '';
+            this.syncChrome(true);
+            return this.setHint('价格轴已自适应');
+          }
+          this.priceScale = mode;
+          this.invalidate();
+          if (mode === 'percent') return this.setHint(`价格轴：百分比（基准 ${TerminalPage.price(this.percentBase())}）`);
+          this.setHint(mode === 'log' ? '价格轴：对数坐标' : '价格轴：线性坐标');
+        }
+
+        /**
+         * 左侧画线图标条（主流看盘软件把画线工具放在图表左边缘、竖排图标）。
+         *
+         * 结构只建一次不够（选中态要跟着走），但每次只重写这一条 42px 宽的 DOM ——
+         * 比整页重排便宜得多。
+         */
+        syncDrawBar() {
+          const bar = document.getElementById('draw-bar');
+          if (!bar) return;
+          const mode = this.drawing ? this.drawing.mode() : null;
+          const stroke = 'viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"';
+          const tools = [
+            ['trend', this.t('tool.trend'), `<path d="M3 12.5L13 3.5" /><circle cx="3.4" cy="12.2" r="1.5" /><circle cx="12.6" cy="3.8" r="1.5" />`],
+            ['hline', this.t('tool.hline'), `<path d="M2.6 8h10.8" /><circle cx="8" cy="8" r="1.5" />`],
+            ['vline', this.t('tool.vline'), `<path d="M8 2.6v10.8" /><circle cx="8" cy="8" r="1.5" />`],
+            ['rect', this.t('tool.rect'), `<rect x="3" y="4.4" width="10" height="7.2" rx="1" />`],
+          ];
+          const actions = [
+            ['delete', this.t('tool.delete'), `<path d="M3.4 5h9.2M6.4 5V3.6h3.2V5M5 5l.7 8.4h4.6L11 5" />`],
+            ['clear', this.t('tool.clear'), `<path d="M3 11.5h10M5.5 11.5L4.4 4.2l7.2.02-1.1 7.3" />`],
+          ];
+          bar.innerHTML =
+            tools
+              .map(
+                ([id, label, path]) =>
+                  `<button class="draw-tool ${mode === id ? 'on' : ''}" type="button" title="${label}" aria-label="${label}" data-tool="${id}"><svg ${stroke}>${path}</svg></button>`
+              )
+              .join('') +
+            '<span class="spacer"></span>' +
+            actions
+              .map(
+                ([id, label, path]) =>
+                  `<button class="draw-tool" type="button" title="${label}" aria-label="${label}" data-action="${id}"><svg ${stroke}>${path}</svg></button>`
+              )
+              .join('');
+        }
+
+        /** 左侧图标条的点击（选工具 / 删除选中 / 清空）。 */
+        onDrawBarClick(event) {
+          const node = event.target.closest ? event.target.closest('[data-tool],[data-action]') : null;
+          if (!node) return;
+          const tool = node.getAttribute('data-tool');
+          if (tool) {
+            const next = this.drawing.mode() === tool ? null : tool;
+            this.drawing.setMode(next);
+            this.renderDrawingPanel();
+            return this.setHint(next ? '在图上点一下（趋势线 / 区间点两下）' : '已退出画线模式');
+          }
+          const action = node.getAttribute('data-action');
+          if (action === 'clear') {
+            this.drawing.clear();
+            return this.setHint('已清空画线');
+          }
+          const selected = this.drawing.selected();
+          if (!selected) return this.setHint('先点一下某条线选中它');
+          this.drawing.remove(selected.id);
+          this.setHint(`已删除 ${selected.id}`);
+        }
+
+        /**
+         * 会话分隔线：每天第一根上画一条极淡的竖线（主流看盘软件的时间轴分隔）。
+         *
+         * 画在外壳覆盖层里 —— 也就是画在画布**上面**。颜色取到极淡（0.055），
+         * 落在 K 线上几乎看不出来；引擎没有「第二套竖线」的能力，这是当前口径。
+         */
+        syncSessionLines(force) {
+          const layer = this.chrome && this.chrome.sessionLayer;
+          if (!layer) return;
+          const chart = this.stack ? this.stack.chartOf('price') : null;
+          if (!chart || !this.sessionLines) {
+            layer.style.display = 'none';
+            // 关掉时把线**清干净**：留着虽然看不见，但 DOM 里还挂着（用例也会数出旧线）
+            layer.innerHTML = '';
+            this.sessionSig = '';
+            return;
+          }
+          const { from, to } = this.visibleRange();
+          const rows = this.poolSlice(from, to + 1);
+          const keys = [];
+          let day = '';
+          for (const row of rows) {
+            const key = String(row.x);
+            const next = key.slice(0, 8);
+            if (next !== day) {
+              day = next;
+              keys.push(key);
+            }
+          }
+          const signature = keys.join('|');
+          if (!force && signature === this.sessionSig) return;
+          this.sessionSig = signature;
+          const ruler = this.rulerSpan();
+          if (!ruler || !keys.length) {
+            layer.innerHTML = '';
+            layer.style.display = 'none';
+            return;
+          }
+          layer.innerHTML = keys
+            .map((key) => {
+              const x = ICETradingChart.categoryToX(chart, key);
+              if (x === null) return '';
+              return `<i style="left:${this.snapDevice(x)}px;top:${ruler.top}px;height:${ruler.height}px"></i>`;
+            })
+            .join('');
+          layer.style.display = 'block';
+        }
+
+        /**
+         * 屏幕坐标 → 「是否落在某一格的**右侧数值标尺**上」。
+         *
+         * 标尺 = 绘图区右缘到画布右缘之间的那一条（引擎的 y 轴刻度就画在里面），
+         * 纵向还要落在这一格的绘图区内 —— 时间轴标签带与 pane 之间的分隔条都不算。
+         * 不在标尺上（含落在绘图区里、落在整摞 pane 之外）返回 null。
+         * `y` 是**这一格画布内**的 y（`yToPrice` / 缩放锚点要的就是它）。
+         */
+        valueAxisAt(clientX, clientY) {
+          const host = document.getElementById('panes').getBoundingClientRect();
+          const x = clientX - host.left - this.chromeOrigin.x;
+          const y = clientY - host.top - this.chromeOrigin.y;
+          if (x < 0 || x > this.canvasBox.width) return null;
+          for (const id of TerminalPage.PANES) {
+            const geom = this.paneGeom[id];
+            if (!geom || y < geom.top || y > geom.top + geom.height) continue;
+            const chart = this.stack.chartOf(id);
+            const plot = chart ? ICETradingChart.plotRect(chart) : null;
+            if (!plot) return null;
+            const local = y - geom.top;
+            if (local < plot.y || local > plot.y + plot.height) return null;
+            return x >= plot.x + plot.width ? { pane: id, y: local } : null;
+          }
+          return null;
+        }
+
+        /** 指针是不是停在某一格的数值标尺上（只给光标用；画线工具武装时不算）。 */
+        overAxis(clientX, clientY) {
+          if (this.drawing && this.drawing.mode()) return false;
+          return !!this.valueAxisAt(clientX, clientY);
+        }
+
+        /**
+         * 屏幕坐标 → 某一格画布内的 y。
+         *
+         * 与 `valueAxisAt` 的区别：**不做越界判断** —— 拖拽缩放时指针会跑出这一格
+         * （甚至跑出整张图），缩放公式要拿到真实的 y（离绘图区下缘多远）才能连续响应。
+         */
+        paneLocalY(paneId, clientY) {
+          const geom = this.paneGeom[paneId];
+          if (!geom) return null;
+          const host = document.getElementById('panes').getBoundingClientRect();
+          return clientY - host.top - this.chromeOrigin.y - geom.top;
+        }
+
+        /**
+         * 屏幕坐标 → 「是否落在**时间轴**上」（最下面那块绘图区下缘 → 画布下缘）。
+         *
+         * 横向不挑：时间轴是整条带子，和主流看盘软件一致（也不用躲右侧标尺 ——
+         * 两者的纵向范围本来就不重叠）。
+         */
+        timeAxisAt(clientX, clientY) {
+          const host = document.getElementById('panes').getBoundingClientRect();
+          const x = clientX - host.left - this.chromeOrigin.x;
+          const y = clientY - host.top - this.chromeOrigin.y;
+          if (x < 0 || x > this.canvasBox.width) return null;
+          const id = TerminalPage.PANES[TerminalPage.PANES.length - 1];
+          const geom = this.paneGeom[id];
+          if (!geom || y < geom.top || y > geom.top + geom.height) return null;
+          const chart = this.stack.chartOf(id);
+          const plot = chart ? ICETradingChart.plotRect(chart) : null;
+          if (!plot) return null;
+          return y - geom.top > plot.y + plot.height ? { pane: id } : null;
+        }
+
+        /** 横线价签的文字：每块 pane 的 y 轴语义不同，读数要跟着换。 */
+        paneValueLabel(paneId, value) {
+          if (paneId === 'volume') return ICETradingChart.formatVolume(value);
+          if (paneId !== 'price') return ICETradingChart.formatSigned(TerminalPage.round2(value));
+          return this.priceLabel(value);
+        }
+
+        setHint(text) {
+          document.getElementById('s-hint').textContent = text;
+        }
+
+        /**
+         * 影响颜色 / 数据的改动：重画图表 + 让外壳的签名失效。
+         *
+         * `resetView` 用于「类目整批换掉」的场景（切换周期）：这时保留旧视窗没有意义，
+         * 窗口里的类目已经不是原来那批了。
+         */
+        invalidate(resetView) {
+          this.chromeSig = '';
+          this.readoutSig = '';
+          this.stack.refresh({ animate: false, preserveView: !resetView });
+          if (this.follow) this.pinToLatest();
+          // 页面自己摆完窗口后记一笔：否则下一次「只动了数值轴」的事件会被误判成动过视窗
+          this.noteViewKey();
+          this.paintAll();
+          this.syncChrome(true);
+        }
+
+        rebuild(hint) {
+          this.seed();
+          this.drawing.clear();
+          this.setFollow(true);
+          this.invalidate(true);
+          this.setHint(hint);
+        }
+
+        resize() {
+          this.stack.resize();
+          this.drawing.refresh(true);
+          this.chromeSig = '';
+          this.syncChromeBox();
+          this.syncChrome(true);
+        }
+
+        step() {
+          if (!this.running || !this.market) return;
+          const interval = this.interval;
+          const last = this.candles[this.candles.length - 1];
+          const next = this.price + (Math.random() - 0.5) * this.price * 0.0016;
+          this.price = next;
+          const addVolume = Math.round(20 + Math.random() * 120);
+          this.volume24 += addVolume;
+          this.pushed += 1;
+          this.ticksInBar += 1;
+          /**
+           * ⚠️ 这一笔**不再直接改 `this.candles`**（旧版是自己改数据 + 自己刷新）。
+           *
+           * 页面在这里扮演**行情源**：把「这一笔之后这一根长什么样」推给网关，之后就交给
+           * `WS → createRealtimeClient → createRealtimeHub → CandleStream → onData` 那条链路
+           * —— 同一根反复推（值在变）就走 update，攒够阈值就收盘 + 起新的一根。页面的模型
+           * 在 `onMarketData` 里跟着走，图表刷新也由那条链路按帧合并。
+           */
+          const bar = {
+            at: last.at,
+            x: last.x,
+            o: last.o,
+            h: TerminalPage.round2(Math.max(last.h, next)),
+            l: TerminalPage.round2(Math.min(last.l, next)),
+            c: TerminalPage.round2(next),
+            v: last.v + addVolume,
+          };
+          this.market.pushCandle(bar, false);
+          if (this.ticksInBar >= TerminalPage.TICKS_PER_BAR) {
+            this.ticksInBar = 0;
+            this.market.pushCandle(this.makeBar(last.at + interval.ms), false);
+          }
+          this.market.pushDepth();
+          this.market.pushTrade({
+            price: TerminalPage.round2(next),
+            size: TerminalPage.round2(0.002 + Math.random() * 0.6),
+            at: TerminalPage.clock(Date.now()),
+            up: Math.random() > 0.5,
+          });
+          this.matchOrders();
+          // 顶部跑马灯是另一批品种的合成行情，跟主图的链路无关，仍在这里自己走
+          this.stepTickers();
+        }
+
+        renderBook() {
+          if (!this.book) return;
+          this.book.update(this.bookData, {
+            mid: this.price,
+            midColor: this.price >= this.open24 ? this.upColor : this.downColor,
+          });
+        }
+
+        /**
+         * 交易对抬头（对齐合约交易所的那一排）：
+         * 左边是符号 + 标记价 + 24h 涨跌，右边一排「标签 / 数值」——标记价格、指数价格、
+         * 资金费率与倒计时、24h 高/低、24h 量/额。涨跌相关的数值直接上色。
+         */
+        renderTopbar() {
+          const change = this.price - this.open24;
+          const pct = this.open24 ? (change / this.open24) * 100 : 0;
+          const color = change >= 0 ? this.upColor : this.downColor;
+          const last = document.getElementById('t-last');
+          last.textContent = TerminalPage.price(this.price);
+          last.style.color = color;
+          const chg = document.getElementById('t-chg');
+          chg.textContent = `${ICETradingChart.formatSigned(TerminalPage.round2(change))} ${TerminalPage.pct(pct)}`;
+          chg.style.color = color;
+          // 标记价 = 最新价；指数价用一个略偏的合成值（演示用，真实的指数价来自现货篮子）
+          document.getElementById('t-mark').textContent = TerminalPage.price(this.price);
+          document.getElementById('t-index').textContent = TerminalPage.price(this.indexPrice());
+          document.getElementById('t-high').textContent = TerminalPage.price(this.high24);
+          document.getElementById('t-low').textContent = TerminalPage.price(this.low24);
+          document.getElementById('t-vol').textContent = ICETradingChart.formatVolume(this.volume24);
+          document.getElementById('t-amount').textContent = ICETradingChart.formatVolume(this.volume24 * this.price);
+          this.renderFunding();
+        }
+
+        /** 资金费率与倒计时（8 小时结算一次；演示里费率固定 0.0100%）。 */
+        renderFunding() {
+          const remaining = 8 * 3600e3 - (Date.now() % (8 * 3600e3));
+          const hours = Math.floor(remaining / 3600e3);
+          const minutes = Math.floor((remaining % 3600e3) / 60e3);
+          const seconds = Math.floor((remaining % 60e3) / 1000);
+          const rate = document.getElementById('t-funding');
+          rate.textContent = '0.0100%';
+          rate.style.color = this.upColor;
+          document.getElementById('t-fund-countdown').textContent =
+            `${TerminalPage.pad2(hours)}:${TerminalPage.pad2(minutes)}:${TerminalPage.pad2(seconds)}`;
+        }
+
+        /** 指数价：拿最新价按时间做一个 0.01% 量级的偏移，只为让抬头那一排有区别。 */
+        indexPrice() {
+          return TerminalPage.round2(this.price * (1 + Math.sin(Date.now() / 60000) * 0.0001));
+        }
+
+        /**
+         * 持仓表：数据来自**仓位 topic 的 store**（`positions:account`），不是页面本地那个撮合
+         * 对象 —— 页面下单只是「告诉网关」；账户变成什么样，是网关推回来的。
+         *
+         * 盈亏 / 保证金 / 强平价这些**展示口径**仍由页面按当前价算（真实场景里它们也随价格变，
+         * 由推送实时算反而更费）。
+         */
+        renderPosition() {
+          const body = document.getElementById('positions');
+          const store = this.feed ? this.feed.data(this.positionsKey) : null;
+          const list = store && store.list ? store.list() : [];
+          const pos = list.length ? list[0] : null;
+          if (!pos) {
+            body.innerHTML = '<tr><td class="empty" colspan="8">暂无持仓</td></tr>';
+            document.getElementById('p-count').textContent = '0';
+            document.getElementById('o-avail').textContent = `${ICETradingChart.formatVolume(TerminalPage.EQUITY)} USDT`;
+            return;
+          }
+          const direction = pos.side === 'long' ? 1 : -1;
+          const pnl = (this.price - pos.entryPrice) * pos.size * direction;
+          const margin = (this.price * pos.size) / pos.leverage;
+          const liq =
+            pos.side === 'long'
+              ? pos.entryPrice * (1 - 1 / pos.leverage + 0.004)
+              : pos.entryPrice * (1 + 1 / pos.leverage - 0.004);
+          const sideColor = pos.side === 'long' ? this.upColor : this.downColor;
+          body.innerHTML =
+            '<tr>' +
+            `<td style="color:${sideColor}">${pos.side === 'long' ? '多' : '空'} ${this.marginMode === 'cross' ? '全仓' : '逐仓'}</td>` +
+            `<td>${pos.size.toFixed(3)}</td>` +
+            `<td>${TerminalPage.price(pos.entryPrice)}</td>` +
+            `<td>${TerminalPage.price(this.price)}</td>` +
+            `<td style="color:${pnl >= 0 ? this.upColor : this.downColor}">${ICETradingChart.formatSigned(TerminalPage.round2(pnl))}</td>` +
+            `<td>${TerminalPage.price(TerminalPage.round2(margin))}</td>` +
+            `<td>${TerminalPage.price(TerminalPage.round2(liq))}</td>` +
+            `<td>${pos.leverage}×</td>` +
+            '</tr>';
+          document.getElementById('p-count').textContent = '1';
+          document.getElementById('o-avail').textContent = `${ICETradingChart.formatVolume(TerminalPage.EQUITY - margin)} USDT`;
+        }
+
+        renderOrders() {
+          const body = document.getElementById('orders');
+          document.getElementById('ord-count').textContent = String(this.orders.length);
+          if (!this.orders.length) {
+            body.innerHTML = '<tr><td class="empty" colspan="7">暂无委托</td></tr>';
+            return;
+          }
+          body.innerHTML = this.orders
+            .map((order) => {
+              const color = order.side === 'long' ? this.upColor : this.downColor;
+              return (
+                '<tr>' +
+                `<td>${order.time}</td>` +
+                `<td style="color:${color}">${order.side === 'long' ? '买入' : '卖出'}</td>` +
+                `<td>${order.type === 'limit' ? '限价' : '市价'}</td>` +
+                `<td>${TerminalPage.price(order.price)}</td>` +
+                `<td>${order.size.toFixed(3)}</td>` +
+                '<td>已挂单</td>' +
+                `<td><span class="cancel" data-cancel="${order.id}">撤单</span></td>` +
+                '</tr>'
+              );
+            })
+            .join('');
+        }
+
+        renderDrawings() {
+          this.syncToolbarState();
+          const list = this.drawing ? this.drawing.dump() : [];
+          document.getElementById('d-count').textContent = String(list.length);
+          document.getElementById('d-dump').textContent = JSON.stringify(list, null, 1);
+        }
+
+        renderReadout() {
+          const reading = this.readout.read();
+          if (!reading || !this.chrome) return;
+          const signature = [
+            reading.index, reading.close, reading.volume, this.scheme, this.intervalKey, this.paneKind,
+            this.macdParams.fast, this.macdParams.slow, this.macdParams.signal, this.rsiPeriod,
+          ].join(':');
+          if (signature === this.readoutSig) return;
+          this.readoutSig = signature;
+          const color = reading.rising ? this.upColor : this.downColor;
+          const tone = reading.rising ? 'up' : 'down';
+          const field = (key) => this.chrome.fields[key];
+          field('interval').textContent = this.intervalLabel(this.intervalKey);
+          this.renderPaneTitles(reading, tone);
+          field('open').textContent = TerminalPage.price(reading.open);
+          field('high').textContent = TerminalPage.price(reading.high);
+          field('low').textContent = TerminalPage.price(reading.low);
+          field('close').textContent = TerminalPage.price(reading.close);
+          field('close').style.color = color;
+          field('volume').textContent = reading.volume === null ? '-' : ICETradingChart.formatVolume(reading.volume);
+          field('chg').textContent = `${ICETradingChart.formatSigned(TerminalPage.round2(reading.change))} ${TerminalPage.pct(reading.changePct)}`;
+          field('chg').style.color = color;
+          field('time').textContent = this.displayLabel(reading.xValue);
+          const plot = ICETradingChart.plotRect(this.stack.chartOf('price'));
+          if (plot) {
+            this.chrome.ohlc.style.left = `${plot.x + 8}px`;
+            this.chrome.ohlc.style.top = `${plot.y + 4}px`;
+          }
+        }
+
+        /**
+         * 两块副图左上角的图例行（主流看盘软件每块 pane 都有一行）：
+         * 成交量写当前量、副图写指标名 + 参数 + 当前值，值随涨跌上色。
+         */
+        renderPaneTitles(reading, tone) {
+          const volume = this.chrome.volumeTitle;
+          if (volume) {
+            const text = reading.volume === null ? '-' : ICETradingChart.formatVolume(reading.volume);
+            volume.innerHTML =
+              '<span class="name">Vol</span>' +
+              `<span class="val ${reading.volume === null ? '' : tone}">${text}</span>`;
+          }
+          const indicator = this.chrome.indicatorTitle;
+          if (!indicator) return;
+          const data = this.paneIndicator;
+          const at = (series) => {
+            const value = series && series[reading.index];
+            return value === null || value === undefined ? '-' : TerminalPage.round2(value);
+          };
+          if (data.kind === 'rsi') {
+            const value = at(data.rsi);
+            indicator.innerHTML =
+              `<span class="name">RSI</span><span class="arg">${this.rsiPeriod}</span>` +
+              `<span class="val ${typeof value === 'number' && value >= 50 ? 'up' : 'down'}">${value}</span>`;
+            return;
+          }
+          const histogram = data.histogram && data.histogram[reading.index];
+          indicator.innerHTML =
+            `<span class="name">MACD</span><span class="arg">${this.macdParams.fast} ${this.macdParams.slow} ${this.macdParams.signal}</span>` +
+            `<span class="val" style="color:${TerminalPage.DIF_COLOR}">DIF ${at(data.dif)}</span>` +
+            `<span class="val" style="color:${TerminalPage.DEA_COLOR}">DEA ${at(data.dea)}</span>` +
+            `<span class="val ${histogram !== null && histogram !== undefined && histogram < 0 ? 'down' : 'up'}">MACD ${at(data.histogram)}</span>`;
+        }
+
+        /** 外壳同步：按几何签名增量写 DOM（每帧无条件写会掉帧）。 */
+        syncChrome(force) {
+          const priceChart = this.stack ? this.stack.chartOf('price') : null;
+          if (!priceChart || !this.chrome) return;
+          // 会话分隔线有自己的签名（视窗一变就重建那几条竖线），放在几何签名早退之前
+          this.syncSessionLines(force);
+          const plot = ICETradingChart.plotRect(priceChart);
+          if (!plot) return;
+          const reading = this.readout.read();
+          const last = this.candles[this.candles.length - 1];
+          const lastY = ICETradingChart.priceToY(priceChart, last.c, 0);
+          const spot = this.pointer ? `${this.pointer.pane}@${this.pointer.x},${this.pointer.y}` : '-';
+          const signature = [
+            plot.x, plot.y, plot.width, plot.height,
+            reading ? reading.index : -1, last.c, spot, this.scheme, this.intervalKey,
+          ].join('|');
+          if (!force && signature === this.chromeSig) return;
+          this.chromeSig = signature;
+
+          this.paintLastPrice(plot, last, lastY);
+          this.paintPointer(priceChart, plot, lastY);
+          this.renderTopbar();
+          this.renderPosition();
+          this.renderOrders();
+        }
+
+        paintLastPrice(plot, last, lastY) {
+          const color = last.c >= last.o ? this.upColor : this.downColor;
+          /**
+           * 最新价被推出视野时（纵向拖得远、或在标尺上把价格轴缩得很小都会发生）：
+           * **虚线不画** —— 它挂在整个 pane 栈的覆盖层上，画出去就落到下面那两块图上了；
+           * **价签钉在价格轴的上/下沿**，用户还能看到最新价、也知道它在视野的哪一侧
+           * （主流看盘软件就是这么处理的）。
+           */
+          const visible = lastY >= plot.y && lastY <= plot.y + plot.height;
+          const pinned = Math.min(Math.max(lastY, plot.y), plot.y + plot.height);
+          this.chrome.lastline.style.display = visible ? 'block' : 'none';
+          this.chrome.lastline.style.left = `${plot.x}px`;
+          this.chrome.lastline.style.width = `${plot.width}px`;
+          this.chrome.lastline.style.top = `${lastY}px`;
+          this.chrome.lastline.style.borderTopColor = color;
+          const box = this.tagBox(plot);
+          const tag = this.chrome.ltag;
+          tag.style.left = `${box.left}px`;
+          tag.style.width = `${box.width}px`;
+          tag.style.top = `${pinned - 9}px`;
+          tag.style.background = color;
+          tag.textContent = this.priceLabel(last.c);
+        }
+
+        /** 把坐标对齐到**设备像素**（1 个 CSS 像素在 dpr=2 上要落到整数设备像素上才不发虚）。 */
+        snapDevice(value) {
+          const dpr = this.dpr || 1;
+          return Math.round(value * dpr) / dpr;
+        }
+
+        /**
+         * 十字准星。两条线都由页面画，**自由跟随指针**（不做任何吸附）。
+         *
+         * - **竖线**在指针的 x 上，从最上面那块绘图区的顶一直画到最后一块的底 ——
+         *   一条线就是「时间标尺」。三块 pane 的绘图区 x 范围完全相同（等宽对齐保证），
+         *   所以一个 x 就能贯穿整摞图。
+         * - **横线 + 右轴价签**在指针的 y 上，但只画在**指针所在的那一块**里，
+         *   读数用那一块自己的 y 轴 —— 所以在成交量 pane 上读到的是成交量。
+         * - **时间签**贴在最下面那块的时间轴上，跟着指针 x 走；文字是**最近那一根**的时间
+         *   （自由跟随 + 就近读数，这与主流看盘软件的默认准星一致）。
+         *
+         * 为什么不让引擎画竖线：引擎的准星吸附柱心，慢速横移时线会「一动不动然后跳一格」。
+         */
+        paintPointer(priceChart, plot, lastY) {
+          const spot = this.pointer;
+          const paneChart = spot ? this.stack.chartOf(spot.pane) : null;
+          const panePlot = paneChart ? ICETradingChart.plotRect(paneChart) : null;
+          const geom = spot ? this.paneGeom[spot.pane] : null;
+          const show = !!(spot && paneChart && panePlot && geom);
+
+          // ---- 竖线：只看 x 在不在绘图区内，纵向上贯穿整摞 pane ----
+          const inPlotX = show && spot.x >= panePlot.x && spot.x <= panePlot.x + panePlot.width;
+          const ruler = this.rulerSpan();
+          this.chrome.vline.style.display = inPlotX && ruler ? 'block' : 'none';
+          if (inPlotX && ruler) {
+            this.chrome.vline.style.left = `${this.snapDevice(spot.x)}px`;
+            this.chrome.vline.style.top = `${ruler.top}px`;
+            this.chrome.vline.style.height = `${ruler.height}px`;
+          }
+
+          // ---- 横线 + 价签：只在指针**落在这一块的绘图区里**时才画 ----
+          // 两个方向都要判：指针停在右侧标尺上（x 出了绘图区）时，y 那一读数是「悬空的」——
+          // 画出来会让用户以为标尺也是绘图区的一部分（标尺上的手势是缩放/自适应，不是读数）。
+          let value = null;
+          if (show) {
+            const local = ICETradingChart.yToPrice(paneChart, spot.y, 0);
+            const inPlotY = spot.y >= panePlot.y && spot.y <= panePlot.y + panePlot.height;
+            if (local !== null && inPlotX && inPlotY) value = local;
+          }
+          // 磁吸：把横线（和它的价签）吸到**这一根**最近的那一个价上（主流看盘软件的「磁吸」）
+          if (value !== null && this.magnet && spot.pane === 'price') {
+            const reading = this.readout.read();
+            if (reading) {
+              let best = null;
+              let bestDistance = Infinity;
+              for (const price of [reading.open, reading.high, reading.low, reading.close]) {
+                const distance = Math.abs(price - value);
+                if (distance < bestDistance) {
+                  bestDistance = distance;
+                  best = price;
+                }
+              }
+              if (best !== null) value = best;
+            }
+          }
+          const showH = value !== null;
+          this.chrome.hline.style.display = showH ? 'block' : 'none';
+          this.chrome.ptag.style.display = showH ? 'block' : 'none';
+          let pointerTop = null;
+          if (showH) {
+            // 磁吸时横线画在**吸附到的那个价**上，而不是指针的 y 上
+            const snapped = this.magnet && spot.pane === 'price' ? ICETradingChart.priceToY(paneChart, value, 0) : null;
+            pointerTop = geom.top + (snapped === null ? spot.y : snapped);
+            const box = this.tagBox(panePlot);
+            this.chrome.hline.style.left = `${panePlot.x}px`;
+            this.chrome.hline.style.width = `${panePlot.width}px`;
+            this.chrome.hline.style.top = `${pointerTop}px`;
+            this.chrome.ptag.style.left = `${box.left}px`;
+            this.chrome.ptag.style.width = `${box.width}px`;
+            this.chrome.ptag.style.top = `${pointerTop - 9}px`;
+            this.chrome.ptag.textContent = this.paneValueLabel(spot.pane, value);
+          }
+          // 准星价签与最新价签会叠在一起：指针在读数时把最新价签让开（主流看盘软件也是这样）。
+          // 阈值取标签**实际高度**而不是拍一个数 —— 拍小了就会看到两个价签压在一起。
+          if (!this.tagHeight) this.tagHeight = this.chrome.ptag.offsetHeight || 21;
+          const collide = pointerTop !== null && Math.abs(pointerTop - lastY) < this.tagHeight + 1;
+          this.chrome.ltag.style.display = collide ? 'none' : 'block';
+
+          // ---- 时间签：贴底部时间轴，跟指针 x 走，文字取最近那一根 ----
+          const reading = this.readout.read();
+          const bottomId = TerminalPage.PANES[TerminalPage.PANES.length - 1];
+          const bottomChart = this.stack.chartOf(bottomId);
+          const bottomPlot = bottomChart ? ICETradingChart.plotRect(bottomChart) : null;
+          const bottomGeom = this.paneGeom[bottomId];
+          if (inPlotX && reading && bottomPlot && bottomGeom) {
+            const chip = this.chrome.xtag;
+            chip.style.display = 'block';
+            const text = this.displayLabel(reading.xValue);
+            if (text !== this.xtagText) {
+              // 宽度量一次就够（同一段周期里标签宽度基本一样），别每帧读 offsetWidth
+              chip.textContent = text;
+              this.xtagText = text;
+              this.xtagWidth = chip.offsetWidth || this.xtagWidth;
+            }
+            // 左右两端要收进来，否则标签会溢出绘图区
+            const half = this.xtagWidth / 2;
+            const left = Math.min(Math.max(spot.x, bottomPlot.x + half), bottomPlot.x + bottomPlot.width - half);
+            chip.style.left = `${this.snapDevice(left)}px`;
+            chip.style.top = `${bottomGeom.top + bottomPlot.y + bottomPlot.height + 3}px`;
+          } else {
+            this.chrome.xtag.style.display = 'none';
+          }
+        }
+
+        /** 竖线贯穿的范围：最上面那块绘图区的顶 → 最后一块绘图区的底（覆盖层坐标系）。 */
+        rulerSpan() {
+          const ids = TerminalPage.PANES;
+          const first = ids[0];
+          const last = ids[ids.length - 1];
+          const firstGeom = this.paneGeom[first];
+          const lastGeom = this.paneGeom[last];
+          const firstChart = this.stack ? this.stack.chartOf(first) : null;
+          const lastChart = this.stack ? this.stack.chartOf(last) : null;
+          if (!firstGeom || !lastGeom || !firstChart || !lastChart) return null;
+          const firstPlot = ICETradingChart.plotRect(firstChart);
+          const lastPlot = ICETradingChart.plotRect(lastChart);
+          if (!firstPlot || !lastPlot) return null;
+          const top = firstGeom.top + firstPlot.y;
+          const bottom = lastGeom.top + lastPlot.y + lastPlot.height;
+          return bottom > top ? { top, height: bottom - top } : null;
+        }
+
+        /** 右侧价签的位置与宽度：贴着绘图区右边缘，但不越出画布。 */
+        tagBox(plot) {
+          const left = plot.x + plot.width + 2;
+          const width = Math.max(40, Math.min(92, this.canvasBox.width - left - 2));
+          return { left, width };
+        }
+
+        countdown() {
+          const interval = this.interval;
+          const now = Date.now();
+          const remaining = Math.max(0, Math.ceil(now / interval.ms) * interval.ms - now);
+          const mm = Math.floor(remaining / 60e3);
+          const ss = Math.floor((remaining % 60e3) / 1000);
+          return `${TerminalPage.pad2(mm)}:${TerminalPage.pad2(ss)}`;
+        }
+
+        paintAll() {
+          this.renderBook();
+          this.renderTopbar();
+          this.renderPosition();
+          this.renderOrders();
+          this.renderReadout();
+        }
+
+        /**
+         * 下单数量下方的百分比滑杆（25% 一档的菱形刻度 + 可拖动的手柄）。
+         *
+         * 口径：`数量 = 可用保证金 × 百分比 × 杠杆 ÷ 价格` —— 与「按可用保证金的百分比开仓」一致。
+         */
+        buildPctSlider() {
+          const host = document.getElementById('o-pct');
+          if (!host) return;
+          const stops = [0, 25, 50, 75, 100];
+          host.innerHTML =
+            '<div class="track"></div>' +
+            stops
+              .map((pct) => `<span class="tick" data-pct="${pct}" style="left:calc(5px + ${pct}% - ${pct * 0.1}px)"></span>`)
+              .join('');
+          const apply = (pct) => {
+            for (const tick of host.querySelectorAll('.tick')) {
+              tick.classList.toggle('on', Number(tick.getAttribute('data-pct')) === pct);
+            }
+            this.applyPct(pct);
+          };
+          host.addEventListener('click', (event) => {
+            const tick = event.target.closest ? event.target.closest('[data-pct]') : null;
+            if (tick) apply(Number(tick.getAttribute('data-pct')));
+          });
+          // 拖动：按住手柄（或任意位置）横向拖，按最近的档位吸附
+          const drag = (event) => {
+            const rect = host.getBoundingClientRect();
+            const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width)));
+            const pct = Math.round(ratio * 4) * 25;
+            apply(pct);
+          };
+          host.addEventListener('pointerdown', (event) => {
+            host.setPointerCapture(event.pointerId);
+            drag(event);
+          });
+          host.addEventListener('pointermove', (event) => {
+            if (event.buttons) drag(event);
+          });
+        }
+
+        /** 把百分比换算成数量填进表单（可用保证金 × 百分比 × 杠杆 ÷ 价格）。 */
+        applyPct(pct) {
+          const price = this.orderType === 'market' ? this.price : Number(document.getElementById('o-price').value) || this.price;
+          const leverage = Number(document.getElementById('o-lev').value) || 1;
+          const notional = (TerminalPage.EQUITY * pct) / 100 * leverage;
+          const size = price > 0 ? TerminalPage.round2(notional / price) : 0;
+          document.getElementById('o-size').value = String(size);
+          const hint = `按可用保证金的 ${pct}% 填数量 ${size} SYN（${leverage}× · 名义 ${ICETradingChart.formatVolume(notional)} USDT）`;
+          document.getElementById('o-hint').textContent = hint;
+          this.setHint(hint);
+        }
+
+        /** 账户面板：保证金比率 / 维持保证金 / 保证金余额（跟着持仓与杠杆走）。 */
+        renderAccount() {
+          const leverage = Number(document.getElementById('o-lev').value) || 1;
+          // 持仓同样**从 store 读**（与持仓表同源）：页面不复述「账户现在是什么样」
+          const store = this.feed ? this.feed.data(this.positionsKey) : null;
+          const list = store && store.list ? store.list() : [];
+          const pos = list.length ? list[0] : null;
+          const margin = pos ? (pos.size * this.price) / (pos.leverage || 1) : 0;
+          const maintenance = pos ? Math.abs(pos.size * this.price) * 0.005 : 0;
+          const ratio = TerminalPage.EQUITY > 0 ? (maintenance / TerminalPage.EQUITY) * 100 : 0;
+          document.getElementById('acct-ratio').textContent = `${ratio.toFixed(2)}%`;
+          document.getElementById('acct-maint').textContent = `${maintenance.toFixed(4)} USDT`;
+          document.getElementById('acct-balance').textContent = `${ICETradingChart.formatVolume(TerminalPage.EQUITY - margin)} USDT`;
+          document.getElementById('o-avail').textContent = `${ICETradingChart.formatVolume(TerminalPage.EQUITY - margin)} USDT`;
+          const pill = document.getElementById('o-lev-pill');
+          if (pill) pill.textContent = `${leverage}x`;
+        }
+
+        /** 行情跑马灯：一排交易对 + 涨跌（演示数据自己走，跟主图无关）。 */
+        renderTickerStrip() {
+          const strip = document.getElementById('ticker-strip');
+          if (!strip) return;
+          if (this.tickerFrame !== this.tickerFrame) this.tickerFrame = 0;
+          strip.innerHTML = this.tickers
+            .map((item) => {
+              const cls = item.pct >= 0 ? 'up' : 'down';
+              return `<span class="tk ${cls}">${item.symbol} <b>${item.pct >= 0 ? '+' : ''}${item.pct.toFixed(2)}%</b> <i>${item.price.toFixed(item.digits)}</i></span>`;
+            })
+            .join('');
+        }
+
+        /** 跑马灯里的合成行情：每个 tick 轻微随机游走，视觉上是「别的品种也在动」。 */
+        stepTickers() {
+          for (const item of this.tickers) {
+            item.pct = Math.max(-30, Math.min(60, item.pct + (Math.random() - 0.5) * 0.08));
+            item.price = Math.max(0.0001, item.price * (1 + (Math.random() - 0.5) * 0.0008));
+          }
+          this.renderTickerStrip();
+        }
+
+        /**
+         * 渲染最新成交（最新的在最上面）。
+         *
+         * 数据来自**页面自己写的那条 `trade` topic**（`syncTradesFromFeed()` 每帧同步一次），
+         * 页面不再自己攒：接一条新的行情流 = 加一个 topic，其余机制（订阅 / 重连重放 /
+         * 按帧合并）全是白拿的。
+         */
+        renderTrades() {
+          const body = document.getElementById('trades');
+          if (!body) return;
+          const signature = this.trades.map((trade) => `${trade.price}:${trade.size}:${trade.at}`).join('|');
+          if (signature === this.tradesSig) return;
+          this.tradesSig = signature;
+          body.innerHTML = this.trades
+            .slice(-14)
+            .reverse()
+            .map(
+              (trade) =>
+                `<tr><td class="${trade.up ? 'up' : 'down'}">${TerminalPage.price(trade.price)}</td><td>${trade.size.toFixed(3)}</td><td>${trade.at}</td></tr>`
+            )
+            .join('');
+        }
+
+        /** 底部选项卡（持仓 / 当前委托 / 画线记录）。 */
+        bindBottomTabs() {
+          document.getElementById('bottom-tabs').addEventListener('click', (event) => {
+            const button = event.target.closest ? event.target.closest('[data-tab]') : null;
+            if (!button) return;
+            const name = button.getAttribute('data-tab');
+            for (const item of document.querySelectorAll('#bottom-tabs [data-tab]')) {
+              item.classList.toggle('on', item === button);
+            }
+            for (const pane of document.querySelectorAll('#bottom-body .pane')) {
+              pane.classList.toggle('on', pane.getAttribute('data-pane') === name);
+            }
+          });
+          for (const button of document.querySelectorAll('.account .acct-actions button')) {
+            button.addEventListener('click', () => this.setHint(`${button.textContent}：演示页未接入资金操作`));
+          }
+        }
+
+        /** 现价穿过限价单就成交（简化撮合）。 */
+        matchOrders() {
+          const pending = [];
+          for (const order of this.orders) {
+            const hit = order.side === 'long' ? this.price <= order.price : this.price >= order.price;
+            if (hit) this.applyFill(order.side, order.price, order.size, order.leverage);
+            else pending.push(order);
+          }
+          this.orders = pending;
+        }
+
+        applyFill(side, price, size, leverage) {
+          if (this.position && this.position.side !== side) {
+            const closeSize = Math.min(size, this.position.size);
+            const direction = this.position.side === 'long' ? 1 : -1;
+            const realized = (price - this.position.entry) * closeSize * direction;
+            this.position.size -= closeSize;
+            if (this.position.size <= 0.0001) this.position = null;
+            this.setHint(`平仓 ${closeSize.toFixed(3)}，实现盈亏 ${ICETradingChart.formatSigned(TerminalPage.round2(realized))}`);
+            this.publishPositions();
+            return;
+          }
+          if (!this.position) {
+            this.position = { side, size, entry: price, leverage };
+            this.publishPositions();
+            return;
+          }
+          const total = this.position.size + size;
+          this.position.entry = (this.position.entry * this.position.size + price * size) / total;
+          this.position.size = total;
+          this.position.leverage = leverage;
+          this.publishPositions();
+        }
+
+        placeOrder(side) {
+          const size = Number(document.getElementById('o-size').value);
+          const leverage = Number(document.getElementById('o-lev').value) || 1;
+          const reduceOnly = document.getElementById('o-ro').checked;
+          if (!isFinite(size) || size <= 0) return this.setHint('数量不合法');
+          if (reduceOnly && (!this.position || this.position.side === side)) {
+            return this.setHint('只减仓：当前没有可减的对手方向持仓');
+          }
+          if (this.orderType === 'market') {
+            this.applyFill(side, TerminalPage.round2(this.price), size, leverage);
+            this.setHint(`市价成交 ${size.toFixed(3)} @ ${TerminalPage.price(this.price)}`);
+          } else {
+            const price = Number(document.getElementById('o-price').value) || TerminalPage.round2(this.price);
+            this.orderSeq += 1;
+            const now = new Date();
+            this.orders = this.orders.concat([
+              {
+                id: `o${this.orderSeq}`,
+                side,
+                type: 'limit',
+                price: Number(price),
+                size,
+                leverage,
+                status: 'open',
+                time: `${TerminalPage.pad2(now.getHours())}:${TerminalPage.pad2(now.getMinutes())}:${TerminalPage.pad2(now.getSeconds())}`,
+              },
+            ]);
+            this.setHint(`限价挂单 ${size.toFixed(3)} @ ${TerminalPage.price(Number(price))}`);
+          }
+          this.paintAll();
+        }
+
+        cancelOrder(id) {
+          this.orders = this.orders.filter((order) => order.id !== id);
+          this.setHint(`已撤单 ${id}`);
+          this.paintAll();
+        }
+
+        onFrame(now) {
+          this.frames += 1;
+          if (now - this.fpsAt >= 500) {
+            document.getElementById('s-fps').textContent = String(Math.round((this.frames / (now - this.fpsAt)) * 1000));
+            document.getElementById('s-countdown').textContent = this.countdown();
+            document.getElementById('s-pushed').textContent = String(this.pushed);
+            const last = this.candles[this.candles.length - 1];
+            document.getElementById('s-next').textContent = this.displayLabel(this.keyOf(last.at + this.interval.ms));
+            this.renderFunding();
+            this.renderAccount();
+            this.frames = 0;
+            this.fpsAt = now;
+          }
+          this.renderReadout();
+          this.syncChrome();
+        }
+      }
+
+      const page = new TerminalPage();
+      const frame = (now) => {
+        page.onFrame(now);
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+      window.__page = page;
+    </script>
+  </body>
+</html>

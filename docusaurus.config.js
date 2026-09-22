@@ -144,6 +144,12 @@ const config = {
           },
           {
             type: 'doc',
+            docId: 'ice-trading-chart/index',
+            position: 'left',
+            label: `ice-trading-chart v${V.iceTradingChart}`,
+          },
+          {
+            type: 'doc',
             docId: 'ice-web-components/index',
             position: 'left',
             label: `ice-web-components v${V.iceWebComponents}`,

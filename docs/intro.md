@@ -17,8 +17,8 @@ keywords:
 
 :::tip 本文档站分三层
 - **引擎层（ice-render）** —— 本站核心，左侧「ice-render 引擎」分组：介绍 / 快速上手 / 指南 / 架构设计 / API 参考 / 二次开发。讲「渲染引擎本身怎么用、怎么实现」。
-- **应用层（家族产品）** —— 基于引擎内核封装的上层产品，左侧「家族产品 · 应用层」分组：Entity Designer（ER 建模）、ice-chart（图表）、ice-web-components（Canvas UI）、ice-smart-water（智慧水务）、ice-game（游戏厅）、ice-agent-console（AG-UI 控制台）。
-- **DSL 层** —— 让 AI Agent 只产出 JSON 就能驱动引擎 / 产品，左侧「2.7 DSL 层」分组：ice-render-dsl（引擎级）、ice-chart-dsl（图表）、ice-entity-designer-dsl（领域建模）。
+- **应用层（家族产品）** —— 基于引擎内核封装的上层产品，左侧「家族产品 · 应用层」分组：Entity Designer（ER 建模）、ice-chart（图表）、ice-trading-chart（K 线 / 交易）、ice-web-components（Canvas UI）、ice-smart-water（智慧水务）、ice-game（游戏厅）、ice-agent-console（AG-UI 控制台）。
+- **DSL 层** —— 让 AI Agent 只产出 JSON 就能驱动引擎 / 产品，左侧「2.8 DSL 层」分组：ice-render-dsl（引擎级）、ice-chart-dsl（图表）、ice-entity-designer-dsl（领域建模）。
 - 一句话：**引擎提供坐标系 / 事件 / 渲染 / 序列化等底座；DSL 层让 Agent 只写数据；产品在其上收敛出领域能力。** 想搞懂底层，看「ice-render 引擎」；想直接拿来用，看「家族产品」；想让 Agent 接入，看「DSL 层」与 [DSL 与 AI Agent 接入](/docs/guide/dsl)。
 :::
 
@@ -32,6 +32,7 @@ graph TD
   subgraph APP["应用层 · 家族产品"]
     A1["Entity Designer"]
     A2["ice-chart"]
+    A2b["ice-trading-chart"]
     A3["ice-web-components"]
     A4["ice-smart-water"]
     A5["ice-game"]
@@ -205,6 +206,7 @@ ice-render 是**引擎底座**；下表其余项目都是**基于它封装的应
 | 引擎 | [ice-render](https://www.npmjs.com/package/ice-render) | 核心引擎（本站文档，当前 **v4.3.0**） |
 | 引擎（DSL） | [ice-render-dsl](https://www.npmjs.com/package/ice-render-dsl) | **引擎级** JSON-first DSL 层，让 AI Agent 无需学习命令式 API 即可驱动引擎 |
 | 应用 | [ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) | 基于引擎的交互式图表库（折线 / 饼 / 雷达 / 桑基 / 关系图等），命中测试与交互全部由引擎承担 |
+| 应用 | [ice-trading-chart](https://www.npmjs.com/package/ice-trading-chart) | 构建在 **ice-chart** 之上的交易语义层（当前 **v0.3.1**）：K 线 / 影线命中 / 含影线的价格轴量程 / 成交量副图 / 盘口 / 画线 / 实时行情；列存与环形缓冲支撑十万根窗口的实时追加 |
 | 应用（DSL） | [ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl) | 图表 DSL：一张表 + `encoding` 编译成 `ChartOption`，带结构化诊断 |
 | 应用 | [ice-entity-designer](https://www.npmjs.com/package/ice-entity-designer) | 基于引擎的可视化建模工具集（当前 **v0.12.2**）：9 个域包（ER / 流程图 / BPMN / UML / 状态机 / 甘特 / 电力一次 / 电力二次 / 给水排水），随包附带 ice-render 内核 |
 | 应用（DSL） | [ice-entity-designer-dsl](https://www.npmjs.com/package/ice-entity-designer-dsl) | 领域 DSL：七种 `kind` 的 JSON 文档，供 Agent 生成并渲染为可继续编辑的设计器实例 |
