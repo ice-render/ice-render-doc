@@ -12,13 +12,13 @@ keywords:
 ---
 import LiveExample from '@site/src/components/LiveExample';
 
-# ice-trading-chart · 交易图表库（当前 v0.3.1）
+# ice-trading-chart · 交易图表库（当前 v0.4.6）
 
-:::info 🧩 应用层 · 基于 ice-chart v0.30.4 + ice-render 引擎 v4.3.0 封装（当前 v0.3.1）
+:::info 🧩 应用层 · 基于 ice-chart v0.30.12 + ice-render 引擎 v4.3.0 封装（当前 v0.4.6）
 本页属于 ice-render 家族的**应用层**产品，而且是家族里少见的「**同层再封装**」：`ice-trading-chart → ice-chart → ice-render` 是**单向**依赖，图表库不知道「交易」这件事存在。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
 :::
 
-**ice-trading-chart 是构建在 `ice-chart` 之上的交易语义层（当前 `ice-trading-chart` v0.3.1）。** 命中测试、事件派发、缩放平移、跨图联动、序列化全部沿用 `ice-chart` / `ice-render`；本包只加交易这一层：K 线（蜡烛 + 影线）的解析与命中、OHLC 提示框、**含影线**的价格轴量程、成交量副图、真副图栈与指标、盘口、画线工具、实时行情编排。
+**ice-trading-chart 是构建在 `ice-chart` 之上的交易语义层（当前 `ice-trading-chart` v0.4.6）。** 命中测试、事件派发、缩放平移、跨图联动、序列化全部沿用 `ice-chart` / `ice-render`；本包只加交易这一层：K 线（蜡烛 + 影线）的解析与命中、OHLC 提示框、**含影线**的价格轴量程、成交量副图、真副图栈与指标、盘口、画线工具、实时行情编排。
 
 它为什么值得单独一个包：**通用图表库不该认识盘口**。把「交易」的语义（四价、影线、量、档位、主题色、文案）收敛在这一层之后，`ice-chart` 里既没有「涨跌色」也没有「买卖十档」，而交易应用拿到的又是一个**标准的 `ICEChart` 实例** —— `chart.on(…)` / `chart.setData(…)` / `chart.toJSON()` 的用法与直接用 `ice-chart` 完全一致。
 
@@ -85,7 +85,32 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 | 端到端每 tick（含流水线） | **1.7ms** | 同量级 |
 | 堆 | **5.9MB** | 9.1MB |
 
-> **诚实标注地板在哪**：数据一变就要重跑归一化 + 布局（~1.6ms/次），与数据怎么存无关。要再往下压，得让上游支持增量归一化 / 布局 —— 这条已记录在 `ice-chart` 的施工图里，**未开工**。
+### 0.4.6：一帧里的多次追加合并成一次流水线（吃 `ice-chart` 0.30.11 的 `chart.batch()`）
+
+滚动看盘每 tick 要推 **K 线 + 量柱**两条系列。以前是两次 `appendData`，每条系列各跑一趟流水线，
+而且**中间态里两条系列天然不对齐**（第一条已经滑过去、第二条还没）——
+上游那套「类目表逐项相同就复用」的捷径在中间态里对不上。现在包进批里：
+
+```js
+chart.batch(() => {
+  chart.appendData('k', [row], { maxPoints: WINDOW });
+  chart.appendData('k__volume', [volumeRow], { maxPoints: WINDOW });
+});
+```
+
+批内只改数据 + 记账，出批跑**一次**流水线，而且它看到的是**两边都更新完**的一致状态。
+真机实测（1M 窗口 + 量柱 + 均线）：
+
+| 口径 | 改前 | 改后 |
+| --- | --- | --- |
+| 数据路径 `stat-tick` | 7.00ms | **2.60ms** |
+| 帧 `stat-frame` | 50.0ms | 50.0ms（**不变**） |
+
+> **诚实标注地板在哪**：一帧里的流水线已经压到 2.6ms，**帧却还是 50ms** —— 因为那一档的帧由
+> **canvas 光栅**主导（CDP 拆账：3 秒里脚本 1.5s、光栅 1.45s，样式与布局是 0）。
+> 数据不变时整页只剩 0.05s/3s，也就是说成本全在「数据更新触发的重绘」。
+> 上游已经把「增量归一化 / 类目域增量 / 点集复用 / 同帧批合并」都做了（`ice-chart` 0.30.5 → 0.30.12，
+> 见它的 `plans/incremental-pipeline.md`）；**再往下要么换引擎的重绘策略（滚动 blit），要么接受这个地板。**
 
 ## 快速开始
 

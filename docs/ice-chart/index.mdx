@@ -10,13 +10,13 @@ keywords:
 ---
 import LiveExample from '@site/src/components/LiveExample';
 
-# ice-chart · 交互式图表库（当前 v0.30.4）
+# ice-chart · 交互式图表库（当前 v0.30.12）
 
-:::info 🧩 应用层 · 基于 ice-render 引擎 v4.3.0 封装（当前 v0.30.4）
+:::info 🧩 应用层 · 基于 ice-render 引擎 v4.3.0 封装（当前 v0.30.12）
 本页属于 ice-render 家族的**应用层**产品：图表层只声明「数据 → 像素 → 语义事件」，命中测试与事件派发全部交给引擎内核。想了解底层引擎本身，请看左侧「ice-render 引擎」分组。
 :::
 
-**ice-chart 是构建在 ice-render 引擎之上的交互式图表库（当前 `@damoqiongqiu/ice-chart` v0.30.4）。** 它不是「把数据画成图」的又一个图表库——命中测试、事件派发、嵌套坐标系、脏矩形局部重绘**全部交给 ice-render 引擎**，图表层只负责把「数据 ↔ 像素 ↔ 语义事件」这三件事打通。
+**ice-chart 是构建在 ice-render 引擎之上的交互式图表库（当前 `@damoqiongqiu/ice-chart` v0.30.12）。** 它不是「把数据画成图」的又一个图表库——命中测试、事件派发、嵌套坐标系、脏矩形局部重绘**全部交给 ice-render 引擎**，图表层只负责把「数据 ↔ 像素 ↔ 语义事件」这三件事打通。
 
 于是**悬停高亮、点击下钻、框选缩放、缩放平移、图例联动、跨图联动、键盘导航都是内建能力**，而不是事后打补丁的插件——因为每一个系列组件都实现了 `containsLocalPoint`，把「画出来什么样」和「点得到哪里」统一在同一份像素缓存里。
 
@@ -56,6 +56,29 @@ MIT License · 作者：大漠穷秋（damoqiongqiu@126.com）
 - **`option.labels`：内置文案可覆盖（i18n 友好）**。图表内建 UI 文本（无障碍标题、扇区 / 数值 / 占比、坐标读数、液位等）由一份 `ChartLabels` 默认表提供，应用层通过 `option.labels` 整体覆盖即可换语言 / 换措辞，图表包本身不做 i18n 运行时——与引擎「引擎不做 i18n」的契约一致。
 - **类型注册已命名空间化到 `ice-chart:*`**。ICEChart 把内部图元（PlotArea / GridLines / Axis / Legend / Title / Tooltip / Crosshair / Highlight / Brush 等）注册为 `ice-chart:PlotArea` 这类 canonical typeId，与引擎的 `ice-render:*`、设计器的 `ice-entity-designer:*` 互不撞名，序列化 / 反序列化安全。
 - **标注 `option.annotation`（0.20.0）**：目标线 / 阈值线 / 异常点 / 目标区间都是**坐标系上的一个图层**——`{ lines: [{ axis: 'y', value: 150, text: '目标 150' }], points: [...], areas: [...] }`。值用数据值（数值轴写数字、类目轴写类目名），所以跟着缩放 / 平移走，不进图例、不占数据下标、不抢命中；越界不画，原因进 `chart.annotationDiagnostics()`。
+:::
+
+:::info 0.30.5 → 0.30.12 值得注意的点（性能这条线的收口）
+- **一次更新只跑一遍归一化**：视窗（缩放 / 平移 / 联动）只落在「域」上，不再为它重跑整条流水线。
+  表达式绘图与等比坐标例外（它们的采样 / 跨度由视窗决定，照旧整条重跑）。
+- **类目域改成增量维护**：滚动窗口的「删头 / 补尾」各 O(delta)，照惰性原始点那套**绝对序号**口径，
+  **逐项验过才认**、判不中就退回全量；多系列共用同一批 x 时复用同一张表。
+- **`chart.batch(fn)`：同帧批合并** —— 一帧里对多个系列的更新合成**一次**流水线。
+  ```ts
+  chart.batch(() => {
+    chart.setData('k', candles);
+    chart.setData('volume', volumes);
+  });
+  ```
+  语义：出批时图表已是新状态（同步）；批内不发布 `data:change`、出批后按调用顺序补发；
+  批内抛异常也 flush。
+- **只换视窗不重建点集**：平移 / 缩放不再重建 10 万个 `DataPoint`（按数据数组身份 + 长度 + 解析规则复用）。
+- 实测（10 万点普通折线，真机 Chromium）：`setData` **6.2 → 3.6ms**、真滑窗 **10.5 → 4.2ms/tick**、
+  多系列逐系列 `setData` **45.4 → 10.4ms/tick**、只换视窗 **3.4 → 1.0ms/tick**。
+- 顺带修掉一条真 bug：类目域的缓存键原来只按「点数 + 首末 x」记，
+  **中间被换掉会命中过期的域**（类目轴上凭空少 / 多一个类目），现在按数据数组身份记。
+
+机制与边界见仓库里的架构文档：[`docs/README.md`](https://github.com/ice-render/ice-chart/blob/main/docs/README.md)（10 篇，带目录与编号）。
 :::
 
 ## 快速开始
@@ -214,7 +237,7 @@ if (diagnostics.length === 0) {
   background="#f8fafc"
 />
 
-## 示例画廊（全部可实时把玩，仓库共 29 个）
+## 示例画廊（全部可实时把玩，仓库共 32 个）
 
 下面这些不是截图，是文档内实时跑起来的 ice-chart 运行时——覆盖主流图表类型，外加两个「引擎卖点」演示（大数据局部重绘、跨图联动）。拖一拖、框选一下、悬停看十字准星：
 
@@ -254,6 +277,14 @@ if (diagnostics.length === 0) {
 
 <LiveExample html="/ice-chart/large-data.html" height={460} note="脏矩形局部重绘，十万点滚动不卡" />
 
+### 百万级：虚拟（列存）系列
+
+<LiveExample html="/ice-chart/large-data-virtual-series.html" height={520} note="100 万点散点 / 折线（列存 + 环形缓冲）、100 万格热力矩阵、以及把同一份列交给引擎虚拟层" />
+
+### 十万级：虚拟化前后对照
+
+<LiveExample html="/ice-chart/large-data-virtual.html" height={520} note="同一份数据的三种存法（普通 / 列存 / 惰性原始点）在构建、堆、命中和滚动上的实测对照" />
+
 ### 跨图联动
 
 <LiveExample html="/ice-chart/linked-charts.html" height={500} note="同一引擎实例池下多图共享事件语义，框选一张联动其余" />
@@ -261,6 +292,7 @@ if (diagnostics.length === 0) {
 ## 相关链接
 
 - GitHub：[ice-chart](https://github.com/ice-render/ice-chart)
+- 架构与机制文档（仓库内，10 篇带目录与编号）：[docs/README.md](https://github.com/ice-render/ice-chart/blob/main/docs/README.md)
 - npm：[@damoqiongqiu/ice-chart](https://www.npmjs.com/package/@damoqiongqiu/ice-chart) · [@damoqiongqiu/ice-chart-dsl](https://www.npmjs.com/package/@damoqiongqiu/ice-chart-dsl)
 - 通用 DSL 与 AI Agent 接入：[DSL 与 AI Agent 接入](/docs/guide/dsl)
 - 引擎内核文档：[ICE Render 介绍](/docs/intro)
