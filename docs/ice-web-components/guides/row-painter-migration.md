@@ -125,6 +125,7 @@ renderItem: ({ ctx, index, item, x, y, width, height }) => {
 **给后续 `ICETable` / `ICETree` 的模板**：数据+几何留在组件里 → painter 画窗口内的行
 → 命中改几何反查 → 只改数据置脏（不建/拆节点）。
 
+
 ---
 
 ## 最终结论（2026-09-15，逐组件核实后）
